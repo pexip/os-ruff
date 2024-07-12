@@ -101,7 +101,9 @@ pub(crate) fn blanket_noqa(
             let mut cursor = Cursor::new(&line[noqa_end.to_usize()..]);
             cursor.eat_while(char::is_whitespace);
 
-            if noqa::lex_codes(cursor.chars().as_str()).is_ok_and(|codes| !codes.is_empty()) {
+            if noqa::lex_codes_and_names(cursor.chars().as_str())
+                .is_ok_and(|codes| !codes.is_empty())
+            {
                 // Check for a missing colon.
                 // Ex) `# noqa F401`
                 let start = all.end();

@@ -1035,6 +1035,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "102") => (RuleGroup::Preview, rules::ruff::rules::InvalidRuleCode),
 
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
+        (Ruff, "851") => (RuleGroup::Preview, rules::ruff::rules::NOQAByCode),
+        (Ruff, "852") => (RuleGroup::Preview, rules::ruff::rules::NOQAByName),
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => (RuleGroup::Stable, rules::ruff::rules::StableTestRule),
         #[cfg(any(feature = "test-rules", test))]

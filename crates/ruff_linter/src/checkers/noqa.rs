@@ -9,11 +9,8 @@ use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::fix::edits::delete_comment;
-use crate::noqa::{
-    Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
-};
+use crate::noqa::{Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping};
 use crate::registry::Rule;
-use crate::rule_redirects::get_redirect_target;
 use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
@@ -138,33 +135,36 @@ pub(crate) fn check_noqa(
                     let mut valid_codes = vec![];
                     let mut seen_codes = FxHashSet::default();
                     let mut self_ignore = false;
-                    for original_code in directive.iter().map(Code::as_str) {
-                        let code = get_redirect_target(original_code).unwrap_or(original_code);
-                        if Rule::UnusedNOQA.noqa_code() == code {
+                    for rule_ident in directive.iter() {
+                        if let Ok(Rule::UnusedNOQA) = rule_ident.identifier().rule() {
                             self_ignore = true;
                             break;
                         }
 
+                        let original_code = rule_ident.as_str();
                         if seen_codes.insert(original_code) {
-                            let is_code_used = if is_file_level {
-                                context
-                                    .iter()
-                                    .any(|diag| diag.noqa_code().is_some_and(|noqa| noqa == code))
-                            } else {
-                                matches.iter().any(|match_| *match_ == code)
-                            } || settings
+                            let is_external = settings
                                 .external
                                 .iter()
-                                .any(|external| code.starts_with(external));
+                                .any(|external| original_code.starts_with(external));
 
-                            if is_code_used {
-                                valid_codes.push(original_code);
-                            } else if let Ok(rule) = Rule::from_code(code) {
-                                if context.is_rule_enabled(rule) {
+                            if let Ok(rule) = rule_ident.identifier().rule() {
+                                let is_code_used = if is_file_level {
+                                    context
+                                        .iter()
+                                        .any(|diag| diag.rule.is_some_and(|noqa| noqa == rule))
+                                } else {
+                                    matches.iter().any(|match_| *match_ == rule.noqa_code())
+                                };
+                                if is_code_used {
+                                    valid_codes.push(original_code);
+                                } else if context.is_rule_enabled(rule) {
                                     unmatched_codes.push(original_code);
                                 } else {
                                     disabled_codes.push(original_code);
                                 }
+                            } else if is_external {
+                                valid_codes.push(original_code);
                             } else {
                                 unknown_codes.push(original_code);
                             }
@@ -248,6 +248,14 @@ pub(crate) fn check_noqa(
         && !exemption.enumerates(Rule::InvalidRuleCode)
     {
         ruff::rules::invalid_noqa_code(context, &noqa_directives, locator, &settings.external);
+    }
+
+    if settings.rules.enabled(Rule::NOQAByCode) {
+        ruff::rules::noqa_by_code(context, &noqa_directives);
+    }
+
+    if settings.rules.enabled(Rule::NOQAByName) {
+        ruff::rules::noqa_by_name(context, &noqa_directives);
     }
 
     ignored_diagnostics.sort_unstable();

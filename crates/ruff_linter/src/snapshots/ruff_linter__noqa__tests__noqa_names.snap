@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/noqa.rs
+expression: directive
+---
+Ok(
+    Some(
+        NoqaLexerOutput {
+            warnings: [],
+            directive: Codes(
+                Codes {
+                    range: 0..38,
+                    codes: [
+                        RuleIdent {
+                            identifier: Name(
+                                "unused-import",
+                            ),
+                            range: 8..21,
+                        },
+                        RuleIdent {
+                            identifier: Name(
+                                "unused-variable",
+                            ),
+                            range: 23..38,
+                        },
+                    ],
+                },
+            ),
+        },
+    ),
+)

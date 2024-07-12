@@ -19,7 +19,7 @@ use crate::Locator;
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
 use crate::message::OldDiagnostic;
-use crate::registry::Rule;
+use crate::registry::{FromCodeOrNameError, Rule};
 use crate::rule_redirects::get_redirect_target;
 
 /// Generates an array of edits that matches the length of `messages`.
@@ -67,25 +67,32 @@ impl Ranged for All {
 
 /// An individual rule code in a `noqa` directive (e.g., `F401`).
 #[derive(Debug)]
-pub(crate) struct Code<'a> {
-    code: &'a str,
+pub(crate) struct RuleIdent<'a> {
+    identifier: NoqaIdentifier<'a>,
     range: TextRange,
 }
 
-impl<'a> Code<'a> {
-    /// The code that is ignored by the `noqa` directive.
+impl<'a> RuleIdent<'a> {
+    /// The identifier used for the rule that is ignored by the `noqa` directive.
     pub(crate) fn as_str(&self) -> &'a str {
-        self.code
+        match self.identifier {
+            NoqaIdentifier::Code(code) => code,
+            NoqaIdentifier::Name(name) => name,
+        }
+    }
+
+    pub(crate) fn identifier(&self) -> NoqaIdentifier<'a> {
+        self.identifier
     }
 }
 
-impl Display for Code<'_> {
+impl Display for RuleIdent<'_> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt.write_str(self.code)
+        fmt.write_str(self.as_str())
     }
 }
 
-impl Ranged for Code<'_> {
+impl Ranged for RuleIdent<'_> {
     /// The range of the rule code.
     fn range(&self) -> TextRange {
         self.range
@@ -95,20 +102,24 @@ impl Ranged for Code<'_> {
 #[derive(Debug)]
 pub(crate) struct Codes<'a> {
     range: TextRange,
-    codes: Vec<Code<'a>>,
+    codes: Vec<RuleIdent<'a>>,
 }
 
 impl Codes<'_> {
     /// Returns an iterator over the [`Code`]s in the `noqa` directive.
-    pub(crate) fn iter(&self) -> std::slice::Iter<Code> {
+    pub(crate) fn iter(&self) -> std::slice::Iter<RuleIdent> {
         self.codes.iter()
     }
 
     /// Returns `true` if the string list of `codes` includes `code` (or an alias
     /// thereof).
     pub(crate) fn includes(&self, needle: NoqaCode) -> bool {
-        self.iter()
-            .any(|code| needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
+        self.iter().any(|rule_ident| {
+            rule_ident
+                .identifier
+                .rule()
+                .is_ok_and(|rule| rule.noqa_code() == needle)
+        })
     }
 }
 
@@ -261,22 +272,36 @@ impl<'a> FileNoqaDirectives<'a> {
                             vec![]
                         }
                         Directive::Codes(codes) => {
-                            codes.iter().filter_map(|code| {
-                                let code = code.as_str();
-                                // Ignore externally-defined rules.
-                                if external.iter().any(|external| code.starts_with(external)) {
-                                    return None;
-                                }
+                            codes.iter().filter_map(|identifier| {
+                                match identifier.identifier {
+                                    NoqaIdentifier::Code(code) => {
+                                        // Ignore externally-defined rules.
+                                        if external.iter().any(|external| code.starts_with(external)) {
+                                            return None;
+                                        }
 
-                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
-                                {
-                                    Some(rule.noqa_code())
-                                } else {
-                                    #[expect(deprecated)]
-                                    let line = locator.compute_line_index(range.start());
-                                    let path_display = relativize_path(path);
-                                    warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
-                                    None
+                                        if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
+                                        {
+                                            Some(rule.noqa_code())
+                                        } else {
+                                            #[expect(deprecated)]
+                                            let line = locator.compute_line_index(range.start());
+                                            let path_display = relativize_path(path);
+                                            warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
+                                            None
+                                        }
+                                    },
+                                    NoqaIdentifier::Name(name) => {
+                                        if let Ok(rule) = Rule::from_name(name) {
+                                            Some(rule.noqa_code())
+                                        } else {
+                                            #[allow(deprecated)]
+                                            let line = locator.compute_line_index(range.start());
+                                            let path_display = relativize_path(path);
+                                            warn!("Invalid rule name provided to `# ruff: noqa` at {path_display}:{line}: {name}");
+                                            None
+                                        }
+                                    }
                                 }
                             }).collect()
                         }
@@ -330,7 +355,7 @@ fn lex_file_exemption(
     lexer.lex_file_exemption()
 }
 
-pub(crate) fn lex_codes(text: &str) -> Result<Vec<Code<'_>>, LexicalError> {
+pub(crate) fn lex_codes_and_names(text: &str) -> Result<Vec<RuleIdent<'_>>, LexicalError> {
     let mut lexer = NoqaLexer::in_range(TextRange::new(TextSize::new(0), text.text_len()), text);
     lexer.lex_codes()?;
     Ok(lexer.codes)
@@ -358,8 +383,10 @@ struct NoqaLexer<'a> {
     /// Tracks whether we are lexing in a context with a missing delimiter
     /// e.g. at `C` in `F401C402`.
     missing_delimiter: bool,
+    /// Tracks whether the space between codes contained a comma
+    space_contains_comma: bool,
     /// Rule codes collected during lexing
-    codes: Vec<Code<'a>>,
+    codes: Vec<RuleIdent<'a>>,
 }
 
 impl<'a> NoqaLexer<'a> {
@@ -371,6 +398,7 @@ impl<'a> NoqaLexer<'a> {
             cursor: Cursor::new(&source[range]),
             warnings: Vec::new(),
             missing_delimiter: false,
+            space_contains_comma: true,
             codes: Vec::new(),
         }
     }
@@ -533,6 +561,7 @@ impl<'a> NoqaLexer<'a> {
                 self.token_range().add(self.offset),
             ));
             self.cursor.eat_char(',');
+            self.space_contains_comma = true;
             return Ok(());
         }
 
@@ -543,6 +572,7 @@ impl<'a> NoqaLexer<'a> {
             // Ex) # noqa: F401
             //             ^
             Some(c) if c.is_ascii_uppercase() => {
+                self.space_contains_comma = false;
                 self.cursor.eat_while(|chr| chr.is_ascii_uppercase());
                 if !self.cursor.eat_if(|c| c.is_ascii_digit()) {
                     // Fail hard if we're already attempting
@@ -569,6 +599,7 @@ impl<'a> NoqaLexer<'a> {
 
                 self.missing_delimiter = match self.cursor.first() {
                     ',' => {
+                        self.space_contains_comma = true;
                         self.cursor.eat_char(',');
                         false
                     }
@@ -595,6 +626,36 @@ impl<'a> NoqaLexer<'a> {
                     _ => return Err(LexicalError::InvalidCodeSuffix),
                 };
             }
+            // Ex) # noqa: unused-import
+            //
+            Some(c) if c.is_ascii_lowercase() && self.space_contains_comma => {
+                self.space_contains_comma = false;
+                self.cursor
+                    .eat_while(|chr| chr.is_ascii_lowercase() || chr.is_ascii_digit() || chr == '-');
+                let name = &before_code[..self.cursor.token_len().to_usize()];
+                self.push_name(name);
+
+                if self.cursor.is_eof() {
+                    return Ok(());
+                }
+
+                self.missing_delimiter = match self.cursor.first() {
+                    ',' => {
+                        self.space_contains_comma = true;
+                        self.cursor.eat_char(',');
+                        false
+                    }
+
+                    // Whitespace is an allowed delimiter or the end of the `noqa`.
+                    c if c.is_whitespace() => false,
+
+                    // Start of a new comment
+                    // e.g. #noqa: unused-import#A comment
+                    //                 ^
+                    '#' => false,
+                    _ => return Err(LexicalError::InvalidCodeSuffix),
+                };
+            }
             Some(_) => {
                 // The first time we hit an evidently invalid code,
                 // it's probably a trailing comment. So stop lexing,
@@ -611,8 +672,16 @@ impl<'a> NoqaLexer<'a> {
 
     /// Push current token to stack of [`Code`] objects
     fn push_code(&mut self, code: &'a str) {
-        self.codes.push(Code {
-            code,
+        self.codes.push(RuleIdent {
+            identifier: NoqaIdentifier::Code(code),
+            range: self.token_range().add(self.offset),
+        });
+    }
+
+    /// Push current token to stack of [`Code`] objects
+    fn push_name(&mut self, name: &'a str) {
+        self.codes.push(RuleIdent {
+            identifier: NoqaIdentifier::Name(name),
             range: self.token_range().add(self.offset),
         });
     }
@@ -671,6 +740,30 @@ impl Ranged for LexicalWarning {
         match *self {
             LexicalWarning::MissingItem(text_range) => text_range,
             LexicalWarning::MissingDelimiter(text_range) => text_range,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum NoqaIdentifier<'a> {
+    Code(&'a str),
+    Name(&'a str),
+}
+
+impl<'a> NoqaIdentifier<'a> {
+    pub(crate) fn as_str(&self) -> &'a str {
+        match self {
+            NoqaIdentifier::Code(code) => code,
+            NoqaIdentifier::Name(name) => name,
+        }
+    }
+
+    pub(crate) fn rule(&self) -> Result<Rule, FromCodeOrNameError> {
+        match self {
+            NoqaIdentifier::Code(code) => {
+                Rule::from_code(get_redirect_target(code).unwrap_or(code))
+            }
+            NoqaIdentifier::Name(name) => Rule::from_name(name),
         }
     }
 }
@@ -1063,17 +1156,11 @@ impl<'a> NoqaDirectives<'a> {
                     }
                     if let Directive::Codes(codes) = &directive {
                         // Warn on invalid rule codes.
-                        for code in &codes.codes {
+                        for rule_ident in &codes.codes {
+                            let code = rule_ident.identifier.as_str();
                             // Ignore externally-defined rules.
-                            if !external
-                                .iter()
-                                .any(|external| code.as_str().starts_with(external))
-                            {
-                                if Rule::from_code(
-                                    get_redirect_target(code.as_str()).unwrap_or(code.as_str()),
-                                )
-                                .is_err()
-                                {
+                            if !external.iter().any(|external| code.starts_with(external)) {
+                                if rule_ident.identifier.rule().is_err() {
                                     #[expect(deprecated)]
                                     let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
@@ -1222,7 +1309,7 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::noqa::{
-        Directive, LexicalError, NoqaLexerOutput, NoqaMapping, add_noqa_inner, lex_codes,
+        Directive, LexicalError, NoqaLexerOutput, NoqaMapping, add_noqa_inner, lex_codes_and_names,
         lex_file_exemption, lex_inline_noqa,
     };
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
@@ -1241,7 +1328,7 @@ mod tests {
         })) = directive
         {
             for code in codes.iter() {
-                assert_eq!(&source[code.range], code.code);
+                assert_eq!(&source[code.range], code.as_str());
             }
         }
     }
@@ -1249,7 +1336,7 @@ mod tests {
     #[test]
     fn noqa_lex_codes() {
         let source = " F401,,F402F403 # and so on";
-        assert_debug_snapshot!(lex_codes(source), @r#"
+        assert_debug_snapshot!(lex_codes_and_names(source), @r#"
         Ok(
             [
                 Code {
@@ -1405,6 +1492,13 @@ mod tests {
     }
 
     #[test]
+    fn noqa_name() {
+        let source = "# noqa: unused-import";
+        let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+    }
+
+    #[test]
     fn noqa_codes() {
         let source = "# noqa: F401, F841";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
@@ -1433,6 +1527,20 @@ mod tests {
         )
         "#);
         assert_lexed_ranges_match_slices(directive, source);
+    }
+
+    #[test]
+    fn noqa_names() {
+        let source = "# noqa: unused-import, unused-variable";
+        let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+    }
+
+    #[test]
+    fn noqa_mixed() {
+        let source = "# noqa: F401, unused-variable";
+        let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
     }
 
     #[test]
@@ -1940,7 +2048,7 @@ mod tests {
 
     #[test]
     fn noqa_invalid_codes() {
-        let source = "# noqa: unused-import, F401, some other code";
+        let source = "# noqa: unused_import, F401, some other code";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive, @r"
         Err(
@@ -2764,6 +2872,13 @@ mod tests {
         )
         "#);
         assert_lexed_ranges_match_slices(exemption, source);
+    }
+
+    #[test]
+    fn ruff_exemption_names() {
+        let source = "# ruff: noqa: unused-import, unused-variable";
+        let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
     }
 
     #[test]

@@ -151,8 +151,13 @@ impl Display for RuleCodeAndBody<'_> {
             if let Some(fix) = self.message.fix() {
                 // Do not display an indicator for inapplicable fixes
                 if fix.applies(self.unsafe_fixes.required_applicability()) {
-                    if let Some(code) = self.message.noqa_code() {
-                        write!(f, "{} ", code.to_string().red().bold())?;
+                    if let Some(rule) = self.message.rule {
+                        write!(
+                            f,
+                            "{code} ({rule_name}) ",
+                            code = rule.noqa_code().to_string().red().bold(),
+                            rule_name = rule.name().to_string().red().bold(),
+                        )?;
                     }
                     return write!(
                         f,
@@ -164,11 +169,12 @@ impl Display for RuleCodeAndBody<'_> {
             }
         }
 
-        if let Some(code) = self.message.noqa_code() {
+        if let Some(rule) = self.message.rule {
             write!(
                 f,
-                "{code} {body}",
-                code = code.to_string().red().bold(),
+                "{code} ({rule_name}) {body}",
+                code = rule.noqa_code().to_string().red().bold(),
+                rule_name = rule.name().to_string().red().bold(),
                 body = self.message.body(),
             )
         } else {
@@ -252,10 +258,13 @@ impl Display for MessageCodeFrame<'_> {
         )
         .fix_up_empty_spans_after_line_terminator();
 
-        let label = self
-            .message
-            .noqa_code()
-            .map_or_else(String::new, |code| code.to_string());
+        let label = self.message.rule.map_or_else(String::new, |rule| {
+            format!(
+                "{code} ({rule_name})",
+                code = rule.noqa_code(),
+                rule_name = rule.name(),
+            )
+        });
 
         let line_start = self.notebook_index.map_or_else(
             || start_index.get(),

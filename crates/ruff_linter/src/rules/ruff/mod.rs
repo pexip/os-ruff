@@ -114,6 +114,8 @@ mod tests {
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
+    #[test_case(Rule::NOQAByCode, Path::new("RUF851.py"))]
+    #[test_case(Rule::NOQAByName, Path::new("RUF852.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -265,6 +267,32 @@ mod tests {
     fn noqa() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/noqa.py"),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedVariable,
+                Rule::AmbiguousVariableName,
+            ]),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn noqa_names() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/noqa_names.py"),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedVariable,
+                Rule::AmbiguousVariableName,
+            ]),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn noqa_mixed() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/noqa_mixed.py"),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
                 Rule::AmbiguousVariableName,
@@ -481,6 +509,16 @@ mod tests {
     fn ruff_noqa_codes() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_noqa_codes.py"),
+            &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruff_noqa_names() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/ruff_noqa_names.py"),
             &settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_diagnostics!(diagnostics);

@@ -32,9 +32,11 @@ impl Emitter for GithubEmitter {
             write!(
                 writer,
                 "::error title=Ruff{code},file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
-                code = diagnostic
-                    .noqa_code()
-                    .map_or_else(String::new, |code| format!(" ({code})")),
+                code = diagnostic.rule.map_or_else(String::new, |rule| format!(
+                    " ({code} {rule_name})",
+                    code = rule.noqa_code(),
+                    rule_name = rule.name()
+                )),
                 file = diagnostic.filename(),
                 row = source_location.line,
                 column = source_location.column,
@@ -50,8 +52,13 @@ impl Emitter for GithubEmitter {
                 column = location.column,
             )?;
 
-            if let Some(code) = diagnostic.noqa_code() {
-                write!(writer, " {code}")?;
+            if let Some(rule) = diagnostic.rule {
+                write!(
+                    writer,
+                    " {code} ({rule_name})",
+                    code = rule.noqa_code(),
+                    rule_name = rule.name()
+                )?;
             }
 
             writeln!(writer, " {}", diagnostic.body())?;
