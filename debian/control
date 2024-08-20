@@ -1,0 +1,15 @@
+Source: ruff
+Section: devel
+Priority: optional
+Maintainer: Pexip AS <packaging@pexip.com>
+Standards-Version: 4.3.0
+Build-Depends: debhelper-compat (= 13), cargo
+Vcs-Browser: https://github.com/pexip/os-ruff/
+Vcs-Git: https://github.com/pexip/os-ruff.git
+
+Package: ruff
+Architecture: any
+Depends: ${misc:Depends},
+ ${shlib:Depends},
+Description: Python formatting and linting tool
+ An extremely fast Python linter and code formatter, written in Rust.

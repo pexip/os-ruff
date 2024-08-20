@@ -1,0 +1,5 @@
+ruff (0.6.1+pexip24u1) pexip; urgency=medium
+
+  * New versioning scheme
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Tue, 20 Aug 2024 14:14:55 +0000
