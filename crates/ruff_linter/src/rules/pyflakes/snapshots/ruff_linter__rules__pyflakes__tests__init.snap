@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-__init__.py:1:8: F401 `os` imported but unused
+__init__.py:1:8: F401 (unused-import) `os` imported but unused
   |
 1 | import os
-  |        ^^ F401
+  |        ^^ F401 (unused-import)
 2 |
 3 | print(__path__)
   |

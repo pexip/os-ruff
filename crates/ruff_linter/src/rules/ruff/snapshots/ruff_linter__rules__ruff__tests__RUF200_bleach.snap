@@ -1,8 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
-pyproject.toml:5:16: RUF200 Failed to parse pyproject.toml: after parsing `1.1.0`, found `<1.2`, which is not part of a valid version
+pyproject.toml:5:16: RUF200 (invalid-pyproject-toml) Failed to parse pyproject.toml: after parsing `1.1.0`, found `<1.2`, which is not part of a valid version
 tinycss2>=1.1.0<1.2
         ^^^^^^^^^^^
   |
@@ -12,5 +11,5 @@ tinycss2>=1.1.0<1.2
   |  ________________^
 6 | |   "tinycss2>=1.1.0<1.2",
 7 | | ]
-  | |_^ RUF200
+  | |_^ RUF200 (invalid-pyproject-toml)
   |

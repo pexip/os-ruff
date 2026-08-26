@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI055.pyi:4:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
+PYI055.pyi:4:4: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
   |
 2 | from typing import Union
 3 |
 4 | s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
-  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 5 | t: type[int] | type[str] | type[float]
 6 | u: builtins.type[int] | type[str] | builtins.type[complex]
   |
@@ -22,11 +22,11 @@ PYI055.pyi:4:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 6 6 | u: builtins.type[int] | type[str] | builtins.type[complex]
 7 7 | v: Union[type[float], type[complex]]
 
-PYI055.pyi:5:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | float]`.
+PYI055.pyi:5:4: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | float]`.
   |
 4 | s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
 5 | t: type[int] | type[str] | type[float]
-  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 6 | u: builtins.type[int] | type[str] | builtins.type[complex]
 7 | v: Union[type[float], type[complex]]
   |
@@ -42,12 +42,12 @@ PYI055.pyi:5:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 7 7 | v: Union[type[float], type[complex]]
 8 8 | w: Union[type[Union[float, int]], type[complex]]
 
-PYI055.pyi:6:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
+PYI055.pyi:6:4: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
   |
 4 | s: builtins.type[int] | builtins.type[str] | builtins.type[complex]
 5 | t: type[int] | type[str] | type[float]
 6 | u: builtins.type[int] | type[str] | builtins.type[complex]
-  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 7 | v: Union[type[float], type[complex]]
 8 | w: Union[type[Union[float, int]], type[complex]]
   |
@@ -63,12 +63,12 @@ PYI055.pyi:6:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 8 8 | w: Union[type[Union[float, int]], type[complex]]
 9 9 | x: Union[Union[type[Union[float, int]], type[complex]]]
 
-PYI055.pyi:7:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, complex]]`.
+PYI055.pyi:7:4: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, complex]]`.
   |
 5 | t: type[int] | type[str] | type[float]
 6 | u: builtins.type[int] | type[str] | builtins.type[complex]
 7 | v: Union[type[float], type[complex]]
-  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 8 | w: Union[type[Union[float, int]], type[complex]]
 9 | x: Union[Union[type[Union[float, int]], type[complex]]]
   |
@@ -84,12 +84,12 @@ PYI055.pyi:7:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 9 9 | x: Union[Union[type[Union[float, int]], type[complex]]]
 10 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
 
-PYI055.pyi:8:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
+PYI055.pyi:8:4: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
    |
  6 | u: builtins.type[int] | type[str] | builtins.type[complex]
  7 | v: Union[type[float], type[complex]]
  8 | w: Union[type[Union[float, int]], type[complex]]
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
  9 | x: Union[Union[type[Union[float, int]], type[complex]]]
 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
    |
@@ -105,12 +105,12 @@ PYI055.pyi:8:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 10 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
 11 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
 
-PYI055.pyi:9:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
+PYI055.pyi:9:4: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
    |
  7 | v: Union[type[float], type[complex]]
  8 | w: Union[type[Union[float, int]], type[complex]]
  9 | x: Union[Union[type[Union[float, int]], type[complex]]]
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
    |
@@ -126,12 +126,12 @@ PYI055.pyi:9:4: PYI055 [*] Multiple `type` members in a union. Combine them into
 11 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
 12 12 | 
 
-PYI055.pyi:10:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
+PYI055.pyi:10:4: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
    |
  8 | w: Union[type[Union[float, int]], type[complex]]
  9 | x: Union[Union[type[Union[float, int]], type[complex]]]
 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
    |
    = help: Combine multiple `type` members
@@ -146,12 +146,12 @@ PYI055.pyi:10:4: PYI055 [*] Multiple `type` members in a union. Combine them int
 12 12 | 
 13 13 | def func(arg: type[int] | str | type[float]) -> None: ...
 
-PYI055.pyi:11:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[complex, Union[float, int]]]`.
+PYI055.pyi:11:4: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[complex, Union[float, int]]]`.
    |
  9 | x: Union[Union[type[Union[float, int]], type[complex]]]
 10 | y: Union[Union[Union[type[Union[float, int]], type[complex]]]]
 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 12 |
 13 | def func(arg: type[int] | str | type[float]) -> None: ...
    |
@@ -167,12 +167,12 @@ PYI055.pyi:11:4: PYI055 [*] Multiple `type` members in a union. Combine them int
 13 13 | def func(arg: type[int] | str | type[float]) -> None: ...
 14 14 | 
 
-PYI055.pyi:13:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | float]`.
+PYI055.pyi:13:15: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | float]`.
    |
 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
 12 |
 13 | def func(arg: type[int] | str | type[float]) -> None: ...
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 14 |
 15 | # OK
    |
@@ -188,11 +188,11 @@ PYI055.pyi:13:15: PYI055 [*] Multiple `type` members in a union. Combine them in
 15 15 | # OK
 16 16 | x: type[int | str | float]
 
-PYI055.pyi:23:7: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty]`.
+PYI055.pyi:23:7: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty]`.
    |
 22 | # PYI055
 23 | item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 24 |
 25 | def func():
    |
@@ -208,12 +208,12 @@ PYI055.pyi:23:7: PYI055 [*] Multiple `type` members in a union. Combine them int
 25 25 | def func():
 26 26 |     # PYI055
 
-PYI055.pyi:27:11: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty | str]`.
+PYI055.pyi:27:11: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty | str]`.
    |
 25 | def func():
 26 |     # PYI055
 27 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
-   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 28 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
 29 |     item3: Union[  # comment
    |
@@ -229,12 +229,12 @@ PYI055.pyi:27:11: PYI055 [*] Multiple `type` members in a union. Combine them in
 29 29 |     item3: Union[  # comment
 30 30 |         type[requests_mock.Mocker], # another comment
 
-PYI055.pyi:28:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
+PYI055.pyi:28:12: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
    |
 26 |     # PYI055
 27 |     item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
 28 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055 (unnecessary-type-union)
 29 |     item3: Union[  # comment
 30 |         type[requests_mock.Mocker], # another comment
    |
@@ -250,7 +250,7 @@ PYI055.pyi:28:12: PYI055 [*] Multiple `type` members in a union. Combine them in
 30 30 |         type[requests_mock.Mocker], # another comment
 31 31 |         type[httpretty], type[str]] = requests_mock.Mocker
 
-PYI055.pyi:29:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
+PYI055.pyi:29:12: PYI055 (unnecessary-type-union) [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
    |
 27 |       item: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
 28 |       item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
@@ -258,7 +258,7 @@ PYI055.pyi:29:12: PYI055 [*] Multiple `type` members in a union. Combine them in
    |  ____________^
 30 | |         type[requests_mock.Mocker], # another comment
 31 | |         type[httpretty], type[str]] = requests_mock.Mocker
-   | |___________________________________^ PYI055
+   | |___________________________________^ PYI055 (unnecessary-type-union)
    |
    = help: Combine multiple `type` members
 

@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_druid.py:12:1: AIR302 [*] `airflow.hooks.druid_hook.DruidDbApiHook` is moved into `apache-druid` provider in Airflow 3.0;
+AIR302_druid.py:12:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.hooks.druid_hook.DruidDbApiHook` is moved into `apache-druid` provider in Airflow 3.0;
    |
 10 | )
 11 |
 12 | DruidDbApiHook()
-   | ^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 13 | DruidHook()
    |
    = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidDbApiHook` from `airflow.providers.apache.druid.hooks.druid` instead.
@@ -27,11 +27,11 @@ AIR302_druid.py:12:1: AIR302 [*] `airflow.hooks.druid_hook.DruidDbApiHook` is mo
 12 12 | DruidDbApiHook()
 13 13 | DruidHook()
 
-AIR302_druid.py:13:1: AIR302 [*] `airflow.hooks.druid_hook.DruidHook` is moved into `apache-druid` provider in Airflow 3.0;
+AIR302_druid.py:13:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.hooks.druid_hook.DruidHook` is moved into `apache-druid` provider in Airflow 3.0;
    |
 12 | DruidDbApiHook()
 13 | DruidHook()
-   | ^^^^^^^^^ AIR302
+   | ^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 14 |
 15 | HiveToDruidOperator()
    |
@@ -52,12 +52,12 @@ AIR302_druid.py:13:1: AIR302 [*] `airflow.hooks.druid_hook.DruidHook` is moved i
 12 12 | DruidDbApiHook()
 13 13 | DruidHook()
 
-AIR302_druid.py:15:1: AIR302 [*] `airflow.operators.hive_to_druid.HiveToDruidOperator` is moved into `apache-druid` provider in Airflow 3.0;
+AIR302_druid.py:15:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.hive_to_druid.HiveToDruidOperator` is moved into `apache-druid` provider in Airflow 3.0;
    |
 13 | DruidHook()
 14 |
 15 | HiveToDruidOperator()
-   | ^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 16 | HiveToDruidTransfer()
    |
    = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDruidOperator` from `airflow.providers.apache.druid.transfers.hive_to_druid` instead.
@@ -74,11 +74,11 @@ AIR302_druid.py:15:1: AIR302 [*] `airflow.operators.hive_to_druid.HiveToDruidOpe
 12 12 | DruidDbApiHook()
 13 13 | DruidHook()
 
-AIR302_druid.py:16:1: AIR302 [*] `airflow.operators.hive_to_druid.HiveToDruidTransfer` is moved into `apache-druid` provider in Airflow 3.0;
+AIR302_druid.py:16:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.hive_to_druid.HiveToDruidTransfer` is moved into `apache-druid` provider in Airflow 3.0;
    |
 15 | HiveToDruidOperator()
 16 | HiveToDruidTransfer()
-   | ^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
    |
    = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDruidOperator` from `airflow.providers.apache.druid.transfers.hive_to_druid` instead.
 

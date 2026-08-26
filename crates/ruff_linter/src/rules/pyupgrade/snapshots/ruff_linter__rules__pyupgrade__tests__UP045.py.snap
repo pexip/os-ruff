@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP045.py:5:10: UP045 [*] Use `X | None` for type annotations
+UP045.py:5:10: UP045 (non-pep604-annotation-optional) [*] Use `X | None` for type annotations
   |
 5 | def f(x: Optional[str]) -> None:
-  |          ^^^^^^^^^^^^^ UP045
+  |          ^^^^^^^^^^^^^ UP045 (non-pep604-annotation-optional)
 6 |     ...
   |
   = help: Convert to `X | None`
@@ -19,10 +19,10 @@ UP045.py:5:10: UP045 [*] Use `X | None` for type annotations
 7 7 | 
 8 8 | 
 
-UP045.py:9:10: UP045 [*] Use `X | None` for type annotations
+UP045.py:9:10: UP045 (non-pep604-annotation-optional) [*] Use `X | None` for type annotations
    |
  9 | def f(x: typing.Optional[str]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^ UP045
+   |          ^^^^^^^^^^^^^^^^^^^^ UP045 (non-pep604-annotation-optional)
 10 |     ...
    |
    = help: Convert to `X | None`
@@ -37,11 +37,11 @@ UP045.py:9:10: UP045 [*] Use `X | None` for type annotations
 11 11 | 
 12 12 | 
 
-UP045.py:14:8: UP045 [*] Use `X | None` for type annotations
+UP045.py:14:8: UP045 (non-pep604-annotation-optional) [*] Use `X | None` for type annotations
    |
 13 | def f() -> None:
 14 |     x: Optional[str]
-   |        ^^^^^^^^^^^^^ UP045
+   |        ^^^^^^^^^^^^^ UP045 (non-pep604-annotation-optional)
 15 |     x = Optional[str]
    |
    = help: Convert to `X | None`
@@ -56,19 +56,19 @@ UP045.py:14:8: UP045 [*] Use `X | None` for type annotations
 16 16 | 
 17 17 | 
 
-UP045.py:15:9: UP045 Use `X | None` for type annotations
+UP045.py:15:9: UP045 (non-pep604-annotation-optional) Use `X | None` for type annotations
    |
 13 | def f() -> None:
 14 |     x: Optional[str]
 15 |     x = Optional[str]
-   |         ^^^^^^^^^^^^^ UP045
+   |         ^^^^^^^^^^^^^ UP045 (non-pep604-annotation-optional)
    |
    = help: Convert to `X | None`
 
-UP045.py:18:15: UP045 [*] Use `X | None` for type annotations
+UP045.py:18:15: UP045 (non-pep604-annotation-optional) [*] Use `X | None` for type annotations
    |
 18 | def f(x: list[Optional[int]]) -> None:
-   |               ^^^^^^^^^^^^^ UP045
+   |               ^^^^^^^^^^^^^ UP045 (non-pep604-annotation-optional)
 19 |     ...
    |
    = help: Convert to `X | None`
@@ -83,31 +83,31 @@ UP045.py:18:15: UP045 [*] Use `X | None` for type annotations
 20 20 | 
 21 21 | 
 
-UP045.py:22:10: UP045 Use `X | None` for type annotations
+UP045.py:22:10: UP045 (non-pep604-annotation-optional) Use `X | None` for type annotations
    |
 22 | def f(x: Optional[int : float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^ UP045
+   |          ^^^^^^^^^^^^^^^^^^^^^ UP045 (non-pep604-annotation-optional)
 23 |     ...
    |
    = help: Convert to `X | None`
 
-UP045.py:26:10: UP045 Use `X | None` for type annotations
+UP045.py:26:10: UP045 (non-pep604-annotation-optional) Use `X | None` for type annotations
    |
 26 | def f(x: Optional[str, int : float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP045
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP045 (non-pep604-annotation-optional)
 27 |     ...
    |
    = help: Convert to `X | None`
 
-UP045.py:30:10: UP045 Use `X | None` for type annotations
+UP045.py:30:10: UP045 (non-pep604-annotation-optional) Use `X | None` for type annotations
    |
 30 | def f(x: Optional[int, float]) -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^ UP045
+   |          ^^^^^^^^^^^^^^^^^^^^ UP045 (non-pep604-annotation-optional)
 31 |     ...
    |
    = help: Convert to `X | None`
 
-UP045.py:36:28: UP045 [*] Use `X | None` for type annotations
+UP045.py:36:28: UP045 (non-pep604-annotation-optional) [*] Use `X | None` for type annotations
    |
 34 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7131
 35 |   class ServiceRefOrValue:
@@ -116,7 +116,7 @@ UP045.py:36:28: UP045 [*] Use `X | None` for type annotations
 37 | |         list[ServiceSpecificationRef]
 38 | |         | list[ServiceSpecification]
 39 | |     ] = None
-   | |_____^ UP045
+   | |_____^ UP045 (non-pep604-annotation-optional)
    |
    = help: Convert to `X | None`
 
@@ -133,12 +133,12 @@ UP045.py:36:28: UP045 [*] Use `X | None` for type annotations
 41 38 | 
 42 39 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
 
-UP045.py:44:28: UP045 [*] Use `X | None` for type annotations
+UP045.py:44:28: UP045 (non-pep604-annotation-optional) [*] Use `X | None` for type annotations
    |
 42 | # Regression test for: https://github.com/astral-sh/ruff/issues/7201
 43 | class ServiceRefOrValue:
 44 |     service_specification: Optional[str]is not True = None
-   |                            ^^^^^^^^^^^^^ UP045
+   |                            ^^^^^^^^^^^^^ UP045 (non-pep604-annotation-optional)
    |
    = help: Convert to `X | None`
 
@@ -152,11 +152,11 @@ UP045.py:44:28: UP045 [*] Use `X | None` for type annotations
 46 46 | 
 47 47 | # Test for: https://github.com/astral-sh/ruff/issues/18508
 
-UP045.py:49:6: UP045 Use `X | None` for type annotations
+UP045.py:49:6: UP045 (non-pep604-annotation-optional) Use `X | None` for type annotations
    |
 47 | # Test for: https://github.com/astral-sh/ruff/issues/18508
 48 | # Optional[None] should not be offered a fix
 49 | foo: Optional[None] = None
-   |      ^^^^^^^^^^^^^^ UP045
+   |      ^^^^^^^^^^^^^^ UP045 (non-pep604-annotation-optional)
    |
    = help: Convert to `X | None`

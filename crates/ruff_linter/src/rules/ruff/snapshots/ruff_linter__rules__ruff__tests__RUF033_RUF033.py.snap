@@ -1,30 +1,30 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF033.py:19:35: RUF033 `__post_init__` method with argument defaults
+RUF033.py:19:35: RUF033 (post-init-default) `__post_init__` method with argument defaults
    |
 17 |     baz: InitVar[int] = 1
 18 |
 19 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
-   |                                   ^^ RUF033
+   |                                   ^^ RUF033 (post-init-default)
    |
    = help: Use `dataclasses.InitVar` instead
 
-RUF033.py:19:45: RUF033 `__post_init__` method with argument defaults
+RUF033.py:19:45: RUF033 (post-init-default) `__post_init__` method with argument defaults
    |
 17 |     baz: InitVar[int] = 1
 18 |
 19 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
-   |                                             ^^ RUF033
+   |                                             ^^ RUF033 (post-init-default)
    |
    = help: Use `dataclasses.InitVar` instead
 
-RUF033.py:25:35: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:25:35: RUF033 (post-init-default) [*] `__post_init__` method with argument defaults
    |
 23 | @dataclass
 24 | class Foo:
 25 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
-   |                                   ^^ RUF033
+   |                                   ^^ RUF033 (post-init-default)
    |
    = help: Use `dataclasses.InitVar` instead
 
@@ -39,12 +39,12 @@ RUF033.py:25:35: RUF033 [*] `__post_init__` method with argument defaults
 27 28 | 
 28 29 | # OK
 
-RUF033.py:25:45: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:25:45: RUF033 (post-init-default) [*] `__post_init__` method with argument defaults
    |
 23 | @dataclass
 24 | class Foo:
 25 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
-   |                                             ^^ RUF033
+   |                                             ^^ RUF033 (post-init-default)
    |
    = help: Use `dataclasses.InitVar` instead
 
@@ -59,12 +59,12 @@ RUF033.py:25:45: RUF033 [*] `__post_init__` method with argument defaults
 27 28 | 
 28 29 | # OK
 
-RUF033.py:46:40: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:46:40: RUF033 (post-init-default) [*] `__post_init__` method with argument defaults
    |
 44 | @dataclass
 45 | class Foo:
 46 |     def __post_init__(self, bar: int = 11, baz: Something[Whatever | None] = 11) -> None: ...
-   |                                        ^^ RUF033
+   |                                        ^^ RUF033 (post-init-default)
    |
    = help: Use `dataclasses.InitVar` instead
 
@@ -79,12 +79,12 @@ RUF033.py:46:40: RUF033 [*] `__post_init__` method with argument defaults
 48 49 | 
 49 50 | # RUF033
 
-RUF033.py:46:78: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:46:78: RUF033 (post-init-default) [*] `__post_init__` method with argument defaults
    |
 44 | @dataclass
 45 | class Foo:
 46 |     def __post_init__(self, bar: int = 11, baz: Something[Whatever | None] = 11) -> None: ...
-   |                                                                              ^^ RUF033
+   |                                                                              ^^ RUF033 (post-init-default)
    |
    = help: Use `dataclasses.InitVar` instead
 
@@ -99,12 +99,12 @@ RUF033.py:46:78: RUF033 [*] `__post_init__` method with argument defaults
 48 49 | 
 49 50 | # RUF033
 
-RUF033.py:59:40: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:59:40: RUF033 (post-init-default) [*] `__post_init__` method with argument defaults
    |
 57 |     ping = "pong"
 58 |
 59 |     def __post_init__(self, bar: int = 11, baz: int = 12) -> None: ...
-   |                                        ^^ RUF033
+   |                                        ^^ RUF033 (post-init-default)
    |
    = help: Use `dataclasses.InitVar` instead
 
@@ -119,12 +119,12 @@ RUF033.py:59:40: RUF033 [*] `__post_init__` method with argument defaults
 61 62 | 
 62 63 | # RUF033
 
-RUF033.py:59:55: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:59:55: RUF033 (post-init-default) [*] `__post_init__` method with argument defaults
    |
 57 |     ping = "pong"
 58 |
 59 |     def __post_init__(self, bar: int = 11, baz: int = 12) -> None: ...
-   |                                                       ^^ RUF033
+   |                                                       ^^ RUF033 (post-init-default)
    |
    = help: Use `dataclasses.InitVar` instead
 
@@ -139,20 +139,20 @@ RUF033.py:59:55: RUF033 [*] `__post_init__` method with argument defaults
 61 62 | 
 62 63 | # RUF033
 
-RUF033.py:67:40: RUF033 `__post_init__` method with argument defaults
+RUF033.py:67:40: RUF033 (post-init-default) `__post_init__` method with argument defaults
    |
 65 |     bar = "should've used attrs"
 66 |
 67 |     def __post_init__(self, bar: str = "ahhh", baz: str = "hmm") -> None: ...
-   |                                        ^^^^^^ RUF033
+   |                                        ^^^^^^ RUF033 (post-init-default)
    |
    = help: Use `dataclasses.InitVar` instead
 
-RUF033.py:67:59: RUF033 `__post_init__` method with argument defaults
+RUF033.py:67:59: RUF033 (post-init-default) `__post_init__` method with argument defaults
    |
 65 |     bar = "should've used attrs"
 66 |
 67 |     def __post_init__(self, bar: str = "ahhh", baz: str = "hmm") -> None: ...
-   |                                                           ^^^^^ RUF033
+   |                                                           ^^^^^ RUF033 (post-init-default)
    |
    = help: Use `dataclasses.InitVar` instead

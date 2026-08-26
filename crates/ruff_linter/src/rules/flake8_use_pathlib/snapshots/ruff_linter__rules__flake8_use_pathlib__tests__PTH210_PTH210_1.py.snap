@@ -1,23 +1,23 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-PTH210_1.py:13:5: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210_1.py:13:5: PTH210 (invalid-pathlib-with-suffix) Invalid suffix passed to `.with_suffix()`
    |
 11 | def test_path(p: Path) -> None:
 12 |     ## Errors
 13 |     p.with_suffix(".")
-   |     ^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 14 |     p.with_suffix("py")
 15 |     p.with_suffix(r"s")
    |
    = help: Remove "." or extend to valid suffix
 
-PTH210_1.py:14:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:14:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 12 |     ## Errors
 13 |     p.with_suffix(".")
 14 |     p.with_suffix("py")
-   |     ^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 15 |     p.with_suffix(r"s")
 16 |     p.with_suffix(u'' "json")
    |
@@ -33,12 +33,12 @@ PTH210_1.py:14:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 16 16 |     p.with_suffix(u'' "json")
 17 17 |     p.with_suffix(suffix="js")
 
-PTH210_1.py:15:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:15:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 13 |     p.with_suffix(".")
 14 |     p.with_suffix("py")
 15 |     p.with_suffix(r"s")
-   |     ^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 16 |     p.with_suffix(u'' "json")
 17 |     p.with_suffix(suffix="js")
    |
@@ -54,12 +54,12 @@ PTH210_1.py:15:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 17 17 |     p.with_suffix(suffix="js")
 18 18 | 
 
-PTH210_1.py:16:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:16:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 14 |     p.with_suffix("py")
 15 |     p.with_suffix(r"s")
 16 |     p.with_suffix(u'' "json")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 17 |     p.with_suffix(suffix="js")
    |
    = help: Add a leading dot
@@ -74,12 +74,12 @@ PTH210_1.py:16:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 18 18 | 
 19 19 |     ## No errors
 
-PTH210_1.py:17:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:17:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 15 |     p.with_suffix(r"s")
 16 |     p.with_suffix(u'' "json")
 17 |     p.with_suffix(suffix="js")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 18 |
 19 |     ## No errors
    |
@@ -95,23 +95,23 @@ PTH210_1.py:17:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 19 19 |     ## No errors
 20 20 |     p.with_suffix()
 
-PTH210_1.py:31:5: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210_1.py:31:5: PTH210 (invalid-pathlib-with-suffix) Invalid suffix passed to `.with_suffix()`
    |
 29 | def test_posix_path(p: PosixPath) -> None:
 30 |     ## Errors
 31 |     p.with_suffix(".")
-   |     ^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 32 |     p.with_suffix("py")
 33 |     p.with_suffix(r"s")
    |
    = help: Remove "." or extend to valid suffix
 
-PTH210_1.py:32:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:32:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 30 |     ## Errors
 31 |     p.with_suffix(".")
 32 |     p.with_suffix("py")
-   |     ^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 33 |     p.with_suffix(r"s")
 34 |     p.with_suffix(u'' "json")
    |
@@ -127,12 +127,12 @@ PTH210_1.py:32:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 34 34 |     p.with_suffix(u'' "json")
 35 35 |     p.with_suffix(suffix="js")
 
-PTH210_1.py:33:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:33:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 31 |     p.with_suffix(".")
 32 |     p.with_suffix("py")
 33 |     p.with_suffix(r"s")
-   |     ^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 34 |     p.with_suffix(u'' "json")
 35 |     p.with_suffix(suffix="js")
    |
@@ -148,12 +148,12 @@ PTH210_1.py:33:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 35 35 |     p.with_suffix(suffix="js")
 36 36 | 
 
-PTH210_1.py:34:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:34:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 32 |     p.with_suffix("py")
 33 |     p.with_suffix(r"s")
 34 |     p.with_suffix(u'' "json")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 35 |     p.with_suffix(suffix="js")
    |
    = help: Add a leading dot
@@ -168,12 +168,12 @@ PTH210_1.py:34:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 36 36 | 
 37 37 |     ## No errors
 
-PTH210_1.py:35:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:35:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 33 |     p.with_suffix(r"s")
 34 |     p.with_suffix(u'' "json")
 35 |     p.with_suffix(suffix="js")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 36 |
 37 |     ## No errors
    |
@@ -189,23 +189,23 @@ PTH210_1.py:35:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 37 37 |     ## No errors
 38 38 |     p.with_suffix()
 
-PTH210_1.py:49:5: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210_1.py:49:5: PTH210 (invalid-pathlib-with-suffix) Invalid suffix passed to `.with_suffix()`
    |
 47 | def test_pure_path(p: PurePath) -> None:
 48 |     ## Errors
 49 |     p.with_suffix(".")
-   |     ^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 50 |     p.with_suffix("py")
 51 |     p.with_suffix(r"s")
    |
    = help: Remove "." or extend to valid suffix
 
-PTH210_1.py:50:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:50:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 48 |     ## Errors
 49 |     p.with_suffix(".")
 50 |     p.with_suffix("py")
-   |     ^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 51 |     p.with_suffix(r"s")
 52 |     p.with_suffix(u'' "json")
    |
@@ -221,12 +221,12 @@ PTH210_1.py:50:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 52 52 |     p.with_suffix(u'' "json")
 53 53 |     p.with_suffix(suffix="js")
 
-PTH210_1.py:51:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:51:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 49 |     p.with_suffix(".")
 50 |     p.with_suffix("py")
 51 |     p.with_suffix(r"s")
-   |     ^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 52 |     p.with_suffix(u'' "json")
 53 |     p.with_suffix(suffix="js")
    |
@@ -242,12 +242,12 @@ PTH210_1.py:51:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 53 53 |     p.with_suffix(suffix="js")
 54 54 | 
 
-PTH210_1.py:52:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:52:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 50 |     p.with_suffix("py")
 51 |     p.with_suffix(r"s")
 52 |     p.with_suffix(u'' "json")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 53 |     p.with_suffix(suffix="js")
    |
    = help: Add a leading dot
@@ -262,12 +262,12 @@ PTH210_1.py:52:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 54 54 | 
 55 55 |     ## No errors
 
-PTH210_1.py:53:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:53:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 51 |     p.with_suffix(r"s")
 52 |     p.with_suffix(u'' "json")
 53 |     p.with_suffix(suffix="js")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 54 |
 55 |     ## No errors
    |
@@ -283,23 +283,23 @@ PTH210_1.py:53:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 55 55 |     ## No errors
 56 56 |     p.with_suffix()
 
-PTH210_1.py:67:5: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210_1.py:67:5: PTH210 (invalid-pathlib-with-suffix) Invalid suffix passed to `.with_suffix()`
    |
 65 | def test_pure_posix_path(p: PurePosixPath) -> None:
 66 |     ## Errors
 67 |     p.with_suffix(".")
-   |     ^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 68 |     p.with_suffix("py")
 69 |     p.with_suffix(r"s")
    |
    = help: Remove "." or extend to valid suffix
 
-PTH210_1.py:68:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:68:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 66 |     ## Errors
 67 |     p.with_suffix(".")
 68 |     p.with_suffix("py")
-   |     ^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 69 |     p.with_suffix(r"s")
 70 |     p.with_suffix(u'' "json")
    |
@@ -315,12 +315,12 @@ PTH210_1.py:68:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 70 70 |     p.with_suffix(u'' "json")
 71 71 |     p.with_suffix(suffix="js")
 
-PTH210_1.py:69:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:69:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 67 |     p.with_suffix(".")
 68 |     p.with_suffix("py")
 69 |     p.with_suffix(r"s")
-   |     ^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 70 |     p.with_suffix(u'' "json")
 71 |     p.with_suffix(suffix="js")
    |
@@ -336,12 +336,12 @@ PTH210_1.py:69:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 71 71 |     p.with_suffix(suffix="js")
 72 72 | 
 
-PTH210_1.py:70:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:70:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 68 |     p.with_suffix("py")
 69 |     p.with_suffix(r"s")
 70 |     p.with_suffix(u'' "json")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 71 |     p.with_suffix(suffix="js")
    |
    = help: Add a leading dot
@@ -356,12 +356,12 @@ PTH210_1.py:70:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 72 72 | 
 73 73 |     ## No errors
 
-PTH210_1.py:71:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:71:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 69 |     p.with_suffix(r"s")
 70 |     p.with_suffix(u'' "json")
 71 |     p.with_suffix(suffix="js")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 72 |
 73 |     ## No errors
    |
@@ -377,23 +377,23 @@ PTH210_1.py:71:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 73 73 |     ## No errors
 74 74 |     p.with_suffix()
 
-PTH210_1.py:85:5: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210_1.py:85:5: PTH210 (invalid-pathlib-with-suffix) Invalid suffix passed to `.with_suffix()`
    |
 83 | def test_pure_windows_path(p: PureWindowsPath) -> None:
 84 |     ## Errors
 85 |     p.with_suffix(".")
-   |     ^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 86 |     p.with_suffix("py")
 87 |     p.with_suffix(r"s")
    |
    = help: Remove "." or extend to valid suffix
 
-PTH210_1.py:86:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:86:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 84 |     ## Errors
 85 |     p.with_suffix(".")
 86 |     p.with_suffix("py")
-   |     ^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 87 |     p.with_suffix(r"s")
 88 |     p.with_suffix(u'' "json")
    |
@@ -409,12 +409,12 @@ PTH210_1.py:86:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 88 88 |     p.with_suffix(u'' "json")
 89 89 |     p.with_suffix(suffix="js")
 
-PTH210_1.py:87:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:87:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 85 |     p.with_suffix(".")
 86 |     p.with_suffix("py")
 87 |     p.with_suffix(r"s")
-   |     ^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 88 |     p.with_suffix(u'' "json")
 89 |     p.with_suffix(suffix="js")
    |
@@ -430,12 +430,12 @@ PTH210_1.py:87:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 89 89 |     p.with_suffix(suffix="js")
 90 90 | 
 
-PTH210_1.py:88:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:88:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 86 |     p.with_suffix("py")
 87 |     p.with_suffix(r"s")
 88 |     p.with_suffix(u'' "json")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 89 |     p.with_suffix(suffix="js")
    |
    = help: Add a leading dot
@@ -450,12 +450,12 @@ PTH210_1.py:88:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 90 90 | 
 91 91 |     ## No errors
 
-PTH210_1.py:89:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:89:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
    |
 87 |     p.with_suffix(r"s")
 88 |     p.with_suffix(u'' "json")
 89 |     p.with_suffix(suffix="js")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 90 |
 91 |     ## No errors
    |
@@ -471,23 +471,23 @@ PTH210_1.py:89:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 91 91 |     ## No errors
 92 92 |     p.with_suffix()
 
-PTH210_1.py:103:5: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210_1.py:103:5: PTH210 (invalid-pathlib-with-suffix) Invalid suffix passed to `.with_suffix()`
     |
 101 | def test_windows_path(p: WindowsPath) -> None:
 102 |     ## Errors
 103 |     p.with_suffix(".")
-    |     ^^^^^^^^^^^^^^^^^^ PTH210
+    |     ^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 104 |     p.with_suffix("py")
 105 |     p.with_suffix(r"s")
     |
     = help: Remove "." or extend to valid suffix
 
-PTH210_1.py:104:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:104:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
     |
 102 |     ## Errors
 103 |     p.with_suffix(".")
 104 |     p.with_suffix("py")
-    |     ^^^^^^^^^^^^^^^^^^^ PTH210
+    |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 105 |     p.with_suffix(r"s")
 106 |     p.with_suffix(u'' "json")
     |
@@ -503,12 +503,12 @@ PTH210_1.py:104:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 106 106 |     p.with_suffix(u'' "json")
 107 107 |     p.with_suffix(suffix="js")
 
-PTH210_1.py:105:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:105:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
     |
 103 |     p.with_suffix(".")
 104 |     p.with_suffix("py")
 105 |     p.with_suffix(r"s")
-    |     ^^^^^^^^^^^^^^^^^^^ PTH210
+    |     ^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 106 |     p.with_suffix(u'' "json")
 107 |     p.with_suffix(suffix="js")
     |
@@ -524,12 +524,12 @@ PTH210_1.py:105:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 107 107 |     p.with_suffix(suffix="js")
 108 108 | 
 
-PTH210_1.py:106:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:106:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
     |
 104 |     p.with_suffix("py")
 105 |     p.with_suffix(r"s")
 106 |     p.with_suffix(u'' "json")
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 107 |     p.with_suffix(suffix="js")
     |
     = help: Add a leading dot
@@ -544,12 +544,12 @@ PTH210_1.py:106:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 108 108 | 
 109 109 |     ## No errors
 
-PTH210_1.py:107:5: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210_1.py:107:5: PTH210 (invalid-pathlib-with-suffix) [*] Dotless suffix passed to `.with_suffix()`
     |
 105 |     p.with_suffix(r"s")
 106 |     p.with_suffix(u'' "json")
 107 |     p.with_suffix(suffix="js")
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210 (invalid-pathlib-with-suffix)
 108 |
 109 |     ## No errors
     |

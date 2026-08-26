@@ -1339,16 +1339,22 @@ mod tests {
         assert_debug_snapshot!(lex_codes_and_names(source), @r#"
         Ok(
             [
-                Code {
-                    code: "F401",
+                RuleIdent {
+                    identifier: Code(
+                        "F401",
+                    ),
                     range: 1..5,
                 },
-                Code {
-                    code: "F402",
+                RuleIdent {
+                    identifier: Code(
+                        "F402",
+                    ),
                     range: 7..11,
                 },
-                Code {
-                    code: "F403",
+                RuleIdent {
+                    identifier: Code(
+                        "F403",
+                    ),
                     range: 11..15,
                 },
             ],
@@ -1438,8 +1444,10 @@ mod tests {
                         Codes {
                             range: 0..14,
                             codes: [
-                                Code {
-                                    code: "RUF001",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "RUF001",
+                                    ),
                                     range: 8..14,
                                 },
                             ],
@@ -1477,8 +1485,10 @@ mod tests {
                         Codes {
                             range: 0..12,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 8..12,
                                 },
                             ],
@@ -1511,12 +1521,16 @@ mod tests {
                         Codes {
                             range: 0..18,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 8..12,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 14..18,
                                 },
                             ],
@@ -1577,8 +1591,10 @@ mod tests {
                         Codes {
                             range: 0..12,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 8..12,
                                 },
                             ],
@@ -1604,12 +1620,16 @@ mod tests {
                         Codes {
                             range: 0..18,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 8..12,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 14..18,
                                 },
                             ],
@@ -1635,8 +1655,10 @@ mod tests {
                         Codes {
                             range: 4..16,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 12..16,
                                 },
                             ],
@@ -1662,8 +1684,10 @@ mod tests {
                         Codes {
                             range: 0..12,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 8..12,
                                 },
                             ],
@@ -1710,8 +1734,10 @@ mod tests {
                         Codes {
                             range: 0..10,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 6..10,
                                 },
                             ],
@@ -1737,12 +1763,16 @@ mod tests {
                         Codes {
                             range: 0..15,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 6..10,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 11..15,
                                 },
                             ],
@@ -1789,8 +1819,10 @@ mod tests {
                         Codes {
                             range: 0..13,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 9..13,
                                 },
                             ],
@@ -1816,12 +1848,16 @@ mod tests {
                         Codes {
                             range: 0..20,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 9..13,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 16..20,
                                 },
                             ],
@@ -1847,8 +1883,10 @@ mod tests {
                         Codes {
                             range: 2..13,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 9..13,
                                 },
                             ],
@@ -1874,8 +1912,10 @@ mod tests {
                         Codes {
                             range: 6..18,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 14..18,
                                 },
                             ],
@@ -1922,8 +1962,10 @@ mod tests {
                         Codes {
                             range: 35..47,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 43..47,
                                 },
                             ],
@@ -1949,12 +1991,16 @@ mod tests {
                         Codes {
                             range: 35..53,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 43..47,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 49..53,
                                 },
                             ],
@@ -2001,8 +2047,10 @@ mod tests {
                         Codes {
                             range: 0..12,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 8..12,
                                 },
                             ],
@@ -2028,12 +2076,16 @@ mod tests {
                         Codes {
                             range: 0..18,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 8..12,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 14..18,
                                 },
                             ],
@@ -2075,12 +2127,16 @@ mod tests {
                         Codes {
                             range: 0..16,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 8..12,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 12..16,
                                 },
                             ],
@@ -2110,12 +2166,16 @@ mod tests {
                         Codes {
                             range: 0..18,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 8..12,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 14..18,
                                 },
                             ],
@@ -2145,12 +2205,16 @@ mod tests {
                         Codes {
                             range: 0..19,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 8..12,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 15..19,
                                 },
                             ],
@@ -2176,8 +2240,10 @@ mod tests {
                         Codes {
                             range: 0..12,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 8..12,
                                 },
                             ],
@@ -2296,8 +2362,10 @@ mod tests {
                         Codes {
                             range: 0..22,
                             codes: [
-                                Code {
-                                    code: "RUF001",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "RUF001",
+                                    ),
                                     range: 16..22,
                                 },
                             ],
@@ -2404,8 +2472,10 @@ mod tests {
                         Codes {
                             range: 0..20,
                             codes: [
-                                Code {
-                                    code: "RUF001",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "RUF001",
+                                    ),
                                     range: 14..20,
                                 },
                             ],
@@ -2486,12 +2556,16 @@ mod tests {
                         Codes {
                             range: 0..26,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 16..20,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 22..26,
                                 },
                             ],
@@ -2517,12 +2591,16 @@ mod tests {
                         Codes {
                             range: 0..24,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 14..18,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 20..24,
                                 },
                             ],
@@ -2547,12 +2625,16 @@ mod tests {
                         Codes {
                             range: 3..27,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 17..21,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 23..27,
                                 },
                             ],
@@ -2582,12 +2664,16 @@ mod tests {
                         Codes {
                             range: 0..22,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 14..18,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 18..22,
                                 },
                             ],
@@ -2617,12 +2703,16 @@ mod tests {
                         Codes {
                             range: 0..24,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 14..18,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 20..24,
                                 },
                             ],
@@ -2652,12 +2742,16 @@ mod tests {
                         Codes {
                             range: 0..25,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 14..18,
                                 },
-                                Code {
-                                    code: "F841",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F841",
+                                    ),
                                     range: 21..25,
                                 },
                             ],
@@ -2695,8 +2789,10 @@ mod tests {
                         Codes {
                             range: 18..36,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 32..36,
                                 },
                             ],
@@ -2722,8 +2818,10 @@ mod tests {
                         Codes {
                             range: 0..18,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 14..18,
                                 },
                             ],
@@ -2791,8 +2889,10 @@ mod tests {
                         Codes {
                             range: 0..18,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 14..18,
                                 },
                             ],
@@ -2860,8 +2960,10 @@ mod tests {
                         Codes {
                             range: 0..18,
                             codes: [
-                                Code {
-                                    code: "F401",
+                                RuleIdent {
+                                    identifier: Code(
+                                        "F401",
+                                    ),
                                     range: 14..18,
                                 },
                             ],

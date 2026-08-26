@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_mysql.py:9:1: AIR302 [*] `airflow.hooks.mysql_hook.MySqlHook` is moved into `mysql` provider in Airflow 3.0;
+AIR302_mysql.py:9:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.hooks.mysql_hook.MySqlHook` is moved into `mysql` provider in Airflow 3.0;
    |
  7 | )
  8 |
  9 | MySqlHook()
-   | ^^^^^^^^^ AIR302
+   | ^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 10 | PrestoToMySqlOperator()
 11 | PrestoToMySqlTransfer()
    |
@@ -25,11 +25,11 @@ AIR302_mysql.py:9:1: AIR302 [*] `airflow.hooks.mysql_hook.MySqlHook` is moved in
 9 9 | MySqlHook()
 10 10 | PrestoToMySqlOperator()
 
-AIR302_mysql.py:10:1: AIR302 [*] `airflow.operators.presto_to_mysql.PrestoToMySqlOperator` is moved into `mysql` provider in Airflow 3.0;
+AIR302_mysql.py:10:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.presto_to_mysql.PrestoToMySqlOperator` is moved into `mysql` provider in Airflow 3.0;
    |
  9 | MySqlHook()
 10 | PrestoToMySqlOperator()
-   | ^^^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 11 | PrestoToMySqlTransfer()
    |
    = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `PrestoToMySqlOperator` from `airflow.providers.mysql.transfers.presto_to_mysql` instead.
@@ -46,12 +46,12 @@ AIR302_mysql.py:10:1: AIR302 [*] `airflow.operators.presto_to_mysql.PrestoToMySq
 9 9 | MySqlHook()
 10 10 | PrestoToMySqlOperator()
 
-AIR302_mysql.py:11:1: AIR302 [*] `airflow.operators.presto_to_mysql.PrestoToMySqlTransfer` is moved into `mysql` provider in Airflow 3.0;
+AIR302_mysql.py:11:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.presto_to_mysql.PrestoToMySqlTransfer` is moved into `mysql` provider in Airflow 3.0;
    |
  9 | MySqlHook()
 10 | PrestoToMySqlOperator()
 11 | PrestoToMySqlTransfer()
-   | ^^^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
    |
    = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `PrestoToMySqlOperator` from `airflow.providers.mysql.transfers.presto_to_mysql` instead.
 

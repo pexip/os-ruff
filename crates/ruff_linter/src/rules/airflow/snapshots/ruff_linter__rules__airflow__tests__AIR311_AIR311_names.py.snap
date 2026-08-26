@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR311_names.py:20:1: AIR311 [*] `airflow.Dataset` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:20:1: AIR311 (airflow3-suggested-update) [*] `airflow.Dataset` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 19 | # airflow
 20 | DatasetFromRoot()
-   | ^^^^^^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 21 |
 22 | # airflow.datasets
    |
@@ -24,11 +24,11 @@ AIR311_names.py:20:1: AIR311 [*] `airflow.Dataset` is removed in Airflow 3.0; It
 22 23 | # airflow.datasets
 23 24 | Dataset()
 
-AIR311_names.py:23:1: AIR311 [*] `airflow.datasets.Dataset` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:23:1: AIR311 (airflow3-suggested-update) [*] `airflow.datasets.Dataset` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 22 | # airflow.datasets
 23 | Dataset()
-   | ^^^^^^^ AIR311
+   | ^^^^^^^ AIR311 (airflow3-suggested-update)
 24 | DatasetAlias()
 25 | DatasetAll()
    |
@@ -50,12 +50,12 @@ AIR311_names.py:23:1: AIR311 [*] `airflow.datasets.Dataset` is removed in Airflo
 25 26 | DatasetAll()
 26 27 | DatasetAny()
 
-AIR311_names.py:24:1: AIR311 [*] `airflow.datasets.DatasetAlias` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:24:1: AIR311 (airflow3-suggested-update) [*] `airflow.datasets.DatasetAlias` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 22 | # airflow.datasets
 23 | Dataset()
 24 | DatasetAlias()
-   | ^^^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 25 | DatasetAll()
 26 | DatasetAny()
    |
@@ -78,12 +78,12 @@ AIR311_names.py:24:1: AIR311 [*] `airflow.datasets.DatasetAlias` is removed in A
 26 27 | DatasetAny()
 27 28 | Metadata()
 
-AIR311_names.py:25:1: AIR311 [*] `airflow.datasets.DatasetAll` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:25:1: AIR311 (airflow3-suggested-update) [*] `airflow.datasets.DatasetAll` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 23 | Dataset()
 24 | DatasetAlias()
 25 | DatasetAll()
-   | ^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 26 | DatasetAny()
 27 | Metadata()
    |
@@ -107,12 +107,12 @@ AIR311_names.py:25:1: AIR311 [*] `airflow.datasets.DatasetAll` is removed in Air
 27 28 | Metadata()
 28 29 | expand_alias_to_datasets()
 
-AIR311_names.py:26:1: AIR311 [*] `airflow.datasets.DatasetAny` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:26:1: AIR311 (airflow3-suggested-update) [*] `airflow.datasets.DatasetAny` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 24 | DatasetAlias()
 25 | DatasetAll()
 26 | DatasetAny()
-   | ^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 27 | Metadata()
 28 | expand_alias_to_datasets()
    |
@@ -136,12 +136,12 @@ AIR311_names.py:26:1: AIR311 [*] `airflow.datasets.DatasetAny` is removed in Air
 28 29 | expand_alias_to_datasets()
 29 30 | 
 
-AIR311_names.py:27:1: AIR311 [*] `airflow.datasets.metadata.Metadata` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:27:1: AIR311 (airflow3-suggested-update) [*] `airflow.datasets.metadata.Metadata` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 25 | DatasetAll()
 26 | DatasetAny()
 27 | Metadata()
-   | ^^^^^^^^ AIR311
+   | ^^^^^^^^ AIR311 (airflow3-suggested-update)
 28 | expand_alias_to_datasets()
    |
    = help: Use `Metadata` from `airflow.sdk` instead.
@@ -162,12 +162,12 @@ AIR311_names.py:27:1: AIR311 [*] `airflow.datasets.metadata.Metadata` is removed
 19 19 | # airflow
 20 20 | DatasetFromRoot()
 
-AIR311_names.py:28:1: AIR311 [*] `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:28:1: AIR311 (airflow3-suggested-update) [*] `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 26 | DatasetAny()
 27 | Metadata()
 28 | expand_alias_to_datasets()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 29 |
 30 | # airflow.decorators
    |
@@ -191,11 +191,11 @@ AIR311_names.py:28:1: AIR311 [*] `airflow.datasets.expand_alias_to_datasets` is 
 30 31 | # airflow.decorators
 31 32 | dag()
 
-AIR311_names.py:31:1: AIR311 [*] `airflow.decorators.dag` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:31:1: AIR311 (airflow3-suggested-update) [*] `airflow.decorators.dag` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 30 | # airflow.decorators
 31 | dag()
-   | ^^^ AIR311
+   | ^^^ AIR311 (airflow3-suggested-update)
 32 | task()
 33 | task_group()
    |
@@ -215,12 +215,12 @@ AIR311_names.py:31:1: AIR311 [*] `airflow.decorators.dag` is removed in Airflow 
 19 19 | # airflow
 20 20 | DatasetFromRoot()
 
-AIR311_names.py:32:1: AIR311 [*] `airflow.decorators.task` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:32:1: AIR311 (airflow3-suggested-update) [*] `airflow.decorators.task` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 30 | # airflow.decorators
 31 | dag()
 32 | task()
-   | ^^^^ AIR311
+   | ^^^^ AIR311 (airflow3-suggested-update)
 33 | task_group()
 34 | setup()
    |
@@ -238,12 +238,12 @@ AIR311_names.py:32:1: AIR311 [*] `airflow.decorators.task` is removed in Airflow
 19 19 | # airflow
 20 20 | DatasetFromRoot()
 
-AIR311_names.py:33:1: AIR311 [*] `airflow.decorators.task_group` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:33:1: AIR311 (airflow3-suggested-update) [*] `airflow.decorators.task_group` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 31 | dag()
 32 | task()
 33 | task_group()
-   | ^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 34 | setup()
 35 | from airflow.decorators import teardown
    |
@@ -260,12 +260,12 @@ AIR311_names.py:33:1: AIR311 [*] `airflow.decorators.task_group` is removed in A
 19 19 | # airflow
 20 20 | DatasetFromRoot()
 
-AIR311_names.py:34:1: AIR311 [*] `airflow.decorators.setup` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:34:1: AIR311 (airflow3-suggested-update) [*] `airflow.decorators.setup` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 32 | task()
 33 | task_group()
 34 | setup()
-   | ^^^^^ AIR311
+   | ^^^^^ AIR311 (airflow3-suggested-update)
 35 | from airflow.decorators import teardown
 36 | from airflow.io.path import ObjectStoragePath
    |
@@ -284,11 +284,11 @@ AIR311_names.py:34:1: AIR311 [*] `airflow.decorators.setup` is removed in Airflo
 19 19 | # airflow
 20 20 | DatasetFromRoot()
 
-AIR311_names.py:48:1: AIR311 [*] `airflow.decorators.teardown` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:48:1: AIR311 (airflow3-suggested-update) [*] `airflow.decorators.teardown` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 47 | # airflow.decorators
 48 | teardown()
-   | ^^^^^^^^ AIR311
+   | ^^^^^^^^ AIR311 (airflow3-suggested-update)
 49 |
 50 | # # airflow.io
    |
@@ -311,11 +311,11 @@ AIR311_names.py:48:1: AIR311 [*] `airflow.decorators.teardown` is removed in Air
 47 47 | # airflow.decorators
 48 48 | teardown()
 
-AIR311_names.py:51:1: AIR311 [*] `airflow.io.path.ObjectStoragePath` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:51:1: AIR311 (airflow3-suggested-update) [*] `airflow.io.path.ObjectStoragePath` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 50 | # # airflow.io
 51 | ObjectStoragePath()
-   | ^^^^^^^^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 52 | attach()
    |
    = help: Use `ObjectStoragePath` from `airflow.sdk` instead.
@@ -337,12 +337,12 @@ AIR311_names.py:51:1: AIR311 [*] `airflow.io.path.ObjectStoragePath` is removed 
 47 47 | # airflow.decorators
 48 48 | teardown()
 
-AIR311_names.py:52:1: AIR311 [*] `airflow.io.storage.attach` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:52:1: AIR311 (airflow3-suggested-update) [*] `airflow.io.storage.attach` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 50 | # # airflow.io
 51 | ObjectStoragePath()
 52 | attach()
-   | ^^^^^^ AIR311
+   | ^^^^^^ AIR311 (airflow3-suggested-update)
 53 |
 54 | # airflow.models
    |
@@ -365,11 +365,11 @@ AIR311_names.py:52:1: AIR311 [*] `airflow.io.storage.attach` is removed in Airfl
 47 47 | # airflow.decorators
 48 48 | teardown()
 
-AIR311_names.py:55:1: AIR311 [*] `airflow.models.Connection` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:55:1: AIR311 (airflow3-suggested-update) [*] `airflow.models.Connection` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 54 | # airflow.models
 55 | Connection()
-   | ^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 56 | DAGFromModel()
 57 | Variable()
    |
@@ -390,12 +390,12 @@ AIR311_names.py:55:1: AIR311 [*] `airflow.models.Connection` is removed in Airfl
 47 47 | # airflow.decorators
 48 48 | teardown()
 
-AIR311_names.py:56:1: AIR311 [*] `airflow.models.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:56:1: AIR311 (airflow3-suggested-update) [*] `airflow.models.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 54 | # airflow.models
 55 | Connection()
 56 | DAGFromModel()
-   | ^^^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 57 | Variable()
    |
    = help: Use `DAG` from `airflow.sdk` instead.
@@ -418,12 +418,12 @@ AIR311_names.py:56:1: AIR311 [*] `airflow.models.DAG` is removed in Airflow 3.0;
 58 59 | 
 59 60 | # airflow.models.baseoperator
 
-AIR311_names.py:57:1: AIR311 [*] `airflow.models.Variable` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:57:1: AIR311 (airflow3-suggested-update) [*] `airflow.models.Variable` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 55 | Connection()
 56 | DAGFromModel()
 57 | Variable()
-   | ^^^^^^^^ AIR311
+   | ^^^^^^^^ AIR311 (airflow3-suggested-update)
 58 |
 59 | # airflow.models.baseoperator
    |
@@ -443,11 +443,11 @@ AIR311_names.py:57:1: AIR311 [*] `airflow.models.Variable` is removed in Airflow
 47 47 | # airflow.decorators
 48 48 | teardown()
 
-AIR311_names.py:60:1: AIR311 [*] `airflow.models.baseoperator.chain` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:60:1: AIR311 (airflow3-suggested-update) [*] `airflow.models.baseoperator.chain` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 59 | # airflow.models.baseoperator
 60 | chain()
-   | ^^^^^ AIR311
+   | ^^^^^ AIR311 (airflow3-suggested-update)
 61 | chain_linear()
 62 | cross_downstream()
    |
@@ -466,12 +466,12 @@ AIR311_names.py:60:1: AIR311 [*] `airflow.models.baseoperator.chain` is removed 
 47 48 | # airflow.decorators
 48 49 | teardown()
 
-AIR311_names.py:61:1: AIR311 [*] `airflow.models.baseoperator.chain_linear` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:61:1: AIR311 (airflow3-suggested-update) [*] `airflow.models.baseoperator.chain_linear` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 59 | # airflow.models.baseoperator
 60 | chain()
 61 | chain_linear()
-   | ^^^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 62 | cross_downstream()
    |
    = help: Use `chain_linear` from `airflow.sdk` instead.
@@ -489,12 +489,12 @@ AIR311_names.py:61:1: AIR311 [*] `airflow.models.baseoperator.chain_linear` is r
 47 48 | # airflow.decorators
 48 49 | teardown()
 
-AIR311_names.py:62:1: AIR311 [*] `airflow.models.baseoperator.cross_downstream` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:62:1: AIR311 (airflow3-suggested-update) [*] `airflow.models.baseoperator.cross_downstream` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 60 | chain()
 61 | chain_linear()
 62 | cross_downstream()
-   | ^^^^^^^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 63 |
 64 | # airflow.models.baseoperatolinker
    |
@@ -513,11 +513,11 @@ AIR311_names.py:62:1: AIR311 [*] `airflow.models.baseoperator.cross_downstream` 
 47 48 | # airflow.decorators
 48 49 | teardown()
 
-AIR311_names.py:65:1: AIR311 [*] `airflow.models.baseoperatorlink.BaseOperatorLink` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:65:1: AIR311 (airflow3-suggested-update) [*] `airflow.models.baseoperatorlink.BaseOperatorLink` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 64 | # airflow.models.baseoperatolinker
 65 | BaseOperatorLink()
-   | ^^^^^^^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 66 |
 67 | # airflow.models.dag
    |
@@ -534,11 +534,11 @@ AIR311_names.py:65:1: AIR311 [*] `airflow.models.baseoperatorlink.BaseOperatorLi
 47 47 | # airflow.decorators
 48 48 | teardown()
 
-AIR311_names.py:68:1: AIR311 [*] `airflow.models.dag.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:68:1: AIR311 (airflow3-suggested-update) [*] `airflow.models.dag.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 67 | # airflow.models.dag
 68 | DAGFromDag()
-   | ^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 69 | from airflow.timetables.datasets import DatasetOrTimeSchedule
 70 | from airflow.utils.dag_parsing_context import get_parsing_context
    |
@@ -562,11 +562,11 @@ AIR311_names.py:68:1: AIR311 [*] `airflow.models.dag.DAG` is removed in Airflow 
 70 71 | from airflow.utils.dag_parsing_context import get_parsing_context
 71 72 | 
 
-AIR311_names.py:73:1: AIR311 [*] `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:73:1: AIR311 (airflow3-suggested-update) [*] `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 72 | # airflow.timetables.datasets
 73 | DatasetOrTimeSchedule()
-   | ^^^^^^^^^^^^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR311 (airflow3-suggested-update)
 74 |
 75 | # airflow.utils.dag_parsing_context
    |
@@ -585,11 +585,11 @@ AIR311_names.py:73:1: AIR311 [*] `airflow.timetables.datasets.DatasetOrTimeSched
 75 76 | # airflow.utils.dag_parsing_context
 76 77 | get_parsing_context()
 
-AIR311_names.py:76:1: AIR311 [*] `airflow.utils.dag_parsing_context.get_parsing_context` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:76:1: AIR311 (airflow3-suggested-update) [*] `airflow.utils.dag_parsing_context.get_parsing_context` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 75 | # airflow.utils.dag_parsing_context
 76 | get_parsing_context()
-   | ^^^^^^^^^^^^^^^^^^^ AIR311
+   | ^^^^^^^^^^^^^^^^^^^ AIR311 (airflow3-suggested-update)
    |
    = help: Use `get_parsing_context` from `airflow.sdk` instead.
 

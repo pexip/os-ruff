@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_smtp.py:5:1: AIR302 [*] `airflow.operators.email_operator.EmailOperator` is moved into `smtp` provider in Airflow 3.0;
+AIR302_smtp.py:5:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.email_operator.EmailOperator` is moved into `smtp` provider in Airflow 3.0;
   |
 3 | from airflow.operators.email_operator import EmailOperator
 4 |
 5 | EmailOperator()
-  | ^^^^^^^^^^^^^ AIR302
+  | ^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 6 |
 7 | from airflow.operators.email import EmailOperator
   |
@@ -21,12 +21,12 @@ AIR302_smtp.py:5:1: AIR302 [*] `airflow.operators.email_operator.EmailOperator` 
 5 5 | EmailOperator()
 6 6 | 
 
-AIR302_smtp.py:9:1: AIR302 [*] `airflow.operators.email.EmailOperator` is moved into `smtp` provider in Airflow 3.0;
+AIR302_smtp.py:9:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.email.EmailOperator` is moved into `smtp` provider in Airflow 3.0;
   |
 7 | from airflow.operators.email import EmailOperator
 8 |
 9 | EmailOperator()
-  | ^^^^^^^^^^^^^ AIR302
+  | ^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
   |
   = help: Install `apache-airflow-providers-smtp>=1.0.0` and use `EmailOperator` from `airflow.providers.smtp.operators.smtp` instead.
 

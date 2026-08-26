@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF059_0.py:24:6: RUF059 [*] Unpacked variable `c` is never used
+RUF059_0.py:24:6: RUF059 (unused-unpacked-variable) [*] Unpacked variable `c` is never used
    |
 23 |     bar = (1, 2)
 24 |     (c, d) = bar
-   |      ^ RUF059
+   |      ^ RUF059 (unused-unpacked-variable)
 25 |
 26 |     (x, y) = baz = bar
    |
@@ -21,11 +21,11 @@ RUF059_0.py:24:6: RUF059 [*] Unpacked variable `c` is never used
 26 26 |     (x, y) = baz = bar
 27 27 | 
 
-RUF059_0.py:24:9: RUF059 [*] Unpacked variable `d` is never used
+RUF059_0.py:24:9: RUF059 (unused-unpacked-variable) [*] Unpacked variable `d` is never used
    |
 23 |     bar = (1, 2)
 24 |     (c, d) = bar
-   |         ^ RUF059
+   |         ^ RUF059 (unused-unpacked-variable)
 25 |
 26 |     (x, y) = baz = bar
    |
@@ -41,12 +41,12 @@ RUF059_0.py:24:9: RUF059 [*] Unpacked variable `d` is never used
 26 26 |     (x, y) = baz = bar
 27 27 | 
 
-RUF059_0.py:26:6: RUF059 [*] Unpacked variable `x` is never used
+RUF059_0.py:26:6: RUF059 (unused-unpacked-variable) [*] Unpacked variable `x` is never used
    |
 24 |     (c, d) = bar
 25 |
 26 |     (x, y) = baz = bar
-   |      ^ RUF059
+   |      ^ RUF059 (unused-unpacked-variable)
    |
    = help: Prefix it with an underscore or any other dummy variable pattern
 
@@ -60,12 +60,12 @@ RUF059_0.py:26:6: RUF059 [*] Unpacked variable `x` is never used
 28 28 | 
 29 29 | def f():
 
-RUF059_0.py:26:9: RUF059 [*] Unpacked variable `y` is never used
+RUF059_0.py:26:9: RUF059 (unused-unpacked-variable) [*] Unpacked variable `y` is never used
    |
 24 |     (c, d) = bar
 25 |
 26 |     (x, y) = baz = bar
-   |         ^ RUF059
+   |         ^ RUF059 (unused-unpacked-variable)
    |
    = help: Prefix it with an underscore or any other dummy variable pattern
 
@@ -79,12 +79,12 @@ RUF059_0.py:26:9: RUF059 [*] Unpacked variable `y` is never used
 28 28 | 
 29 29 | def f():
 
-RUF059_0.py:66:24: RUF059 [*] Unpacked variable `connection` is never used
+RUF059_0.py:66:24: RUF059 (unused-unpacked-variable) [*] Unpacked variable `connection` is never used
    |
 64 |         return None, None
 65 |
 66 |     with connect() as (connection, cursor):
-   |                        ^^^^^^^^^^ RUF059
+   |                        ^^^^^^^^^^ RUF059 (unused-unpacked-variable)
 67 |         cursor.execute("SELECT * FROM users")
    |
    = help: Prefix it with an underscore or any other dummy variable pattern
@@ -99,12 +99,12 @@ RUF059_0.py:66:24: RUF059 [*] Unpacked variable `connection` is never used
 68 68 | 
 69 69 | 
 
-RUF059_0.py:74:24: RUF059 [*] Unpacked variable `connection` is never used
+RUF059_0.py:74:24: RUF059 (unused-unpacked-variable) [*] Unpacked variable `connection` is never used
    |
 72 |         return None, None
 73 |
 74 |     with connect() as (connection, cursor):
-   |                        ^^^^^^^^^^ RUF059
+   |                        ^^^^^^^^^^ RUF059 (unused-unpacked-variable)
 75 |         cursor.execute("SELECT * FROM users")
    |
    = help: Prefix it with an underscore or any other dummy variable pattern
@@ -119,11 +119,11 @@ RUF059_0.py:74:24: RUF059 [*] Unpacked variable `connection` is never used
 76 76 | 
 77 77 | 
 
-RUF059_0.py:79:49: RUF059 [*] Unpacked variable `this` is never used
+RUF059_0.py:79:49: RUF059 (unused-unpacked-variable) [*] Unpacked variable `this` is never used
    |
 78 | def f():
 79 |     with open("file") as my_file, open("") as ((this, that)):
-   |                                                 ^^^^ RUF059
+   |                                                 ^^^^ RUF059 (unused-unpacked-variable)
 80 |         print("hello")
    |
    = help: Prefix it with an underscore or any other dummy variable pattern
@@ -138,11 +138,11 @@ RUF059_0.py:79:49: RUF059 [*] Unpacked variable `this` is never used
 81 81 | 
 82 82 | 
 
-RUF059_0.py:79:55: RUF059 [*] Unpacked variable `that` is never used
+RUF059_0.py:79:55: RUF059 (unused-unpacked-variable) [*] Unpacked variable `that` is never used
    |
 78 | def f():
 79 |     with open("file") as my_file, open("") as ((this, that)):
-   |                                                       ^^^^ RUF059
+   |                                                       ^^^^ RUF059 (unused-unpacked-variable)
 80 |         print("hello")
    |
    = help: Prefix it with an underscore or any other dummy variable pattern
@@ -157,12 +157,12 @@ RUF059_0.py:79:55: RUF059 [*] Unpacked variable `that` is never used
 81 81 | 
 82 82 | 
 
-RUF059_0.py:86:23: RUF059 [*] Unpacked variable `this` is never used
+RUF059_0.py:86:23: RUF059 (unused-unpacked-variable) [*] Unpacked variable `this` is never used
    |
 84 |     with (
 85 |         open("file") as my_file,
 86 |         open("") as ((this, that)),
-   |                       ^^^^ RUF059
+   |                       ^^^^ RUF059 (unused-unpacked-variable)
 87 |     ):
 88 |         print("hello")
    |
@@ -178,12 +178,12 @@ RUF059_0.py:86:23: RUF059 [*] Unpacked variable `this` is never used
 88 88 |         print("hello")
 89 89 | 
 
-RUF059_0.py:86:29: RUF059 [*] Unpacked variable `that` is never used
+RUF059_0.py:86:29: RUF059 (unused-unpacked-variable) [*] Unpacked variable `that` is never used
    |
 84 |     with (
 85 |         open("file") as my_file,
 86 |         open("") as ((this, that)),
-   |                             ^^^^ RUF059
+   |                             ^^^^ RUF059 (unused-unpacked-variable)
 87 |     ):
 88 |         print("hello")
    |
@@ -199,12 +199,12 @@ RUF059_0.py:86:29: RUF059 [*] Unpacked variable `that` is never used
 88 88 |         print("hello")
 89 89 | 
 
-RUF059_0.py:101:5: RUF059 Unpacked variable `x` is never used
+RUF059_0.py:101:5: RUF059 (unused-unpacked-variable) Unpacked variable `x` is never used
     |
  99 | # see: https://github.com/astral-sh/ruff/issues/18507
 100 | def f(_x):
 101 |     x, = "1"
-    |     ^ RUF059
+    |     ^ RUF059 (unused-unpacked-variable)
 102 |     print(_x)
     |
     = help: Prefix it with an underscore or any other dummy variable pattern

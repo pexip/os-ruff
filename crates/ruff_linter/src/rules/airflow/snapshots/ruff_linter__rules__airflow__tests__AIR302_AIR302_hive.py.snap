@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_hive.py:18:1: AIR302 [*] `airflow.hooks.hive_hooks.HIVE_QUEUE_PRIORITIES` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:18:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.hooks.hive_hooks.HIVE_QUEUE_PRIORITIES` is moved into `apache-hive` provider in Airflow 3.0;
    |
 16 | from airflow.operators.hive_to_samba_operator import HiveToSambaOperator
 17 |
 18 | HIVE_QUEUE_PRIORITIES
-   | ^^^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 19 | HiveCliHook()
 20 | HiveMetastoreHook()
    |
@@ -29,11 +29,11 @@ AIR302_hive.py:18:1: AIR302 [*] `airflow.hooks.hive_hooks.HIVE_QUEUE_PRIORITIES`
 18 18 | HIVE_QUEUE_PRIORITIES
 19 19 | HiveCliHook()
 
-AIR302_hive.py:19:1: AIR302 [*] `airflow.hooks.hive_hooks.HiveCliHook` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:19:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.hooks.hive_hooks.HiveCliHook` is moved into `apache-hive` provider in Airflow 3.0;
    |
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
-   | ^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 20 | HiveMetastoreHook()
 21 | HiveServer2Hook()
    |
@@ -56,12 +56,12 @@ AIR302_hive.py:19:1: AIR302 [*] `airflow.hooks.hive_hooks.HiveCliHook` is moved 
 18 18 | HIVE_QUEUE_PRIORITIES
 19 19 | HiveCliHook()
 
-AIR302_hive.py:20:1: AIR302 [*] `airflow.hooks.hive_hooks.HiveMetastoreHook` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:20:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.hooks.hive_hooks.HiveMetastoreHook` is moved into `apache-hive` provider in Airflow 3.0;
    |
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
 20 | HiveMetastoreHook()
-   | ^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 21 | HiveServer2Hook()
    |
    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveMetastoreHook` from `airflow.providers.apache.hive.hooks.hive` instead.
@@ -83,12 +83,12 @@ AIR302_hive.py:20:1: AIR302 [*] `airflow.hooks.hive_hooks.HiveMetastoreHook` is 
 18 18 | HIVE_QUEUE_PRIORITIES
 19 19 | HiveCliHook()
 
-AIR302_hive.py:21:1: AIR302 [*] `airflow.hooks.hive_hooks.HiveServer2Hook` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:21:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.hooks.hive_hooks.HiveServer2Hook` is moved into `apache-hive` provider in Airflow 3.0;
    |
 19 | HiveCliHook()
 20 | HiveMetastoreHook()
 21 | HiveServer2Hook()
-   | ^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 22 |
 23 | closest_ds_partition()
    |
@@ -111,12 +111,12 @@ AIR302_hive.py:21:1: AIR302 [*] `airflow.hooks.hive_hooks.HiveServer2Hook` is mo
 18 18 | HIVE_QUEUE_PRIORITIES
 19 19 | HiveCliHook()
 
-AIR302_hive.py:23:1: AIR302 [*] `airflow.macros.hive.closest_ds_partition` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:23:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.macros.hive.closest_ds_partition` is moved into `apache-hive` provider in Airflow 3.0;
    |
 21 | HiveServer2Hook()
 22 |
 23 | closest_ds_partition()
-   | ^^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 24 | max_partition()
    |
    = help: Install `apache-airflow-providers-apache-hive>=5.1.0` and use `closest_ds_partition` from `airflow.providers.apache.hive.macros.hive` instead.
@@ -137,11 +137,11 @@ AIR302_hive.py:23:1: AIR302 [*] `airflow.macros.hive.closest_ds_partition` is mo
 18 18 | HIVE_QUEUE_PRIORITIES
 19 19 | HiveCliHook()
 
-AIR302_hive.py:24:1: AIR302 [*] `airflow.macros.hive.max_partition` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:24:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.macros.hive.max_partition` is moved into `apache-hive` provider in Airflow 3.0;
    |
 23 | closest_ds_partition()
 24 | max_partition()
-   | ^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 25 |
 26 | HiveOperator()
    |
@@ -162,12 +162,12 @@ AIR302_hive.py:24:1: AIR302 [*] `airflow.macros.hive.max_partition` is moved int
 18 18 | HIVE_QUEUE_PRIORITIES
 19 19 | HiveCliHook()
 
-AIR302_hive.py:26:1: AIR302 [*] `airflow.operators.hive_operator.HiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:26:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.hive_operator.HiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
    |
 24 | max_partition()
 25 |
 26 | HiveOperator()
-   | ^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 27 | HiveStatsCollectionOperator()
 28 | HiveToMySqlOperator()
    |
@@ -186,11 +186,11 @@ AIR302_hive.py:26:1: AIR302 [*] `airflow.operators.hive_operator.HiveOperator` i
 18 18 | HIVE_QUEUE_PRIORITIES
 19 19 | HiveCliHook()
 
-AIR302_hive.py:27:1: AIR302 [*] `airflow.operators.hive_stats_operator.HiveStatsCollectionOperator` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:27:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.hive_stats_operator.HiveStatsCollectionOperator` is moved into `apache-hive` provider in Airflow 3.0;
    |
 26 | HiveOperator()
 27 | HiveStatsCollectionOperator()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 28 | HiveToMySqlOperator()
 29 | HiveToSambaOperator()
    |
@@ -208,12 +208,12 @@ AIR302_hive.py:27:1: AIR302 [*] `airflow.operators.hive_stats_operator.HiveStats
 18 18 | HIVE_QUEUE_PRIORITIES
 19 19 | HiveCliHook()
 
-AIR302_hive.py:28:1: AIR302 [*] `airflow.operators.hive_to_mysql.HiveToMySqlOperator` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:28:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.hive_to_mysql.HiveToMySqlOperator` is moved into `apache-hive` provider in Airflow 3.0;
    |
 26 | HiveOperator()
 27 | HiveStatsCollectionOperator()
 28 | HiveToMySqlOperator()
-   | ^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 29 | HiveToSambaOperator()
    |
    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveToMySqlOperator` from `airflow.providers.apache.hive.transfers.hive_to_mysql` instead.
@@ -229,12 +229,12 @@ AIR302_hive.py:28:1: AIR302 [*] `airflow.operators.hive_to_mysql.HiveToMySqlOper
 18 18 | HIVE_QUEUE_PRIORITIES
 19 19 | HiveCliHook()
 
-AIR302_hive.py:29:1: AIR302 [*] `airflow.operators.hive_to_samba_operator.HiveToSambaOperator` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:29:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.hive_to_samba_operator.HiveToSambaOperator` is moved into `apache-hive` provider in Airflow 3.0;
    |
 27 | HiveStatsCollectionOperator()
 28 | HiveToMySqlOperator()
 29 | HiveToSambaOperator()
-   | ^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
    |
    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveToSambaOperator` from `airflow.providers.apache.hive.transfers.hive_to_samba` instead.
 
@@ -248,12 +248,12 @@ AIR302_hive.py:29:1: AIR302 [*] `airflow.operators.hive_to_samba_operator.HiveTo
 18 18 | HIVE_QUEUE_PRIORITIES
 19 19 | HiveCliHook()
 
-AIR302_hive.py:34:1: AIR302 [*] `airflow.operators.hive_to_mysql.HiveToMySqlTransfer` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:34:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.hive_to_mysql.HiveToMySqlTransfer` is moved into `apache-hive` provider in Airflow 3.0;
    |
 32 | from airflow.operators.hive_to_mysql import HiveToMySqlTransfer
 33 |
 34 | HiveToMySqlTransfer()
-   | ^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 35 |
 36 | from airflow.operators.mysql_to_hive import MySqlToHiveOperator
    |
@@ -268,12 +268,12 @@ AIR302_hive.py:34:1: AIR302 [*] `airflow.operators.hive_to_mysql.HiveToMySqlTran
 34 35 | HiveToMySqlTransfer()
 35 36 | 
 
-AIR302_hive.py:38:1: AIR302 [*] `airflow.operators.mysql_to_hive.MySqlToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:38:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.mysql_to_hive.MySqlToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
    |
 36 | from airflow.operators.mysql_to_hive import MySqlToHiveOperator
 37 |
 38 | MySqlToHiveOperator()
-   | ^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 39 |
 40 | from airflow.operators.mysql_to_hive import MySqlToHiveTransfer
    |
@@ -289,12 +289,12 @@ AIR302_hive.py:38:1: AIR302 [*] `airflow.operators.mysql_to_hive.MySqlToHiveOper
 38 38 | MySqlToHiveOperator()
 39 39 | 
 
-AIR302_hive.py:42:1: AIR302 [*] `airflow.operators.mysql_to_hive.MySqlToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:42:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.mysql_to_hive.MySqlToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
    |
 40 | from airflow.operators.mysql_to_hive import MySqlToHiveTransfer
 41 |
 42 | MySqlToHiveTransfer()
-   | ^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 43 |
 44 | from airflow.operators.mssql_to_hive import MsSqlToHiveOperator
    |
@@ -309,12 +309,12 @@ AIR302_hive.py:42:1: AIR302 [*] `airflow.operators.mysql_to_hive.MySqlToHiveTran
 42 43 | MySqlToHiveTransfer()
 43 44 | 
 
-AIR302_hive.py:46:1: AIR302 [*] `airflow.operators.mssql_to_hive.MsSqlToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:46:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.mssql_to_hive.MsSqlToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
    |
 44 | from airflow.operators.mssql_to_hive import MsSqlToHiveOperator
 45 |
 46 | MsSqlToHiveOperator()
-   | ^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 47 |
 48 | from airflow.operators.mssql_to_hive import MsSqlToHiveTransfer
    |
@@ -330,12 +330,12 @@ AIR302_hive.py:46:1: AIR302 [*] `airflow.operators.mssql_to_hive.MsSqlToHiveOper
 46 46 | MsSqlToHiveOperator()
 47 47 | 
 
-AIR302_hive.py:50:1: AIR302 [*] `airflow.operators.mssql_to_hive.MsSqlToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:50:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.mssql_to_hive.MsSqlToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
    |
 48 | from airflow.operators.mssql_to_hive import MsSqlToHiveTransfer
 49 |
 50 | MsSqlToHiveTransfer()
-   | ^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 51 |
 52 | from airflow.operators.s3_to_hive_operator import S3ToHiveOperator
    |
@@ -350,12 +350,12 @@ AIR302_hive.py:50:1: AIR302 [*] `airflow.operators.mssql_to_hive.MsSqlToHiveTran
 50 51 | MsSqlToHiveTransfer()
 51 52 | 
 
-AIR302_hive.py:54:1: AIR302 [*] `airflow.operators.s3_to_hive_operator.S3ToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:54:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.s3_to_hive_operator.S3ToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
    |
 52 | from airflow.operators.s3_to_hive_operator import S3ToHiveOperator
 53 |
 54 | S3ToHiveOperator()
-   | ^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 55 |
 56 | from airflow.operators.s3_to_hive_operator import S3ToHiveTransfer
    |
@@ -371,12 +371,12 @@ AIR302_hive.py:54:1: AIR302 [*] `airflow.operators.s3_to_hive_operator.S3ToHiveO
 54 54 | S3ToHiveOperator()
 55 55 | 
 
-AIR302_hive.py:58:1: AIR302 [*] `airflow.operators.s3_to_hive_operator.S3ToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:58:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.operators.s3_to_hive_operator.S3ToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
    |
 56 | from airflow.operators.s3_to_hive_operator import S3ToHiveTransfer
 57 |
 58 | S3ToHiveTransfer()
-   | ^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 59 |
 60 | from airflow.sensors.hive_partition_sensor import HivePartitionSensor
    |
@@ -391,12 +391,12 @@ AIR302_hive.py:58:1: AIR302 [*] `airflow.operators.s3_to_hive_operator.S3ToHiveT
 58 59 | S3ToHiveTransfer()
 59 60 | 
 
-AIR302_hive.py:62:1: AIR302 [*] `airflow.sensors.hive_partition_sensor.HivePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:62:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.sensors.hive_partition_sensor.HivePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
    |
 60 | from airflow.sensors.hive_partition_sensor import HivePartitionSensor
 61 |
 62 | HivePartitionSensor()
-   | ^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 63 |
 64 | from airflow.sensors.metastore_partition_sensor import MetastorePartitionSensor
    |
@@ -412,12 +412,12 @@ AIR302_hive.py:62:1: AIR302 [*] `airflow.sensors.hive_partition_sensor.HiveParti
 62 62 | HivePartitionSensor()
 63 63 | 
 
-AIR302_hive.py:66:1: AIR302 [*] `airflow.sensors.metastore_partition_sensor.MetastorePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:66:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.sensors.metastore_partition_sensor.MetastorePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
    |
 64 | from airflow.sensors.metastore_partition_sensor import MetastorePartitionSensor
 65 |
 66 | MetastorePartitionSensor()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
 67 |
 68 | from airflow.sensors.named_hive_partition_sensor import NamedHivePartitionSensor
    |
@@ -433,12 +433,12 @@ AIR302_hive.py:66:1: AIR302 [*] `airflow.sensors.metastore_partition_sensor.Meta
 66 66 | MetastorePartitionSensor()
 67 67 | 
 
-AIR302_hive.py:70:1: AIR302 [*] `airflow.sensors.named_hive_partition_sensor.NamedHivePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
+AIR302_hive.py:70:1: AIR302 (airflow3-moved-to-provider) [*] `airflow.sensors.named_hive_partition_sensor.NamedHivePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
    |
 68 | from airflow.sensors.named_hive_partition_sensor import NamedHivePartitionSensor
 69 |
 70 | NamedHivePartitionSensor()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR302 (airflow3-moved-to-provider)
    |
    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `NamedHivePartitionSensor` from `airflow.providers.apache.hive.sensors.named_hive_partition` instead.
 

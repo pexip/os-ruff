@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_linter/src/message/json.rs
 expression: content
-snapshot_kind: text
 ---
 [
   {
@@ -18,6 +17,7 @@ snapshot_kind: text
       "row": 1
     },
     "message": "SyntaxError: Expected one or more symbol names after import",
+    "name": null,
     "noqa_row": null,
     "url": null
   },
@@ -35,6 +35,7 @@ snapshot_kind: text
       "row": 3
     },
     "message": "SyntaxError: Expected ')', found newline",
+    "name": null,
     "noqa_row": null,
     "url": null
   }

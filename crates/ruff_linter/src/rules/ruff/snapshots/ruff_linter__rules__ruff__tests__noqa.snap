@@ -1,20 +1,20 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-noqa.py:24:5: E741 Ambiguous variable name: `I`
+noqa.py:24:5: E741 (ambiguous-variable-name) Ambiguous variable name: `I`
    |
 22 |     # Neither of these are ignored and warning is
 23 |     # logged to user
 24 |     I = 1  # noqa: E741.F841
-   |     ^ E741
+   |     ^ E741 (ambiguous-variable-name)
    |
 
-noqa.py:24:5: F841 [*] Local variable `I` is assigned to but never used
+noqa.py:24:5: F841 (unused-variable) [*] Local variable `I` is assigned to but never used
    |
 22 |     # Neither of these are ignored and warning is
 23 |     # logged to user
 24 |     I = 1  # noqa: E741.F841
-   |     ^ F841
+   |     ^ F841 (unused-variable)
    |
    = help: Remove assignment to unused variable `I`
 

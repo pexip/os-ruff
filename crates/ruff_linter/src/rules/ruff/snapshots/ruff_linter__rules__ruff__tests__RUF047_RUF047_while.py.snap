@@ -1,13 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF047_while.py:6:1: RUF047 [*] Empty `else` clause
+RUF047_while.py:6:1: RUF047 (needless-else) [*] Empty `else` clause
   |
 4 |       loop_body_is_not_checked()
 5 |       break
 6 | / else:
 7 | |     pass
-  | |________^ RUF047
+  | |________^ RUF047 (needless-else)
   |
   = help: Remove the `else` clause
 
@@ -21,13 +21,13 @@ RUF047_while.py:6:1: RUF047 [*] Empty `else` clause
 9 7 | 
 10 8 | while this_comment:
 
-RUF047_while.py:12:1: RUF047 [*] Empty `else` clause
+RUF047_while.py:12:1: RUF047 (needless-else) [*] Empty `else` clause
    |
 10 |   while this_comment:
 11 |       belongs_to()  # `for`
 12 | / else:
 13 | |     ...
-   | |_______^ RUF047
+   | |_______^ RUF047 (needless-else)
    |
    = help: Remove the `else` clause
 

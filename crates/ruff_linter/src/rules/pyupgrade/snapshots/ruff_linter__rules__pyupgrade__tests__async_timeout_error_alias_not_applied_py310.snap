@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
-UP041.py:10:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:10:8: UP041 (timeout-error-alias) [*] Replace aliased errors with `TimeoutError`
    |
  8 | try:
  9 |     pass
 10 | except socket.timeout:
-   |        ^^^^^^^^^^^^^^ UP041
+   |        ^^^^^^^^^^^^^^ UP041 (timeout-error-alias)
 11 |     pass
    |
    = help: Replace `socket.timeout` with builtin `TimeoutError`
@@ -22,12 +21,12 @@ UP041.py:10:8: UP041 [*] Replace aliased errors with `TimeoutError`
 12 12 | 
 13 13 | # Should NOT be in parentheses when replaced
 
-UP041.py:22:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:22:8: UP041 (timeout-error-alias) [*] Replace aliased errors with `TimeoutError`
    |
 20 | try:
 21 |     pass
 22 | except (socket.timeout,):
-   |        ^^^^^^^^^^^^^^^^^ UP041
+   |        ^^^^^^^^^^^^^^^^^ UP041 (timeout-error-alias)
 23 |     pass
    |
    = help: Replace with builtin `TimeoutError`
@@ -42,12 +41,12 @@ UP041.py:22:8: UP041 [*] Replace aliased errors with `TimeoutError`
 24 24 | 
 25 25 | try:
 
-UP041.py:27:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:27:8: UP041 (timeout-error-alias) [*] Replace aliased errors with `TimeoutError`
    |
 25 | try:
 26 |     pass
 27 | except (asyncio.TimeoutError, socket.timeout,):
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP041
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP041 (timeout-error-alias)
 28 |     pass
    |
    = help: Replace with builtin `TimeoutError`
@@ -62,12 +61,12 @@ UP041.py:27:8: UP041 [*] Replace aliased errors with `TimeoutError`
 29 29 | 
 30 30 | # Should be kept in parentheses (because multiple)
 
-UP041.py:34:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:34:8: UP041 (timeout-error-alias) [*] Replace aliased errors with `TimeoutError`
    |
 32 | try:
 33 |     pass
 34 | except (asyncio.TimeoutError, socket.timeout, KeyError, TimeoutError):
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP041
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP041 (timeout-error-alias)
 35 |     pass
    |
    = help: Replace with builtin `TimeoutError`

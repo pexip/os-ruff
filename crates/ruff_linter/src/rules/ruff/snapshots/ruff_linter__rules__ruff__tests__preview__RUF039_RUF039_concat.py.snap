@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF039_concat.py:5:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:5:5: RUF039 (unraw-re-pattern) [*] First argument to `re.compile()` is not raw string
   |
 4 | re.compile(
 5 |     'implicit'
-  |     ^^^^^^^^^^ RUF039
+  |     ^^^^^^^^^^ RUF039 (unraw-re-pattern)
 6 |     'concatenation'
 7 | )
   |
@@ -21,12 +21,12 @@ RUF039_concat.py:5:5: RUF039 [*] First argument to `re.compile()` is not raw str
 7 7 | )
 8 8 | re.findall(
 
-RUF039_concat.py:6:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:6:5: RUF039 (unraw-re-pattern) [*] First argument to `re.compile()` is not raw string
   |
 4 | re.compile(
 5 |     'implicit'
 6 |     'concatenation'
-  |     ^^^^^^^^^^^^^^^ RUF039
+  |     ^^^^^^^^^^^^^^^ RUF039 (unraw-re-pattern)
 7 | )
 8 | re.findall(
   |
@@ -42,14 +42,14 @@ RUF039_concat.py:6:5: RUF039 [*] First argument to `re.compile()` is not raw str
 8 8 | re.findall(
 9 9 |     r'''
 
-RUF039_concat.py:12:5: RUF039 [*] First argument to `re.findall()` is not raw string
+RUF039_concat.py:12:5: RUF039 (unraw-re-pattern) [*] First argument to `re.findall()` is not raw string
    |
 10 |       multiline
 11 |       '''
 12 | /     """
 13 | |     concatenation
 14 | |     """
-   | |_______^ RUF039
+   | |_______^ RUF039 (unraw-re-pattern)
 15 |   )
 16 |   re.finditer(
    |
@@ -65,34 +65,34 @@ RUF039_concat.py:12:5: RUF039 [*] First argument to `re.findall()` is not raw st
 14 14 |     """
 15 15 | )
 
-RUF039_concat.py:26:5: RUF039 First argument to `re.match()` is not raw bytes literal
+RUF039_concat.py:26:5: RUF039 (unraw-re-pattern) First argument to `re.match()` is not raw bytes literal
    |
 24 | )
 25 | re.match(
 26 |     b'reak'
-   |     ^^^^^^^ RUF039
+   |     ^^^^^^^ RUF039 (unraw-re-pattern)
 27 |     br'eak'
 28 | )
    |
    = help: Replace with raw bytes literal
 
-RUF039_concat.py:30:8: RUF039 First argument to `re.search()` is not raw string
+RUF039_concat.py:30:8: RUF039 (unraw-re-pattern) First argument to `re.search()` is not raw string
    |
 28 | )
 29 | re.search(
 30 |     r''u''
-   |        ^^^ RUF039
+   |        ^^^ RUF039 (unraw-re-pattern)
 31 |     '''okay?'''
 32 | )
    |
    = help: Replace with raw string
 
-RUF039_concat.py:31:5: RUF039 [*] First argument to `re.search()` is not raw string
+RUF039_concat.py:31:5: RUF039 (unraw-re-pattern) [*] First argument to `re.search()` is not raw string
    |
 29 | re.search(
 30 |     r''u''
 31 |     '''okay?'''
-   |     ^^^^^^^^^^^ RUF039
+   |     ^^^^^^^^^^^ RUF039 (unraw-re-pattern)
 32 | )
 33 | re.split(''U"""w"""U'')
    |
@@ -108,12 +108,12 @@ RUF039_concat.py:31:5: RUF039 [*] First argument to `re.search()` is not raw str
 33 33 | re.split(''U"""w"""U'')
 34 34 | re.sub(
 
-RUF039_concat.py:33:10: RUF039 [*] First argument to `re.split()` is not raw string
+RUF039_concat.py:33:10: RUF039 (unraw-re-pattern) [*] First argument to `re.split()` is not raw string
    |
 31 |     '''okay?'''
 32 | )
 33 | re.split(''U"""w"""U'')
-   |          ^^ RUF039
+   |          ^^ RUF039 (unraw-re-pattern)
 34 | re.sub(
 35 |     "I''m o"
    |
@@ -129,34 +129,34 @@ RUF039_concat.py:33:10: RUF039 [*] First argument to `re.split()` is not raw str
 35 35 |     "I''m o"
 36 36 |     'utta ideas'
 
-RUF039_concat.py:33:12: RUF039 First argument to `re.split()` is not raw string
+RUF039_concat.py:33:12: RUF039 (unraw-re-pattern) First argument to `re.split()` is not raw string
    |
 31 |     '''okay?'''
 32 | )
 33 | re.split(''U"""w"""U'')
-   |            ^^^^^^^^ RUF039
+   |            ^^^^^^^^ RUF039 (unraw-re-pattern)
 34 | re.sub(
 35 |     "I''m o"
    |
    = help: Replace with raw string
 
-RUF039_concat.py:33:20: RUF039 First argument to `re.split()` is not raw string
+RUF039_concat.py:33:20: RUF039 (unraw-re-pattern) First argument to `re.split()` is not raw string
    |
 31 |     '''okay?'''
 32 | )
 33 | re.split(''U"""w"""U'')
-   |                    ^^^ RUF039
+   |                    ^^^ RUF039 (unraw-re-pattern)
 34 | re.sub(
 35 |     "I''m o"
    |
    = help: Replace with raw string
 
-RUF039_concat.py:35:5: RUF039 [*] First argument to `re.sub()` is not raw string
+RUF039_concat.py:35:5: RUF039 (unraw-re-pattern) [*] First argument to `re.sub()` is not raw string
    |
 33 | re.split(''U"""w"""U'')
 34 | re.sub(
 35 |     "I''m o"
-   |     ^^^^^^^^ RUF039
+   |     ^^^^^^^^ RUF039 (unraw-re-pattern)
 36 |     'utta ideas'
 37 | )
    |
@@ -172,12 +172,12 @@ RUF039_concat.py:35:5: RUF039 [*] First argument to `re.sub()` is not raw string
 37 37 | )
 38 38 | re.subn("()"r' am I'"??")
 
-RUF039_concat.py:36:5: RUF039 [*] First argument to `re.sub()` is not raw string
+RUF039_concat.py:36:5: RUF039 (unraw-re-pattern) [*] First argument to `re.sub()` is not raw string
    |
 34 | re.sub(
 35 |     "I''m o"
 36 |     'utta ideas'
-   |     ^^^^^^^^^^^^ RUF039
+   |     ^^^^^^^^^^^^ RUF039 (unraw-re-pattern)
 37 | )
 38 | re.subn("()"r' am I'"??")
    |
@@ -193,12 +193,12 @@ RUF039_concat.py:36:5: RUF039 [*] First argument to `re.sub()` is not raw string
 38 38 | re.subn("()"r' am I'"??")
 39 39 | 
 
-RUF039_concat.py:38:9: RUF039 [*] First argument to `re.subn()` is not raw string
+RUF039_concat.py:38:9: RUF039 (unraw-re-pattern) [*] First argument to `re.subn()` is not raw string
    |
 36 |     'utta ideas'
 37 | )
 38 | re.subn("()"r' am I'"??")
-   |         ^^^^ RUF039
+   |         ^^^^ RUF039 (unraw-re-pattern)
    |
    = help: Replace with raw string
 
@@ -212,12 +212,12 @@ RUF039_concat.py:38:9: RUF039 [*] First argument to `re.subn()` is not raw strin
 40 40 | 
 41 41 | import regex
 
-RUF039_concat.py:38:21: RUF039 [*] First argument to `re.subn()` is not raw string
+RUF039_concat.py:38:21: RUF039 (unraw-re-pattern) [*] First argument to `re.subn()` is not raw string
    |
 36 |     'utta ideas'
 37 | )
 38 | re.subn("()"r' am I'"??")
-   |                     ^^^^ RUF039
+   |                     ^^^^ RUF039 (unraw-re-pattern)
    |
    = help: Replace with raw string
 
@@ -231,11 +231,11 @@ RUF039_concat.py:38:21: RUF039 [*] First argument to `re.subn()` is not raw stri
 40 40 | 
 41 41 | import regex
 
-RUF039_concat.py:45:5: RUF039 [*] First argument to `regex.compile()` is not raw string
+RUF039_concat.py:45:5: RUF039 (unraw-re-pattern) [*] First argument to `regex.compile()` is not raw string
    |
 44 | regex.compile(
 45 |     'implicit'
-   |     ^^^^^^^^^^ RUF039
+   |     ^^^^^^^^^^ RUF039 (unraw-re-pattern)
 46 |     'concatenation'
 47 | )
    |
@@ -251,12 +251,12 @@ RUF039_concat.py:45:5: RUF039 [*] First argument to `regex.compile()` is not raw
 47 47 | )
 48 48 | regex.findall(
 
-RUF039_concat.py:46:5: RUF039 [*] First argument to `regex.compile()` is not raw string
+RUF039_concat.py:46:5: RUF039 (unraw-re-pattern) [*] First argument to `regex.compile()` is not raw string
    |
 44 | regex.compile(
 45 |     'implicit'
 46 |     'concatenation'
-   |     ^^^^^^^^^^^^^^^ RUF039
+   |     ^^^^^^^^^^^^^^^ RUF039 (unraw-re-pattern)
 47 | )
 48 | regex.findall(
    |
@@ -272,14 +272,14 @@ RUF039_concat.py:46:5: RUF039 [*] First argument to `regex.compile()` is not raw
 48 48 | regex.findall(
 49 49 |     r'''
 
-RUF039_concat.py:52:5: RUF039 [*] First argument to `regex.findall()` is not raw string
+RUF039_concat.py:52:5: RUF039 (unraw-re-pattern) [*] First argument to `regex.findall()` is not raw string
    |
 50 |       multiline
 51 |       '''
 52 | /     """
 53 | |     concatenation
 54 | |     """
-   | |_______^ RUF039
+   | |_______^ RUF039 (unraw-re-pattern)
 55 |   )
 56 |   regex.finditer(
    |
@@ -295,34 +295,34 @@ RUF039_concat.py:52:5: RUF039 [*] First argument to `regex.findall()` is not raw
 54 54 |     """
 55 55 | )
 
-RUF039_concat.py:66:5: RUF039 First argument to `regex.match()` is not raw bytes literal
+RUF039_concat.py:66:5: RUF039 (unraw-re-pattern) First argument to `regex.match()` is not raw bytes literal
    |
 64 | )
 65 | regex.match(
 66 |     b'reak'
-   |     ^^^^^^^ RUF039
+   |     ^^^^^^^ RUF039 (unraw-re-pattern)
 67 |     br'eak'
 68 | )
    |
    = help: Replace with raw bytes literal
 
-RUF039_concat.py:70:8: RUF039 First argument to `regex.search()` is not raw string
+RUF039_concat.py:70:8: RUF039 (unraw-re-pattern) First argument to `regex.search()` is not raw string
    |
 68 | )
 69 | regex.search(
 70 |     r''u''
-   |        ^^^ RUF039
+   |        ^^^ RUF039 (unraw-re-pattern)
 71 |     '''okay?'''
 72 | )
    |
    = help: Replace with raw string
 
-RUF039_concat.py:71:5: RUF039 [*] First argument to `regex.search()` is not raw string
+RUF039_concat.py:71:5: RUF039 (unraw-re-pattern) [*] First argument to `regex.search()` is not raw string
    |
 69 | regex.search(
 70 |     r''u''
 71 |     '''okay?'''
-   |     ^^^^^^^^^^^ RUF039
+   |     ^^^^^^^^^^^ RUF039 (unraw-re-pattern)
 72 | )
 73 | regex.split(''U"""w"""U'')
    |
@@ -338,12 +338,12 @@ RUF039_concat.py:71:5: RUF039 [*] First argument to `regex.search()` is not raw 
 73 73 | regex.split(''U"""w"""U'')
 74 74 | regex.sub(
 
-RUF039_concat.py:73:13: RUF039 [*] First argument to `regex.split()` is not raw string
+RUF039_concat.py:73:13: RUF039 (unraw-re-pattern) [*] First argument to `regex.split()` is not raw string
    |
 71 |     '''okay?'''
 72 | )
 73 | regex.split(''U"""w"""U'')
-   |             ^^ RUF039
+   |             ^^ RUF039 (unraw-re-pattern)
 74 | regex.sub(
 75 |     "I''m o"
    |
@@ -359,34 +359,34 @@ RUF039_concat.py:73:13: RUF039 [*] First argument to `regex.split()` is not raw 
 75 75 |     "I''m o"
 76 76 |     'utta ideas'
 
-RUF039_concat.py:73:15: RUF039 First argument to `regex.split()` is not raw string
+RUF039_concat.py:73:15: RUF039 (unraw-re-pattern) First argument to `regex.split()` is not raw string
    |
 71 |     '''okay?'''
 72 | )
 73 | regex.split(''U"""w"""U'')
-   |               ^^^^^^^^ RUF039
+   |               ^^^^^^^^ RUF039 (unraw-re-pattern)
 74 | regex.sub(
 75 |     "I''m o"
    |
    = help: Replace with raw string
 
-RUF039_concat.py:73:23: RUF039 First argument to `regex.split()` is not raw string
+RUF039_concat.py:73:23: RUF039 (unraw-re-pattern) First argument to `regex.split()` is not raw string
    |
 71 |     '''okay?'''
 72 | )
 73 | regex.split(''U"""w"""U'')
-   |                       ^^^ RUF039
+   |                       ^^^ RUF039 (unraw-re-pattern)
 74 | regex.sub(
 75 |     "I''m o"
    |
    = help: Replace with raw string
 
-RUF039_concat.py:75:5: RUF039 [*] First argument to `regex.sub()` is not raw string
+RUF039_concat.py:75:5: RUF039 (unraw-re-pattern) [*] First argument to `regex.sub()` is not raw string
    |
 73 | regex.split(''U"""w"""U'')
 74 | regex.sub(
 75 |     "I''m o"
-   |     ^^^^^^^^ RUF039
+   |     ^^^^^^^^ RUF039 (unraw-re-pattern)
 76 |     'utta ideas'
 77 | )
    |
@@ -402,12 +402,12 @@ RUF039_concat.py:75:5: RUF039 [*] First argument to `regex.sub()` is not raw str
 77 77 | )
 78 78 | regex.subn("()"r' am I'"??")
 
-RUF039_concat.py:76:5: RUF039 [*] First argument to `regex.sub()` is not raw string
+RUF039_concat.py:76:5: RUF039 (unraw-re-pattern) [*] First argument to `regex.sub()` is not raw string
    |
 74 | regex.sub(
 75 |     "I''m o"
 76 |     'utta ideas'
-   |     ^^^^^^^^^^^^ RUF039
+   |     ^^^^^^^^^^^^ RUF039 (unraw-re-pattern)
 77 | )
 78 | regex.subn("()"r' am I'"??")
    |
@@ -423,12 +423,12 @@ RUF039_concat.py:76:5: RUF039 [*] First argument to `regex.sub()` is not raw str
 78 78 | regex.subn("()"r' am I'"??")
 79 79 | 
 
-RUF039_concat.py:78:12: RUF039 [*] First argument to `regex.subn()` is not raw string
+RUF039_concat.py:78:12: RUF039 (unraw-re-pattern) [*] First argument to `regex.subn()` is not raw string
    |
 76 |     'utta ideas'
 77 | )
 78 | regex.subn("()"r' am I'"??")
-   |            ^^^^ RUF039
+   |            ^^^^ RUF039 (unraw-re-pattern)
    |
    = help: Replace with raw string
 
@@ -442,12 +442,12 @@ RUF039_concat.py:78:12: RUF039 [*] First argument to `regex.subn()` is not raw s
 80 80 | 
 81 81 | regex.template(
 
-RUF039_concat.py:78:24: RUF039 [*] First argument to `regex.subn()` is not raw string
+RUF039_concat.py:78:24: RUF039 (unraw-re-pattern) [*] First argument to `regex.subn()` is not raw string
    |
 76 |     'utta ideas'
 77 | )
 78 | regex.subn("()"r' am I'"??")
-   |                        ^^^^ RUF039
+   |                        ^^^^ RUF039 (unraw-re-pattern)
    |
    = help: Replace with raw string
 

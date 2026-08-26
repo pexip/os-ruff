@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-unused.py:5:8: F401 [*] `sys` imported but unused
+unused.py:5:8: F401 (unused-import) [*] `sys` imported but unused
   |
 4 | # Unused, _not_ marked as required.
 5 | import sys
-  |        ^^^ F401
+  |        ^^^ F401 (unused-import)
 6 |
 7 | # Unused, _not_ marked as required (due to the alias).
   |
@@ -20,11 +20,11 @@ unused.py:5:8: F401 [*] `sys` imported but unused
 7 6 | # Unused, _not_ marked as required (due to the alias).
 8 7 | import pathlib as non_alias
 
-unused.py:8:19: F401 [*] `pathlib` imported but unused
+unused.py:8:19: F401 (unused-import) [*] `pathlib` imported but unused
    |
  7 | # Unused, _not_ marked as required (due to the alias).
  8 | import pathlib as non_alias
-   |                   ^^^^^^^^^ F401
+   |                   ^^^^^^^^^ F401 (unused-import)
  9 |
 10 | # Unused, marked as required.
    |

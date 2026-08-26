@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:44:5: D407 [*] Missing dashed underline after section ("Returns")
+sections.py:44:5: D407 (missing-dashed-underline-after-section) [*] Missing dashed underline after section ("Returns")
    |
 42 |     """Toggle the gizmo.
 43 |
 44 |     Returns
-   |     ^^^^^^^ D407
+   |     ^^^^^^^ D407 (missing-dashed-underline-after-section)
 45 |     A value of some sort.
    |
    = help: Add dashed line under "Returns"
@@ -20,12 +20,12 @@ sections.py:44:5: D407 [*] Missing dashed underline after section ("Returns")
 46 47 | 
 47 48 |     """
 
-sections.py:56:5: D407 [*] Missing dashed underline after section ("Returns")
+sections.py:56:5: D407 (missing-dashed-underline-after-section) [*] Missing dashed underline after section ("Returns")
    |
 54 |     """Toggle the gizmo.
 55 |
 56 |     Returns
-   |     ^^^^^^^ D407
+   |     ^^^^^^^ D407 (missing-dashed-underline-after-section)
 57 |
 58 |     """
    |
@@ -40,12 +40,12 @@ sections.py:56:5: D407 [*] Missing dashed underline after section ("Returns")
 58 59 |     """
 59 60 | 
 
-sections.py:67:5: D407 [*] Missing dashed underline after section ("Returns")
+sections.py:67:5: D407 (missing-dashed-underline-after-section) [*] Missing dashed underline after section ("Returns")
    |
 65 |     """Toggle the gizmo.
 66 |
 67 |     Returns"""
-   |     ^^^^^^^ D407
+   |     ^^^^^^^ D407 (missing-dashed-underline-after-section)
    |
    = help: Add dashed line under "Returns"
 
@@ -60,12 +60,12 @@ sections.py:67:5: D407 [*] Missing dashed underline after section ("Returns")
 69 70 | 
 70 71 | @expect(_D213)
 
-sections.py:227:5: D407 [*] Missing dashed underline after section ("Raises")
+sections.py:227:5: D407 (missing-dashed-underline-after-section) [*] Missing dashed underline after section ("Raises")
     |
 225 |     ------
 226 |     Many many wonderful things.
 227 |     Raises:
-    |     ^^^^^^ D407
+    |     ^^^^^^ D407 (missing-dashed-underline-after-section)
 228 |     My attention.
     |
     = help: Add dashed line under "Raises"
@@ -79,11 +79,11 @@ sections.py:227:5: D407 [*] Missing dashed underline after section ("Raises")
 229 230 | 
 230 231 |     """
 
-sections.py:522:5: D407 [*] Missing dashed underline after section ("Parameters")
+sections.py:522:5: D407 (missing-dashed-underline-after-section) [*] Missing dashed underline after section ("Parameters")
     |
 521 |     Parameters
 522 |     ==========
-    |     ^^^^^^^^^^ D407
+    |     ^^^^^^^^^^ D407 (missing-dashed-underline-after-section)
 523 |     """
     |
     = help: Add dashed line under "Parameters"
@@ -98,11 +98,11 @@ sections.py:522:5: D407 [*] Missing dashed underline after section ("Parameters"
 524 524 | 
 525 525 | 
 
-sections.py:530:5: D407 [*] Missing dashed underline after section ("Parameters")
+sections.py:530:5: D407 (missing-dashed-underline-after-section) [*] Missing dashed underline after section ("Parameters")
     |
 529 |     Parameters
 530 |     ===========
-    |     ^^^^^^^^^^^ D407
+    |     ^^^^^^^^^^^ D407 (missing-dashed-underline-after-section)
 531 |     """
     |
     = help: Add dashed line under "Parameters"
@@ -117,12 +117,12 @@ sections.py:530:5: D407 [*] Missing dashed underline after section ("Parameters"
 532 532 | 
 533 533 | 
 
-sections.py:613:4: D407 [*] Missing dashed underline after section ("Parameters")
+sections.py:613:4: D407 (missing-dashed-underline-after-section) [*] Missing dashed underline after section ("Parameters")
     |
 611 |    """Test that lower case subsection header is valid even if it is of a different kind.
 612 |
 613 |    Parameters
-    |    ^^^^^^^^^^ D407
+    |    ^^^^^^^^^^ D407 (missing-dashed-underline-after-section)
 614 |    -‐-----------------
 615 |    returns:
     |

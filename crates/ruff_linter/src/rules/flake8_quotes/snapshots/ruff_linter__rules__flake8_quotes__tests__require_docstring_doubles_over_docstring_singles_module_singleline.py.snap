@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
-snapshot_kind: text
 ---
-docstring_singles_module_singleline.py:1:1: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_module_singleline.py:1:1: Q002 (bad-quotes-docstring) [*] Single quote docstring found but double quotes preferred
   |
 1 | ''' Double quotes singleline module docstring '''
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002 (bad-quotes-docstring)
 2 | ''' this is not a docstring '''
   |
   = help: Replace single quotes docstring with double quotes

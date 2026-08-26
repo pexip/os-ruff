@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF058_0.py:7:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:7:1: RUF058 (starmap-zip) [*] `itertools.starmap` called on `zip` iterable
   |
 5 | # Errors
 6 |
 7 | starmap(func, zip())
-  | ^^^^^^^^^^^^^^^^^^^^ RUF058
+  | ^^^^^^^^^^^^^^^^^^^^ RUF058 (starmap-zip)
 8 | starmap(func, zip([]))
   |
   = help: Use `map` instead
@@ -21,11 +21,11 @@ RUF058_0.py:7:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 9 9 | 
 10 10 | 
 
-RUF058_0.py:8:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:8:1: RUF058 (starmap-zip) [*] `itertools.starmap` called on `zip` iterable
   |
 7 | starmap(func, zip())
 8 | starmap(func, zip([]))
-  | ^^^^^^^^^^^^^^^^^^^^^^ RUF058
+  | ^^^^^^^^^^^^^^^^^^^^^^ RUF058 (starmap-zip)
   |
   = help: Use `map` instead
 
@@ -39,10 +39,10 @@ RUF058_0.py:8:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 10 10 | 
 11 11 | starmap(func, zip(a, b, c,),)
 
-RUF058_0.py:11:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:11:1: RUF058 (starmap-zip) [*] `itertools.starmap` called on `zip` iterable
    |
 11 | starmap(func, zip(a, b, c,),)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF058
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF058 (starmap-zip)
    |
    = help: Use `map` instead
 
@@ -56,7 +56,7 @@ RUF058_0.py:11:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 13 13 | 
 14 14 | starmap(
 
-RUF058_0.py:14:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:14:1: RUF058 (starmap-zip) [*] `itertools.starmap` called on `zip` iterable
    |
 14 | / starmap(
 15 | |     func,  # Foo
@@ -65,7 +65,7 @@ RUF058_0.py:14:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 18 | |
 19 | |     )
 20 | | )
-   | |_^ RUF058
+   | |_^ RUF058 (starmap-zip)
 21 |
 22 |   (  # Foo
    |
@@ -88,7 +88,7 @@ RUF058_0.py:14:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 21 21 | 
 22 22 | (  # Foo
 
-RUF058_0.py:22:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:22:1: RUF058 (starmap-zip) [*] `itertools.starmap` called on `zip` iterable
    |
 20 |   )
 21 |
@@ -100,7 +100,7 @@ RUF058_0.py:22:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 27 | |         a, b, c,
 28 | |     ),
 29 | | )
-   | |_^ RUF058
+   | |_^ RUF058 (starmap-zip)
 30 |
 31 |   (  # Foobar
    |
@@ -124,7 +124,7 @@ RUF058_0.py:22:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 30 28 | 
 31 29 | (  # Foobar
 
-RUF058_0.py:31:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:31:1: RUF058 (starmap-zip) [*] `itertools.starmap` called on `zip` iterable
    |
 29 |   )
 30 |
@@ -147,7 +147,7 @@ RUF058_0.py:31:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 47 | |    )      )
 48 | |    ),
 49 | | )
-   | |_^ RUF058
+   | |_^ RUF058 (starmap-zip)
 50 |
 51 |   starmap(
    |
@@ -182,7 +182,7 @@ RUF058_0.py:31:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 50 42 | 
 51 43 | starmap(
 
-RUF058_0.py:51:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:51:1: RUF058 (starmap-zip) [*] `itertools.starmap` called on `zip` iterable
    |
 49 |   )
 50 |
@@ -196,7 +196,7 @@ RUF058_0.py:51:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 58 | |             c,\
 59 | |         )
 60 | | )
-   | |_^ RUF058
+   | |_^ RUF058 (starmap-zip)
    |
    = help: Use `map` instead
 

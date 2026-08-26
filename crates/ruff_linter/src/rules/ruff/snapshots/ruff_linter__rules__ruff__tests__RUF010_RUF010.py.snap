@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF010.py:9:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:9:4: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-   |    ^^^^^^^^ RUF010
+   |    ^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 10 |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |
@@ -20,10 +20,10 @@ RUF010.py:9:4: RUF010 [*] Use explicit conversion flag
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
 
-RUF010.py:9:16: RUF010 [*] Use explicit conversion flag
+RUF010.py:9:16: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-   |                ^^^^^^^^^ RUF010
+   |                ^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 10 |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |
@@ -39,10 +39,10 @@ RUF010.py:9:16: RUF010 [*] Use explicit conversion flag
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
 
-RUF010.py:9:29: RUF010 [*] Use explicit conversion flag
+RUF010.py:9:29: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
-   |                             ^^^^^^^^^^ RUF010
+   |                             ^^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 10 |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |
@@ -58,12 +58,12 @@ RUF010.py:9:29: RUF010 [*] Use explicit conversion flag
 11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
 
-RUF010.py:11:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:11:4: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
 10 |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-   |    ^^^^^^^^^^^ RUF010
+   |    ^^^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 12 |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
@@ -79,12 +79,12 @@ RUF010.py:11:4: RUF010 [*] Use explicit conversion flag
 13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
 
-RUF010.py:11:19: RUF010 [*] Use explicit conversion flag
+RUF010.py:11:19: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
 10 |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-   |                   ^^^^^^^^^^^^ RUF010
+   |                   ^^^^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 12 |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
@@ -100,12 +100,12 @@ RUF010.py:11:19: RUF010 [*] Use explicit conversion flag
 13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
 
-RUF010.py:11:35: RUF010 [*] Use explicit conversion flag
+RUF010.py:11:35: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
  9 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
 10 |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
-   |                                   ^^^^^^^^^^^^^ RUF010
+   |                                   ^^^^^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 12 |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
@@ -121,12 +121,12 @@ RUF010.py:11:35: RUF010 [*] Use explicit conversion flag
 13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
 
-RUF010.py:13:5: RUF010 [*] Use explicit conversion flag
+RUF010.py:13:5: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
-   |     ^^^^^^^^ RUF010
+   |     ^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 14 |
 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
@@ -142,12 +142,12 @@ RUF010.py:13:5: RUF010 [*] Use explicit conversion flag
 15 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 16 16 | 
 
-RUF010.py:13:19: RUF010 [*] Use explicit conversion flag
+RUF010.py:13:19: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
-   |                   ^^^^^^^^^ RUF010
+   |                   ^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 14 |
 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
@@ -163,12 +163,12 @@ RUF010.py:13:19: RUF010 [*] Use explicit conversion flag
 15 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 16 16 | 
 
-RUF010.py:13:34: RUF010 [*] Use explicit conversion flag
+RUF010.py:13:34: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
-   |                                  ^^^^^^^^^^ RUF010
+   |                                  ^^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 14 |
 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
@@ -184,12 +184,12 @@ RUF010.py:13:34: RUF010 [*] Use explicit conversion flag
 15 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 16 16 | 
 
-RUF010.py:15:14: RUF010 [*] Use explicit conversion flag
+RUF010.py:15:14: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 |
 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
-   |              ^^^^^^^^^ RUF010
+   |              ^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 16 |
 17 | f"{foo(bla)}"  # OK
    |
@@ -205,12 +205,12 @@ RUF010.py:15:14: RUF010 [*] Use explicit conversion flag
 17 17 | f"{foo(bla)}"  # OK
 18 18 | 
 
-RUF010.py:15:29: RUF010 [*] Use explicit conversion flag
+RUF010.py:15:29: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 |
 15 | f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
-   |                             ^^^^^^^^^^ RUF010
+   |                             ^^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 16 |
 17 | f"{foo(bla)}"  # OK
    |
@@ -226,12 +226,12 @@ RUF010.py:15:29: RUF010 [*] Use explicit conversion flag
 17 17 | f"{foo(bla)}"  # OK
 18 18 | 
 
-RUF010.py:35:20: RUF010 [*] Use explicit conversion flag
+RUF010.py:35:20: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 33 |     f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
 34 |     " intermediary content "
 35 |     f" that flows {repr(obj)} of type {type(obj)}.{additional_message}"  # RUF010
-   |                    ^^^^^^^^^ RUF010
+   |                    ^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 36 | )
    |
    = help: Replace with conversion flag
@@ -246,11 +246,11 @@ RUF010.py:35:20: RUF010 [*] Use explicit conversion flag
 37 37 | 
 38 38 | 
 
-RUF010.py:40:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:40:4: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 39 | # https://github.com/astral-sh/ruff/issues/16325
 40 | f"{str({})}"
-   |    ^^^^^^^ RUF010
+   |    ^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 41 |
 42 | f"{str({} | {})}"
    |
@@ -266,12 +266,12 @@ RUF010.py:40:4: RUF010 [*] Use explicit conversion flag
 42 42 | f"{str({} | {})}"
 43 43 | 
 
-RUF010.py:42:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:42:4: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 40 | f"{str({})}"
 41 |
 42 | f"{str({} | {})}"
-   |    ^^^^^^^^^^^^ RUF010
+   |    ^^^^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 43 |
 44 | import builtins
    |
@@ -287,12 +287,12 @@ RUF010.py:42:4: RUF010 [*] Use explicit conversion flag
 44 44 | import builtins
 45 45 | 
 
-RUF010.py:46:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:46:4: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 44 | import builtins
 45 |
 46 | f"{builtins.repr(1)}"
-   |    ^^^^^^^^^^^^^^^^ RUF010
+   |    ^^^^^^^^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 47 |
 48 | f"{repr(1)=}"
    |
@@ -308,23 +308,23 @@ RUF010.py:46:4: RUF010 [*] Use explicit conversion flag
 48 48 | f"{repr(1)=}"
 49 49 | 
 
-RUF010.py:48:4: RUF010 Use explicit conversion flag
+RUF010.py:48:4: RUF010 (explicit-f-string-type-conversion) Use explicit conversion flag
    |
 46 | f"{builtins.repr(1)}"
 47 |
 48 | f"{repr(1)=}"
-   |    ^^^^^^^ RUF010
+   |    ^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 49 |
 50 | f"{repr(lambda: 1)}"
    |
    = help: Replace with conversion flag
 
-RUF010.py:50:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:50:4: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 48 | f"{repr(1)=}"
 49 |
 50 | f"{repr(lambda: 1)}"
-   |    ^^^^^^^^^^^^^^^ RUF010
+   |    ^^^^^^^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 51 |
 52 | f"{repr(x := 2)}"
    |
@@ -340,12 +340,12 @@ RUF010.py:50:4: RUF010 [*] Use explicit conversion flag
 52 52 | f"{repr(x := 2)}"
 53 53 | 
 
-RUF010.py:52:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:52:4: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 50 | f"{repr(lambda: 1)}"
 51 |
 52 | f"{repr(x := 2)}"
-   |    ^^^^^^^^^^^^ RUF010
+   |    ^^^^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
 53 |
 54 | f"{str(object=3)}"
    |
@@ -360,12 +360,12 @@ RUF010.py:52:4: RUF010 [*] Use explicit conversion flag
 53 53 | 
 54 54 | f"{str(object=3)}"
 
-RUF010.py:54:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:54:4: RUF010 (explicit-f-string-type-conversion) [*] Use explicit conversion flag
    |
 52 | f"{repr(x := 2)}"
 53 |
 54 | f"{str(object=3)}"
-   |    ^^^^^^^^^^^^^ RUF010
+   |    ^^^^^^^^^^^^^ RUF010 (explicit-f-string-type-conversion)
    |
    = help: Replace with conversion flag
 

@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
-UP044.py:6:17: UP044 [*] Use `*` for unpacking
+UP044.py:6:17: UP044 (non-pep646-unpack) [*] Use `*` for unpacking
   |
 6 | class C(Generic[Unpack[Shape]]):
-  |                 ^^^^^^^^^^^^^ UP044
+  |                 ^^^^^^^^^^^^^ UP044 (non-pep646-unpack)
 7 |     pass
   |
   = help: Convert to `*` for unpacking
@@ -20,10 +19,10 @@ UP044.py:6:17: UP044 [*] Use `*` for unpacking
 8 8 | 
 9 9 | 
 
-UP044.py:10:17: UP044 [*] Use `*` for unpacking
+UP044.py:10:17: UP044 (non-pep646-unpack) [*] Use `*` for unpacking
    |
 10 | class D(Generic[Unpack[Shape]]):
-   |                 ^^^^^^^^^^^^^ UP044
+   |                 ^^^^^^^^^^^^^ UP044 (non-pep646-unpack)
 11 |     pass
    |
    = help: Convert to `*` for unpacking
@@ -38,10 +37,10 @@ UP044.py:10:17: UP044 [*] Use `*` for unpacking
 12 12 | 
 13 13 | 
 
-UP044.py:14:14: UP044 [*] Use `*` for unpacking
+UP044.py:14:14: UP044 (non-pep646-unpack) [*] Use `*` for unpacking
    |
 14 | def f(*args: Unpack[tuple[int, ...]]):
-   |              ^^^^^^^^^^^^^^^^^^^^^^^ UP044
+   |              ^^^^^^^^^^^^^^^^^^^^^^^ UP044 (non-pep646-unpack)
 15 |     pass
    |
    = help: Convert to `*` for unpacking
@@ -56,10 +55,10 @@ UP044.py:14:14: UP044 [*] Use `*` for unpacking
 16 16 | 
 17 17 | 
 
-UP044.py:18:14: UP044 [*] Use `*` for unpacking
+UP044.py:18:14: UP044 (non-pep646-unpack) [*] Use `*` for unpacking
    |
 18 | def f(*args: Unpack[other.Type]):
-   |              ^^^^^^^^^^^^^^^^^^ UP044
+   |              ^^^^^^^^^^^^^^^^^^ UP044 (non-pep646-unpack)
 19 |     pass
    |
    = help: Convert to `*` for unpacking
@@ -74,10 +73,10 @@ UP044.py:18:14: UP044 [*] Use `*` for unpacking
 20 20 | 
 21 21 | 
 
-UP044.py:22:27: UP044 [*] Use `*` for unpacking
+UP044.py:22:27: UP044 (non-pep646-unpack) [*] Use `*` for unpacking
    |
 22 | def f(*args: Generic[int, Unpack[int]]):
-   |                           ^^^^^^^^^^^ UP044
+   |                           ^^^^^^^^^^^ UP044 (non-pep646-unpack)
 23 |     pass
    |
    = help: Convert to `*` for unpacking

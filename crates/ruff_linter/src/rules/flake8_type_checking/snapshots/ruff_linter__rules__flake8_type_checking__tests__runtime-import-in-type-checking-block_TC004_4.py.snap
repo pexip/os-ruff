@@ -1,12 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
-TC004_4.py:4:24: TC004 [*] Move import `typing.Any` out of type-checking block. Import is used for more than type hinting.
+TC004_4.py:4:24: TC004 (runtime-import-in-type-checking-block) [*] Move import `typing.Any` out of type-checking block. Import is used for more than type hinting.
   |
 3 | if TYPE_CHECKING:
 4 |     from typing import Any
-  |                        ^^^ TC004
+  |                        ^^^ TC004 (runtime-import-in-type-checking-block)
   |
   = help: Move out of type-checking block
 

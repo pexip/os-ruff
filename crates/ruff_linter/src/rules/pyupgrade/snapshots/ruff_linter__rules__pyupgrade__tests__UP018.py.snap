@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP018.py:37:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
+UP018.py:37:1: UP018 (native-literals) [*] Unnecessary `str` call (rewrite as a literal)
    |
 36 | # These become literals
 37 | str()
-   | ^^^^^ UP018
+   | ^^^^^ UP018 (native-literals)
 38 | str("foo")
 39 | str("""
    |
@@ -21,12 +21,12 @@ UP018.py:37:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 39 39 | str("""
 40 40 | foo""")
 
-UP018.py:38:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
+UP018.py:38:1: UP018 (native-literals) [*] Unnecessary `str` call (rewrite as a literal)
    |
 36 | # These become literals
 37 | str()
 38 | str("foo")
-   | ^^^^^^^^^^ UP018
+   | ^^^^^^^^^^ UP018 (native-literals)
 39 | str("""
 40 | foo""")
    |
@@ -42,13 +42,13 @@ UP018.py:38:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 40 40 | foo""")
 41 41 | bytes()
 
-UP018.py:39:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
+UP018.py:39:1: UP018 (native-literals) [*] Unnecessary `str` call (rewrite as a literal)
    |
 37 |   str()
 38 |   str("foo")
 39 | / str("""
 40 | | foo""")
-   | |_______^ UP018
+   | |_______^ UP018 (native-literals)
 41 |   bytes()
 42 |   bytes(b"foo")
    |
@@ -66,12 +66,12 @@ UP018.py:39:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 42 42 | bytes(b"foo")
 43 43 | bytes(b"""
 
-UP018.py:41:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
+UP018.py:41:1: UP018 (native-literals) [*] Unnecessary `bytes` call (rewrite as a literal)
    |
 39 | str("""
 40 | foo""")
 41 | bytes()
-   | ^^^^^^^ UP018
+   | ^^^^^^^ UP018 (native-literals)
 42 | bytes(b"foo")
 43 | bytes(b"""
    |
@@ -87,12 +87,12 @@ UP018.py:41:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
 43 43 | bytes(b"""
 44 44 | foo""")
 
-UP018.py:42:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
+UP018.py:42:1: UP018 (native-literals) [*] Unnecessary `bytes` call (rewrite as a literal)
    |
 40 | foo""")
 41 | bytes()
 42 | bytes(b"foo")
-   | ^^^^^^^^^^^^^ UP018
+   | ^^^^^^^^^^^^^ UP018 (native-literals)
 43 | bytes(b"""
 44 | foo""")
    |
@@ -108,13 +108,13 @@ UP018.py:42:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
 44 44 | foo""")
 45 45 | f"{str()}"
 
-UP018.py:43:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
+UP018.py:43:1: UP018 (native-literals) [*] Unnecessary `bytes` call (rewrite as a literal)
    |
 41 |   bytes()
 42 |   bytes(b"foo")
 43 | / bytes(b"""
 44 | | foo""")
-   | |_______^ UP018
+   | |_______^ UP018 (native-literals)
 45 |   f"{str()}"
 46 |   int()
    |
@@ -132,12 +132,12 @@ UP018.py:43:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
 46 46 | int()
 47 47 | int(1)
 
-UP018.py:45:4: UP018 [*] Unnecessary `str` call (rewrite as a literal)
+UP018.py:45:4: UP018 (native-literals) [*] Unnecessary `str` call (rewrite as a literal)
    |
 43 | bytes(b"""
 44 | foo""")
 45 | f"{str()}"
-   |    ^^^^^ UP018
+   |    ^^^^^ UP018 (native-literals)
 46 | int()
 47 | int(1)
    |
@@ -153,12 +153,12 @@ UP018.py:45:4: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 47 47 | int(1)
 48 48 | float()
 
-UP018.py:46:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:46:1: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 44 | foo""")
 45 | f"{str()}"
 46 | int()
-   | ^^^^^ UP018
+   | ^^^^^ UP018 (native-literals)
 47 | int(1)
 48 | float()
    |
@@ -174,12 +174,12 @@ UP018.py:46:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 48 48 | float()
 49 49 | float(1.0)
 
-UP018.py:47:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:47:1: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 45 | f"{str()}"
 46 | int()
 47 | int(1)
-   | ^^^^^^ UP018
+   | ^^^^^^ UP018 (native-literals)
 48 | float()
 49 | float(1.0)
    |
@@ -195,12 +195,12 @@ UP018.py:47:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 49 49 | float(1.0)
 50 50 | bool()
 
-UP018.py:48:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+UP018.py:48:1: UP018 (native-literals) [*] Unnecessary `float` call (rewrite as a literal)
    |
 46 | int()
 47 | int(1)
 48 | float()
-   | ^^^^^^^ UP018
+   | ^^^^^^^ UP018 (native-literals)
 49 | float(1.0)
 50 | bool()
    |
@@ -216,12 +216,12 @@ UP018.py:48:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 50 50 | bool()
 51 51 | bool(True)
 
-UP018.py:49:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+UP018.py:49:1: UP018 (native-literals) [*] Unnecessary `float` call (rewrite as a literal)
    |
 47 | int(1)
 48 | float()
 49 | float(1.0)
-   | ^^^^^^^^^^ UP018
+   | ^^^^^^^^^^ UP018 (native-literals)
 50 | bool()
 51 | bool(True)
    |
@@ -237,12 +237,12 @@ UP018.py:49:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 51 51 | bool(True)
 52 52 | bool(False)
 
-UP018.py:50:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
+UP018.py:50:1: UP018 (native-literals) [*] Unnecessary `bool` call (rewrite as a literal)
    |
 48 | float()
 49 | float(1.0)
 50 | bool()
-   | ^^^^^^ UP018
+   | ^^^^^^ UP018 (native-literals)
 51 | bool(True)
 52 | bool(False)
    |
@@ -258,12 +258,12 @@ UP018.py:50:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 52 52 | bool(False)
 53 53 | 
 
-UP018.py:51:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
+UP018.py:51:1: UP018 (native-literals) [*] Unnecessary `bool` call (rewrite as a literal)
    |
 49 | float(1.0)
 50 | bool()
 51 | bool(True)
-   | ^^^^^^^^^^ UP018
+   | ^^^^^^^^^^ UP018 (native-literals)
 52 | bool(False)
    |
    = help: Replace with boolean literal
@@ -278,12 +278,12 @@ UP018.py:51:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 53 53 | 
 54 54 | # These become a literal but retain parentheses
 
-UP018.py:52:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
+UP018.py:52:1: UP018 (native-literals) [*] Unnecessary `bool` call (rewrite as a literal)
    |
 50 | bool()
 51 | bool(True)
 52 | bool(False)
-   | ^^^^^^^^^^^ UP018
+   | ^^^^^^^^^^^ UP018 (native-literals)
 53 |
 54 | # These become a literal but retain parentheses
    |
@@ -299,11 +299,11 @@ UP018.py:52:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 54 54 | # These become a literal but retain parentheses
 55 55 | int(1).denominator
 
-UP018.py:55:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:55:1: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 54 | # These become a literal but retain parentheses
 55 | int(1).denominator
-   | ^^^^^^ UP018
+   | ^^^^^^ UP018 (native-literals)
 56 |
 57 | # These too are literals in spirit
    |
@@ -319,11 +319,11 @@ UP018.py:55:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 57 57 | # These too are literals in spirit
 58 58 | int(+1)
 
-UP018.py:58:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:58:1: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 57 | # These too are literals in spirit
 58 | int(+1)
-   | ^^^^^^^ UP018
+   | ^^^^^^^ UP018 (native-literals)
 59 | int(-1)
 60 | float(+1.0)
    |
@@ -339,12 +339,12 @@ UP018.py:58:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 60 60 | float(+1.0)
 61 61 | float(-1.0)
 
-UP018.py:59:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:59:1: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 57 | # These too are literals in spirit
 58 | int(+1)
 59 | int(-1)
-   | ^^^^^^^ UP018
+   | ^^^^^^^ UP018 (native-literals)
 60 | float(+1.0)
 61 | float(-1.0)
    |
@@ -360,12 +360,12 @@ UP018.py:59:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 61 61 | float(-1.0)
 62 62 | 
 
-UP018.py:60:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+UP018.py:60:1: UP018 (native-literals) [*] Unnecessary `float` call (rewrite as a literal)
    |
 58 | int(+1)
 59 | int(-1)
 60 | float(+1.0)
-   | ^^^^^^^^^^^ UP018
+   | ^^^^^^^^^^^ UP018 (native-literals)
 61 | float(-1.0)
    |
    = help: Replace with float literal
@@ -380,12 +380,12 @@ UP018.py:60:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 62 62 | 
 63 63 | 
 
-UP018.py:61:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+UP018.py:61:1: UP018 (native-literals) [*] Unnecessary `float` call (rewrite as a literal)
    |
 59 | int(-1)
 60 | float(+1.0)
 61 | float(-1.0)
-   | ^^^^^^^^^^^ UP018
+   | ^^^^^^^^^^^ UP018 (native-literals)
    |
    = help: Replace with float literal
 
@@ -399,11 +399,11 @@ UP018.py:61:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 63 63 | 
 64 64 | # https://github.com/astral-sh/ruff/issues/15859
 
-UP018.py:65:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:65:1: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 64 | # https://github.com/astral-sh/ruff/issues/15859
 65 | int(-1) ** 0                 # (-1) ** 0
-   | ^^^^^^^ UP018
+   | ^^^^^^^ UP018 (native-literals)
 66 | 2 ** int(-1)                 # 2 ** -1
    |
    = help: Replace with integer literal
@@ -418,12 +418,12 @@ UP018.py:65:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 67 67 | 
 68 68 | int(-1)[0]                   # (-1)[0]
 
-UP018.py:66:6: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:66:6: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 64 | # https://github.com/astral-sh/ruff/issues/15859
 65 | int(-1) ** 0                 # (-1) ** 0
 66 | 2 ** int(-1)                 # 2 ** -1
-   |      ^^^^^^^ UP018
+   |      ^^^^^^^ UP018 (native-literals)
 67 |
 68 | int(-1)[0]                   # (-1)[0]
    |
@@ -439,12 +439,12 @@ UP018.py:66:6: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 68 68 | int(-1)[0]                   # (-1)[0]
 69 69 | 2[int(-1)]                   # 2[-1]
 
-UP018.py:68:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:68:1: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 66 | 2 ** int(-1)                 # 2 ** -1
 67 |
 68 | int(-1)[0]                   # (-1)[0]
-   | ^^^^^^^ UP018
+   | ^^^^^^^ UP018 (native-literals)
 69 | 2[int(-1)]                   # 2[-1]
    |
    = help: Replace with integer literal
@@ -459,11 +459,11 @@ UP018.py:68:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 70 70 | 
 71 71 | int(-1)(0)                   # (-1)(0)
 
-UP018.py:69:3: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:69:3: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 68 | int(-1)[0]                   # (-1)[0]
 69 | 2[int(-1)]                   # 2[-1]
-   |   ^^^^^^^ UP018
+   |   ^^^^^^^ UP018 (native-literals)
 70 |
 71 | int(-1)(0)                   # (-1)(0)
    |
@@ -479,12 +479,12 @@ UP018.py:69:3: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 71 71 | int(-1)(0)                   # (-1)(0)
 72 72 | 2(int(-1))                   # 2(-1)
 
-UP018.py:71:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:71:1: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 69 | 2[int(-1)]                   # 2[-1]
 70 |
 71 | int(-1)(0)                   # (-1)(0)
-   | ^^^^^^^ UP018
+   | ^^^^^^^ UP018 (native-literals)
 72 | 2(int(-1))                   # 2(-1)
    |
    = help: Replace with integer literal
@@ -499,11 +499,11 @@ UP018.py:71:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 73 73 | 
 74 74 | float(-1.0).foo              # (-1.0).foo
 
-UP018.py:72:3: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:72:3: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 71 | int(-1)(0)                   # (-1)(0)
 72 | 2(int(-1))                   # 2(-1)
-   |   ^^^^^^^ UP018
+   |   ^^^^^^^ UP018 (native-literals)
 73 |
 74 | float(-1.0).foo              # (-1.0).foo
    |
@@ -519,12 +519,12 @@ UP018.py:72:3: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 74 74 | float(-1.0).foo              # (-1.0).foo
 75 75 | 
 
-UP018.py:74:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+UP018.py:74:1: UP018 (native-literals) [*] Unnecessary `float` call (rewrite as a literal)
    |
 72 | 2(int(-1))                   # 2(-1)
 73 |
 74 | float(-1.0).foo              # (-1.0).foo
-   | ^^^^^^^^^^^ UP018
+   | ^^^^^^^^^^^ UP018 (native-literals)
 75 |
 76 | await int(-1)                # await (-1)
    |
@@ -540,12 +540,12 @@ UP018.py:74:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 76 76 | await int(-1)                # await (-1)
 77 77 | 
 
-UP018.py:76:7: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:76:7: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 74 | float(-1.0).foo              # (-1.0).foo
 75 |
 76 | await int(-1)                # await (-1)
-   |       ^^^^^^^ UP018
+   |       ^^^^^^^ UP018 (native-literals)
    |
    = help: Replace with integer literal
 
@@ -559,10 +559,10 @@ UP018.py:76:7: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 78 78 | 
 79 79 | int(+1) ** 0
 
-UP018.py:79:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:79:1: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 79 | int(+1) ** 0
-   | ^^^^^^^ UP018
+   | ^^^^^^^ UP018 (native-literals)
 80 | float(+1.0)()
    |
    = help: Replace with integer literal
@@ -577,11 +577,11 @@ UP018.py:79:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 81 81 | 
 82 82 | 
 
-UP018.py:80:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+UP018.py:80:1: UP018 (native-literals) [*] Unnecessary `float` call (rewrite as a literal)
    |
 79 | int(+1) ** 0
 80 | float(+1.0)()
-   | ^^^^^^^^^^^ UP018
+   | ^^^^^^^^^^^ UP018 (native-literals)
    |
    = help: Replace with float literal
 
@@ -595,13 +595,13 @@ UP018.py:80:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 82 82 | 
 83 83 | str(
 
-UP018.py:83:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
+UP018.py:83:1: UP018 (native-literals) [*] Unnecessary `str` call (rewrite as a literal)
    |
 83 | / str(
 84 | |     '''Lorem
 85 | |     ipsum'''  # Comment
 86 | | ).foo
-   | |_^ UP018
+   | |_^ UP018 (native-literals)
 87 |
 88 |   # https://github.com/astral-sh/ruff/issues/17606
    |
@@ -621,11 +621,11 @@ UP018.py:83:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 88 86 | # https://github.com/astral-sh/ruff/issues/17606
 89 87 | bool(True)and None
 
-UP018.py:89:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
+UP018.py:89:1: UP018 (native-literals) [*] Unnecessary `bool` call (rewrite as a literal)
    |
 88 | # https://github.com/astral-sh/ruff/issues/17606
 89 | bool(True)and None
-   | ^^^^^^^^^^ UP018
+   | ^^^^^^^^^^ UP018 (native-literals)
 90 | int(1)and None
 91 | float(1.)and None
    |
@@ -641,12 +641,12 @@ UP018.py:89:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 91 91 | float(1.)and None
 92 92 | bool(True)and()
 
-UP018.py:90:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018.py:90:1: UP018 (native-literals) [*] Unnecessary `int` call (rewrite as a literal)
    |
 88 | # https://github.com/astral-sh/ruff/issues/17606
 89 | bool(True)and None
 90 | int(1)and None
-   | ^^^^^^ UP018
+   | ^^^^^^ UP018 (native-literals)
 91 | float(1.)and None
 92 | bool(True)and()
    |
@@ -661,12 +661,12 @@ UP018.py:90:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 91 91 | float(1.)and None
 92 92 | bool(True)and()
 
-UP018.py:91:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+UP018.py:91:1: UP018 (native-literals) [*] Unnecessary `float` call (rewrite as a literal)
    |
 89 | bool(True)and None
 90 | int(1)and None
 91 | float(1.)and None
-   | ^^^^^^^^^ UP018
+   | ^^^^^^^^^ UP018 (native-literals)
 92 | bool(True)and()
    |
    = help: Replace with float literal
@@ -679,12 +679,12 @@ UP018.py:91:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
    91 |+1. and None
 92 92 | bool(True)and()
 
-UP018.py:92:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
+UP018.py:92:1: UP018 (native-literals) [*] Unnecessary `bool` call (rewrite as a literal)
    |
 90 | int(1)and None
 91 | float(1.)and None
 92 | bool(True)and()
-   | ^^^^^^^^^^ UP018
+   | ^^^^^^^^^^ UP018 (native-literals)
    |
    = help: Replace with boolean literal
 

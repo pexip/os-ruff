@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT006_and_PT007.py:3:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006_and_PT007.py:3:26: PT006 (pytest-parametrize-names-wrong-type) [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
   |
 1 | import pytest
 2 |
 3 | @pytest.mark.parametrize(("param",), [[1], [2]])
-  |                          ^^^^^^^^^^ PT006
+  |                          ^^^^^^^^^^ PT006 (pytest-parametrize-names-wrong-type)
 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 |     ...
   |
@@ -20,12 +20,12 @@ PT006_and_PT007.py:3:26: PT006 [*] Wrong type passed to first argument of `pytes
 4 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 5 |     ...
 
-PT006_and_PT007.py:3:39: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT006_and_PT007.py:3:39: PT007 (pytest-parametrize-values-wrong-type) [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
   |
 1 | import pytest
 2 |
 3 | @pytest.mark.parametrize(("param",), [[1], [2]])
-  |                                       ^^^ PT007
+  |                                       ^^^ PT007 (pytest-parametrize-values-wrong-type)
 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 |     ...
   |
@@ -39,12 +39,12 @@ PT006_and_PT007.py:3:39: PT007 [*] Wrong values type in `pytest.mark.parametrize
 4 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 5 |     ...
 
-PT006_and_PT007.py:3:44: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT006_and_PT007.py:3:44: PT007 (pytest-parametrize-values-wrong-type) [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
   |
 1 | import pytest
 2 |
 3 | @pytest.mark.parametrize(("param",), [[1], [2]])
-  |                                            ^^^ PT007
+  |                                            ^^^ PT007 (pytest-parametrize-values-wrong-type)
 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 |     ...
   |

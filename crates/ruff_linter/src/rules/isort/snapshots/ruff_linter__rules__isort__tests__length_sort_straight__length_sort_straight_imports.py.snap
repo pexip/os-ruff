@@ -1,13 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-length_sort_straight_imports.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+length_sort_straight_imports.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
   |
 1 | / import mediuuuuuumb
 2 | | import short
 3 | | import looooooooooooooooong
 4 | | import mediuuuuuuma
-  | |___________________^ I001
+  | |___________________^ I001 (unsorted-imports)
   |
   = help: Organize imports
 

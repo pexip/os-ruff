@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
 ---
-LOG004_1.py:4:1: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_1.py:4:1: LOG004 (log-exception-outside-except-handler) [*] `.exception()` call outside exception handlers
   |
 4 | logger.exception("")
-  | ^^^^^^^^^^^^^^^^^^^^ LOG004
+  | ^^^^^^^^^^^^^^^^^^^^ LOG004 (log-exception-outside-except-handler)
   |
   = help: Replace with `.error()`
 

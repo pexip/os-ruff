@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
-snapshot_kind: text
 ---
-TD006.py:5:3: TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
+TD006.py:5:3: TD006 (invalid-todo-capitalization) [*] Invalid TODO capitalization: `ToDo` should be `TODO`
   |
 3 | # Todoism is a word which starts with todo, but is not a todo
 4 | # TDO006 - error
 5 | # ToDo (evanrittenhouse): invalid capitalization
-  |   ^^^^ TD006
+  |   ^^^^ TD006 (invalid-todo-capitalization)
 6 | # todo (evanrittenhouse): another invalid capitalization
 7 | # foo # todo: invalid capitalization
   |
@@ -22,12 +21,12 @@ TD006.py:5:3: TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
 6 6 | # todo (evanrittenhouse): another invalid capitalization
 7 7 | # foo # todo: invalid capitalization
 
-TD006.py:6:3: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
+TD006.py:6:3: TD006 (invalid-todo-capitalization) [*] Invalid TODO capitalization: `todo` should be `TODO`
   |
 4 | # TDO006 - error
 5 | # ToDo (evanrittenhouse): invalid capitalization
 6 | # todo (evanrittenhouse): another invalid capitalization
-  |   ^^^^ TD006
+  |   ^^^^ TD006 (invalid-todo-capitalization)
 7 | # foo # todo: invalid capitalization
   |
   = help: Replace `todo` with `TODO`
@@ -40,12 +39,12 @@ TD006.py:6:3: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
   6 |+# TODO (evanrittenhouse): another invalid capitalization
 7 7 | # foo # todo: invalid capitalization
 
-TD006.py:7:9: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
+TD006.py:7:9: TD006 (invalid-todo-capitalization) [*] Invalid TODO capitalization: `todo` should be `TODO`
   |
 5 | # ToDo (evanrittenhouse): invalid capitalization
 6 | # todo (evanrittenhouse): another invalid capitalization
 7 | # foo # todo: invalid capitalization
-  |         ^^^^ TD006
+  |         ^^^^ TD006 (invalid-todo-capitalization)
   |
   = help: Replace `todo` with `TODO`
 

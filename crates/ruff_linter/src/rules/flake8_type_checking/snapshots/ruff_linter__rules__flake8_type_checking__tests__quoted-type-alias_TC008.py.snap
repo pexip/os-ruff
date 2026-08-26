@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TC008.py:15:16: TC008 [*] Remove quotes from type alias
+TC008.py:15:16: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 13 |     Bar = Foo
 14 |
 15 | a: TypeAlias = 'int'  # TC008
-   |                ^^^^^ TC008
+   |                ^^^^^ TC008 (quoted-type-alias)
 16 | b: TypeAlias = 'Dict'  # OK
 17 | c: TypeAlias = 'Foo'   # TC008
    |
@@ -22,12 +22,12 @@ TC008.py:15:16: TC008 [*] Remove quotes from type alias
 17 17 | c: TypeAlias = 'Foo'   # TC008
 18 18 | d: TypeAlias = 'Foo[str]'  # OK
 
-TC008.py:17:16: TC008 [*] Remove quotes from type alias
+TC008.py:17:16: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 15 | a: TypeAlias = 'int'  # TC008
 16 | b: TypeAlias = 'Dict'  # OK
 17 | c: TypeAlias = 'Foo'   # TC008
-   |                ^^^^^ TC008
+   |                ^^^^^ TC008 (quoted-type-alias)
 18 | d: TypeAlias = 'Foo[str]'  # OK
 19 | e: TypeAlias = 'Foo.bar'  # OK
    |
@@ -43,12 +43,12 @@ TC008.py:17:16: TC008 [*] Remove quotes from type alias
 19 19 | e: TypeAlias = 'Foo.bar'  # OK
 20 20 | f: TypeAlias = 'Foo | None'  # TC008
 
-TC008.py:20:16: TC008 [*] Remove quotes from type alias
+TC008.py:20:16: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 18 | d: TypeAlias = 'Foo[str]'  # OK
 19 | e: TypeAlias = 'Foo.bar'  # OK
 20 | f: TypeAlias = 'Foo | None'  # TC008
-   |                ^^^^^^^^^^^^ TC008
+   |                ^^^^^^^^^^^^ TC008 (quoted-type-alias)
 21 | g: TypeAlias = 'OptStr'   # OK
 22 | h: TypeAlias = 'Bar'   # TC008
    |
@@ -64,12 +64,12 @@ TC008.py:20:16: TC008 [*] Remove quotes from type alias
 22 22 | h: TypeAlias = 'Bar'   # TC008
 23 23 | i: TypeAlias = Foo['str']   # TC008
 
-TC008.py:22:16: TC008 [*] Remove quotes from type alias
+TC008.py:22:16: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 20 | f: TypeAlias = 'Foo | None'  # TC008
 21 | g: TypeAlias = 'OptStr'   # OK
 22 | h: TypeAlias = 'Bar'   # TC008
-   |                ^^^^^ TC008
+   |                ^^^^^ TC008 (quoted-type-alias)
 23 | i: TypeAlias = Foo['str']   # TC008
 24 | j: TypeAlias = 'Baz'   # OK
    |
@@ -85,12 +85,12 @@ TC008.py:22:16: TC008 [*] Remove quotes from type alias
 24 24 | j: TypeAlias = 'Baz'   # OK
 25 25 | k: TypeAlias = 'k | None'  # OK
 
-TC008.py:23:20: TC008 [*] Remove quotes from type alias
+TC008.py:23:20: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 21 | g: TypeAlias = 'OptStr'   # OK
 22 | h: TypeAlias = 'Bar'   # TC008
 23 | i: TypeAlias = Foo['str']   # TC008
-   |                    ^^^^^ TC008
+   |                    ^^^^^ TC008 (quoted-type-alias)
 24 | j: TypeAlias = 'Baz'   # OK
 25 | k: TypeAlias = 'k | None'  # OK
    |
@@ -106,12 +106,12 @@ TC008.py:23:20: TC008 [*] Remove quotes from type alias
 25 25 | k: TypeAlias = 'k | None'  # OK
 26 26 | l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
 
-TC008.py:26:16: TC008 [*] Remove quotes from type alias
+TC008.py:26:16: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 24 | j: TypeAlias = 'Baz'   # OK
 25 | k: TypeAlias = 'k | None'  # OK
 26 | l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
-   |                ^^^^^ TC008
+   |                ^^^^^ TC008 (quoted-type-alias)
 27 | m: TypeAlias = ('int'  # TC008
 28 |     | None)
    |
@@ -127,12 +127,12 @@ TC008.py:26:16: TC008 [*] Remove quotes from type alias
 28 28 |     | None)
 29 29 | n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
 
-TC008.py:27:17: TC008 [*] Remove quotes from type alias
+TC008.py:27:17: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 25 | k: TypeAlias = 'k | None'  # OK
 26 | l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
 27 | m: TypeAlias = ('int'  # TC008
-   |                 ^^^^^ TC008
+   |                 ^^^^^ TC008 (quoted-type-alias)
 28 |     | None)
 29 | n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
    |
@@ -148,14 +148,14 @@ TC008.py:27:17: TC008 [*] Remove quotes from type alias
 29 29 | n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
 30 30 |     ' | None')
 
-TC008.py:29:17: TC008 [*] Remove quotes from type alias
+TC008.py:29:17: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 27 |   m: TypeAlias = ('int'  # TC008
 28 |       | None)
 29 |   n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
    |  _________________^
 30 | |     ' | None')
-   | |_____________^ TC008
+   | |_____________^ TC008 (quoted-type-alias)
 31 |
 32 |   type B = 'Dict'  # TC008
    |
@@ -172,12 +172,12 @@ TC008.py:29:17: TC008 [*] Remove quotes from type alias
 32 31 | type B = 'Dict'  # TC008
 33 32 | type D = 'Foo[str]'  # TC008
 
-TC008.py:32:10: TC008 [*] Remove quotes from type alias
+TC008.py:32:10: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 30 |     ' | None')
 31 |
 32 | type B = 'Dict'  # TC008
-   |          ^^^^^^ TC008
+   |          ^^^^^^ TC008 (quoted-type-alias)
 33 | type D = 'Foo[str]'  # TC008
 34 | type E = 'Foo.bar'  # TC008
    |
@@ -193,11 +193,11 @@ TC008.py:32:10: TC008 [*] Remove quotes from type alias
 34 34 | type E = 'Foo.bar'  # TC008
 35 35 | type G = 'OptStr'  # TC008
 
-TC008.py:33:10: TC008 [*] Remove quotes from type alias
+TC008.py:33:10: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 32 | type B = 'Dict'  # TC008
 33 | type D = 'Foo[str]'  # TC008
-   |          ^^^^^^^^^^ TC008
+   |          ^^^^^^^^^^ TC008 (quoted-type-alias)
 34 | type E = 'Foo.bar'  # TC008
 35 | type G = 'OptStr'  # TC008
    |
@@ -213,12 +213,12 @@ TC008.py:33:10: TC008 [*] Remove quotes from type alias
 35 35 | type G = 'OptStr'  # TC008
 36 36 | type I = Foo['str']  # TC008
 
-TC008.py:34:10: TC008 [*] Remove quotes from type alias
+TC008.py:34:10: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 32 | type B = 'Dict'  # TC008
 33 | type D = 'Foo[str]'  # TC008
 34 | type E = 'Foo.bar'  # TC008
-   |          ^^^^^^^^^ TC008
+   |          ^^^^^^^^^ TC008 (quoted-type-alias)
 35 | type G = 'OptStr'  # TC008
 36 | type I = Foo['str']  # TC008
    |
@@ -234,12 +234,12 @@ TC008.py:34:10: TC008 [*] Remove quotes from type alias
 36 36 | type I = Foo['str']  # TC008
 37 37 | type J = 'Baz'  # TC008
 
-TC008.py:35:10: TC008 [*] Remove quotes from type alias
+TC008.py:35:10: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 33 | type D = 'Foo[str]'  # TC008
 34 | type E = 'Foo.bar'  # TC008
 35 | type G = 'OptStr'  # TC008
-   |          ^^^^^^^^ TC008
+   |          ^^^^^^^^ TC008 (quoted-type-alias)
 36 | type I = Foo['str']  # TC008
 37 | type J = 'Baz'  # TC008
    |
@@ -255,12 +255,12 @@ TC008.py:35:10: TC008 [*] Remove quotes from type alias
 37 37 | type J = 'Baz'  # TC008
 38 38 | type K = 'K | None'  # TC008
 
-TC008.py:36:14: TC008 [*] Remove quotes from type alias
+TC008.py:36:14: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 34 | type E = 'Foo.bar'  # TC008
 35 | type G = 'OptStr'  # TC008
 36 | type I = Foo['str']  # TC008
-   |              ^^^^^ TC008
+   |              ^^^^^ TC008 (quoted-type-alias)
 37 | type J = 'Baz'  # TC008
 38 | type K = 'K | None'  # TC008
    |
@@ -276,12 +276,12 @@ TC008.py:36:14: TC008 [*] Remove quotes from type alias
 38 38 | type K = 'K | None'  # TC008
 39 39 | type L = 'int' | None  # TC008 (because TC010 is not enabled)
 
-TC008.py:37:10: TC008 [*] Remove quotes from type alias
+TC008.py:37:10: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 35 | type G = 'OptStr'  # TC008
 36 | type I = Foo['str']  # TC008
 37 | type J = 'Baz'  # TC008
-   |          ^^^^^ TC008
+   |          ^^^^^ TC008 (quoted-type-alias)
 38 | type K = 'K | None'  # TC008
 39 | type L = 'int' | None  # TC008 (because TC010 is not enabled)
    |
@@ -297,12 +297,12 @@ TC008.py:37:10: TC008 [*] Remove quotes from type alias
 39 39 | type L = 'int' | None  # TC008 (because TC010 is not enabled)
 40 40 | type M = ('int'  # TC008
 
-TC008.py:38:10: TC008 [*] Remove quotes from type alias
+TC008.py:38:10: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 36 | type I = Foo['str']  # TC008
 37 | type J = 'Baz'  # TC008
 38 | type K = 'K | None'  # TC008
-   |          ^^^^^^^^^^ TC008
+   |          ^^^^^^^^^^ TC008 (quoted-type-alias)
 39 | type L = 'int' | None  # TC008 (because TC010 is not enabled)
 40 | type M = ('int'  # TC008
    |
@@ -318,12 +318,12 @@ TC008.py:38:10: TC008 [*] Remove quotes from type alias
 40 40 | type M = ('int'  # TC008
 41 41 |     | None)
 
-TC008.py:39:10: TC008 [*] Remove quotes from type alias
+TC008.py:39:10: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 37 | type J = 'Baz'  # TC008
 38 | type K = 'K | None'  # TC008
 39 | type L = 'int' | None  # TC008 (because TC010 is not enabled)
-   |          ^^^^^ TC008
+   |          ^^^^^ TC008 (quoted-type-alias)
 40 | type M = ('int'  # TC008
 41 |     | None)
    |
@@ -339,12 +339,12 @@ TC008.py:39:10: TC008 [*] Remove quotes from type alias
 41 41 |     | None)
 42 42 | type N = ('int'  # TC008 (fix removes comment currently)
 
-TC008.py:40:11: TC008 [*] Remove quotes from type alias
+TC008.py:40:11: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 38 | type K = 'K | None'  # TC008
 39 | type L = 'int' | None  # TC008 (because TC010 is not enabled)
 40 | type M = ('int'  # TC008
-   |           ^^^^^ TC008
+   |           ^^^^^ TC008 (quoted-type-alias)
 41 |     | None)
 42 | type N = ('int'  # TC008 (fix removes comment currently)
    |
@@ -360,14 +360,14 @@ TC008.py:40:11: TC008 [*] Remove quotes from type alias
 42 42 | type N = ('int'  # TC008 (fix removes comment currently)
 43 43 |     ' | None')
 
-TC008.py:42:11: TC008 [*] Remove quotes from type alias
+TC008.py:42:11: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 40 |   type M = ('int'  # TC008
 41 |       | None)
 42 |   type N = ('int'  # TC008 (fix removes comment currently)
    |  ___________^
 43 | |     ' | None')
-   | |_____________^ TC008
+   | |_____________^ TC008 (quoted-type-alias)
    |
    = help: Remove quotes
 
@@ -382,12 +382,12 @@ TC008.py:42:11: TC008 [*] Remove quotes from type alias
 45 44 | 
 46 45 | class Baz:
 
-TC008.py:48:14: TC008 [*] Remove quotes from type alias
+TC008.py:48:14: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 46 | class Baz:
 47 |     a: TypeAlias = 'Baz'  # OK
 48 |     type A = 'Baz'  # TC008
-   |              ^^^^^ TC008
+   |              ^^^^^ TC008 (quoted-type-alias)
 49 |
 50 |     class Nested:
    |
@@ -403,12 +403,12 @@ TC008.py:48:14: TC008 [*] Remove quotes from type alias
 50 50 |     class Nested:
 51 51 |         a: TypeAlias = 'Baz'  # OK
 
-TC008.py:52:18: TC008 [*] Remove quotes from type alias
+TC008.py:52:18: TC008 (quoted-type-alias) [*] Remove quotes from type alias
    |
 50 |     class Nested:
 51 |         a: TypeAlias = 'Baz'  # OK
 52 |         type A = 'Baz'  # TC008
-   |                  ^^^^^ TC008
+   |                  ^^^^^ TC008 (quoted-type-alias)
    |
    = help: Remove quotes
 

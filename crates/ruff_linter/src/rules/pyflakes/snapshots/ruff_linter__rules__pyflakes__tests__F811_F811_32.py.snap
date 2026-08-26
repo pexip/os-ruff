@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F811_32.py:5:5: F811 [*] Redefinition of unused `List` from line 4
+F811_32.py:5:5: F811 (redefined-while-unused) [*] Redefinition of unused `List` from line 4
   |
 3 | from typing import (
 4 |     List,
 5 |     List,
-  |     ^^^^ F811
+  |     ^^^^ F811 (redefined-while-unused)
 6 | )
   |
   = help: Remove definition: `List`

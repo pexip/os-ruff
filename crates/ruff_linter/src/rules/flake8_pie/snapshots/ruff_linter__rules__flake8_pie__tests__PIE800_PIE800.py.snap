@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-PIE800.py:1:14: PIE800 [*] Unnecessary spread `**`
+PIE800.py:1:14: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
   |
 1 | {"foo": 1, **{"bar": 1}}  # PIE800
-  |              ^^^^^^^^^^ PIE800
+  |              ^^^^^^^^^^ PIE800 (unnecessary-spread)
 2 |
 3 | {**{"bar": 10}, "a": "b"}  # PIE800
   |
@@ -17,12 +17,12 @@ PIE800.py:1:14: PIE800 [*] Unnecessary spread `**`
 3 3 | {**{"bar": 10}, "a": "b"}  # PIE800
 4 4 | 
 
-PIE800.py:3:4: PIE800 [*] Unnecessary spread `**`
+PIE800.py:3:4: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
   |
 1 | {"foo": 1, **{"bar": 1}}  # PIE800
 2 |
 3 | {**{"bar": 10}, "a": "b"}  # PIE800
-  |    ^^^^^^^^^^^ PIE800
+  |    ^^^^^^^^^^^ PIE800 (unnecessary-spread)
 4 |
 5 | foo({**foo, **{"bar": True}})  # PIE800
   |
@@ -37,12 +37,12 @@ PIE800.py:3:4: PIE800 [*] Unnecessary spread `**`
 5 5 | foo({**foo, **{"bar": True}})  # PIE800
 6 6 | 
 
-PIE800.py:5:15: PIE800 [*] Unnecessary spread `**`
+PIE800.py:5:15: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
   |
 3 | {**{"bar": 10}, "a": "b"}  # PIE800
 4 |
 5 | foo({**foo, **{"bar": True}})  # PIE800
-  |               ^^^^^^^^^^^^^ PIE800
+  |               ^^^^^^^^^^^^^ PIE800 (unnecessary-spread)
 6 |
 7 | {**foo, **{"bar": 10}}  # PIE800
   |
@@ -58,12 +58,12 @@ PIE800.py:5:15: PIE800 [*] Unnecessary spread `**`
 7 7 | {**foo, **{"bar": 10}}  # PIE800
 8 8 | 
 
-PIE800.py:7:11: PIE800 [*] Unnecessary spread `**`
+PIE800.py:7:11: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
   |
 5 | foo({**foo, **{"bar": True}})  # PIE800
 6 |
 7 | {**foo, **{"bar": 10}}  # PIE800
-  |           ^^^^^^^^^^^ PIE800
+  |           ^^^^^^^^^^^ PIE800 (unnecessary-spread)
 8 |
 9 | { # PIE800
   |
@@ -79,7 +79,7 @@ PIE800.py:7:11: PIE800 [*] Unnecessary spread `**`
 9 9 | { # PIE800
 10 10 |     "a": "b",
 
-PIE800.py:12:7: PIE800 [*] Unnecessary spread `**`
+PIE800.py:12:7: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 10 |       "a": "b",
 11 |       # Preserve
@@ -89,7 +89,7 @@ PIE800.py:12:7: PIE800 [*] Unnecessary spread `**`
 14 | |         "bar": 10,  # the
 15 | |         # comments
 16 | |     },
-   | |_____^ PIE800
+   | |_____^ PIE800 (unnecessary-spread)
 17 |   }
    |
    = help: Remove unnecessary dict
@@ -110,12 +110,12 @@ PIE800.py:12:7: PIE800 [*] Unnecessary spread `**`
 18 18 | 
 19 19 | {**foo, **buzz, **{bar: 10}}  # PIE800
 
-PIE800.py:19:19: PIE800 [*] Unnecessary spread `**`
+PIE800.py:19:19: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 17 | }
 18 |
 19 | {**foo, **buzz, **{bar: 10}}  # PIE800
-   |                   ^^^^^^^^^ PIE800
+   |                   ^^^^^^^^^ PIE800 (unnecessary-spread)
 20 |
 21 | # https://github.com/astral-sh/ruff/issues/15366
    |
@@ -131,12 +131,12 @@ PIE800.py:19:19: PIE800 [*] Unnecessary spread `**`
 21 21 | # https://github.com/astral-sh/ruff/issues/15366
 22 22 | {
 
-PIE800.py:24:8: PIE800 [*] Unnecessary spread `**`
+PIE800.py:24:8: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 22 | {
 23 |     "data": [],
 24 |     **({"count": 1 if include_count else {}}),
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE800
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE800 (unnecessary-spread)
 25 | }
    |
    = help: Remove unnecessary dict
@@ -151,13 +151,13 @@ PIE800.py:24:8: PIE800 [*] Unnecessary spread `**`
 26 26 | 
 27 27 | {
 
-PIE800.py:30:9: PIE800 [*] Unnecessary spread `**`
+PIE800.py:30:9: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 28 |       "data": [],
 29 |       **(  # Comment
 30 | /         {  # Comment
 31 | |             "count": 1 if include_count else {}}),
-   | |________________________________________________^ PIE800
+   | |________________________________________________^ PIE800 (unnecessary-spread)
 32 |   }
    |
    = help: Remove unnecessary dict
@@ -176,13 +176,13 @@ PIE800.py:30:9: PIE800 [*] Unnecessary spread `**`
 33 33 | 
 34 34 | {
 
-PIE800.py:37:9: PIE800 [*] Unnecessary spread `**`
+PIE800.py:37:9: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 35 |       "data": [],
 36 |       **(
 37 | /         {
 38 | |             "count": (a := 1),}),
-   | |_______________________________^ PIE800
+   | |_______________________________^ PIE800 (unnecessary-spread)
 39 |   }
    |
    = help: Remove unnecessary dict
@@ -201,14 +201,14 @@ PIE800.py:37:9: PIE800 [*] Unnecessary spread `**`
 40 40 | 
 41 41 | {
 
-PIE800.py:44:9: PIE800 [*] Unnecessary spread `**`
+PIE800.py:44:9: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 42 |       "data": [],
 43 |       **(
 44 | /         {
 45 | |             "count": (a := 1)
 46 | |             }
-   | |_____________^ PIE800
+   | |_____________^ PIE800 (unnecessary-spread)
 47 |       )
 48 |       ,
    |
@@ -231,14 +231,14 @@ PIE800.py:44:9: PIE800 [*] Unnecessary spread `**`
 49 49 | }
 50 50 | 
 
-PIE800.py:54:9: PIE800 [*] Unnecessary spread `**`
+PIE800.py:54:9: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 52 |       "data": [],
 53 |       **(
 54 | /         {
 55 | |             "count": (a := 1),  # Comment
 56 | |             }  # Comment
-   | |_____________^ PIE800
+   | |_____________^ PIE800 (unnecessary-spread)
 57 |       ) # Comment
 58 |       ,
    |
@@ -262,14 +262,14 @@ PIE800.py:54:9: PIE800 [*] Unnecessary spread `**`
 59 59 | }
 60 60 | 
 
-PIE800.py:65:1: PIE800 [*] Unnecessary spread `**`
+PIE800.py:65:1: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 63 |       **(  # Comment
 64 |           (   # Comment
 65 | / { # Comment
 66 | |             "count": (a := 1),  # Comment
 67 | |         }  # Comment
-   | |_________^ PIE800
+   | |_________^ PIE800 (unnecessary-spread)
 68 |               )
 69 |       ) # Comment
    |
@@ -297,14 +297,14 @@ PIE800.py:65:1: PIE800 [*] Unnecessary spread `**`
 71 71 | })
 72 72 | 
 
-PIE800.py:77:9: PIE800 [*] Unnecessary spread `**`
+PIE800.py:77:9: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 75 |       ** # Foo
 76 |       (  # Comment
 77 | /         { "a": b,
 78 | |           # Comment
 79 | |           }
-   | |___________^ PIE800
+   | |___________^ PIE800 (unnecessary-spread)
 80 |       ) ,
 81 |       c: 9,
    |
@@ -329,11 +329,11 @@ PIE800.py:77:9: PIE800 [*] Unnecessary spread `**`
 82 82 | }
 83 83 | 
 
-PIE800.py:86:13: PIE800 [*] Unnecessary spread `**`
+PIE800.py:86:13: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 85 | # https://github.com/astral-sh/ruff/issues/15997
 86 | {"a": [], **{},}
-   |             ^^ PIE800
+   |             ^^ PIE800 (unnecessary-spread)
 87 | {"a": [], **({}),}
    |
    = help: Remove unnecessary dict
@@ -348,12 +348,12 @@ PIE800.py:86:13: PIE800 [*] Unnecessary spread `**`
 88 88 | 
 89 89 | {"a": [], **{}, 6: 3}
 
-PIE800.py:87:14: PIE800 [*] Unnecessary spread `**`
+PIE800.py:87:14: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 85 | # https://github.com/astral-sh/ruff/issues/15997
 86 | {"a": [], **{},}
 87 | {"a": [], **({}),}
-   |              ^^ PIE800
+   |              ^^ PIE800 (unnecessary-spread)
 88 |
 89 | {"a": [], **{}, 6: 3}
    |
@@ -369,12 +369,12 @@ PIE800.py:87:14: PIE800 [*] Unnecessary spread `**`
 89 89 | {"a": [], **{}, 6: 3}
 90 90 | {"a": [], **({}), 6: 3}
 
-PIE800.py:89:13: PIE800 [*] Unnecessary spread `**`
+PIE800.py:89:13: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 87 | {"a": [], **({}),}
 88 |
 89 | {"a": [], **{}, 6: 3}
-   |             ^^ PIE800
+   |             ^^ PIE800 (unnecessary-spread)
 90 | {"a": [], **({}), 6: 3}
    |
    = help: Remove unnecessary dict
@@ -389,11 +389,11 @@ PIE800.py:89:13: PIE800 [*] Unnecessary spread `**`
 91 91 | 
 92 92 | {"a": [], **{
 
-PIE800.py:90:14: PIE800 [*] Unnecessary spread `**`
+PIE800.py:90:14: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 89 | {"a": [], **{}, 6: 3}
 90 | {"a": [], **({}), 6: 3}
-   |              ^^ PIE800
+   |              ^^ PIE800 (unnecessary-spread)
 91 |
 92 | {"a": [], **{
    |
@@ -409,7 +409,7 @@ PIE800.py:90:14: PIE800 [*] Unnecessary spread `**`
 92 92 | {"a": [], **{
 93 93 |     # Comment
 
-PIE800.py:92:13: PIE800 [*] Unnecessary spread `**`
+PIE800.py:92:13: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 90 |   {"a": [], **({}), 6: 3}
 91 |
@@ -417,7 +417,7 @@ PIE800.py:92:13: PIE800 [*] Unnecessary spread `**`
    |  _____________^
 93 | |     # Comment
 94 | | }, 6: 3}
-   | |_^ PIE800
+   | |_^ PIE800 (unnecessary-spread)
 95 |   {"a": [], **({
 96 |       # Comment
    |
@@ -436,7 +436,7 @@ PIE800.py:92:13: PIE800 [*] Unnecessary spread `**`
 96 96 |     # Comment
 97 97 | }), 6: 3}
 
-PIE800.py:95:14: PIE800 [*] Unnecessary spread `**`
+PIE800.py:95:14: PIE800 (unnecessary-spread) [*] Unnecessary spread `**`
    |
 93 |       # Comment
 94 |   }, 6: 3}
@@ -444,7 +444,7 @@ PIE800.py:95:14: PIE800 [*] Unnecessary spread `**`
    |  ______________^
 96 | |     # Comment
 97 | | }), 6: 3}
-   | |_^ PIE800
+   | |_^ PIE800 (unnecessary-spread)
    |
    = help: Remove unnecessary dict
 

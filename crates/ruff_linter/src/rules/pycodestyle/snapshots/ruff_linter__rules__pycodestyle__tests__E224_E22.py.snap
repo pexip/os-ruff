@@ -1,12 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
-E22.py:48:5: E224 [*] Tab after operator
+E22.py:48:5: E224 (tab-after-operator) [*] Tab after operator
    |
 47 | #: E224
 48 | a +=    1
-   |     ^^^^ E224
+   |     ^^^^ E224 (tab-after-operator)
 49 | b += 1000
 50 | #:
    |

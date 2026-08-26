@@ -2243,15 +2243,15 @@ fn pyproject_toml_stdin_syntax_error() {
 
     assert_cmd_snapshot!(
         cmd.pass_stdin("[project"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
-    pyproject.toml:1:9: RUF200 Failed to parse pyproject.toml: invalid table header
+    pyproject.toml:1:9: RUF200 (invalid-pyproject-toml) Failed to parse pyproject.toml: invalid table header
     expected `.`, `]`
       |
     1 | [project
-      |         ^ RUF200
+      |         ^ RUF200 (invalid-pyproject-toml)
       |
 
     Found 1 error.
@@ -2269,15 +2269,15 @@ fn pyproject_toml_stdin_schema_error() {
 
     assert_cmd_snapshot!(
         cmd.pass_stdin("[project]\nname = 1"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
-    pyproject.toml:2:8: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+    pyproject.toml:2:8: RUF200 (invalid-pyproject-toml) Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
       |
     1 | [project]
     2 | name = 1
-      |        ^ RUF200
+      |        ^ RUF200 (invalid-pyproject-toml)
       |
 
     Found 1 error.
@@ -2358,18 +2358,18 @@ fn pyproject_toml_stdin_schema_error_fix() {
 
     assert_cmd_snapshot!(
         cmd.pass_stdin("[project]\nname = 1"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
     [project]
     name = 1
     ----- stderr -----
-    pyproject.toml:2:8: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+    pyproject.toml:2:8: RUF200 (invalid-pyproject-toml) Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
       |
     1 | [project]
     2 | name = 1
-      |        ^ RUF200
+      |        ^ RUF200 (invalid-pyproject-toml)
       |
 
     Found 1 error.

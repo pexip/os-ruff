@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C417_1.py:7:10: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+C417_1.py:7:10: C417 (unnecessary-map) [*] Unnecessary `map()` usage (rewrite using a generator expression)
   |
 5 | def overshadowed_list():
 6 |     list = ...
 7 |     list(map(lambda x: x, []))
-  |          ^^^^^^^^^^^^^^^^^^^^ C417
+  |          ^^^^^^^^^^^^^^^^^^^^ C417 (unnecessary-map)
   |
   = help: Replace `map()` with a generator expression
 

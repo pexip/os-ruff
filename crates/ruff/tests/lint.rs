@@ -2774,16 +2774,16 @@ requires-python = ">= 3.11"
             .args(["--select","UP007"])
             .arg(".")
             .current_dir(project_dir)
-            , @r###"
+            , @"
         success: false
         exit_code: 1
         ----- stdout -----
-        test.py:1:31: UP007 [*] Use `X | Y` for type annotations
+        test.py:1:31: UP007 (non-pep604-annotation-union) [*] Use `X | Y` for type annotations
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
-        "###);
+        ");
     });
     Ok(())
 }
@@ -3149,16 +3149,16 @@ from typing import Union;foo: Union[int, str] = 1
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
             .arg(".")
-            .current_dir(project_dir), @r###"
+            .current_dir(project_dir), @"
         success: false
         exit_code: 1
         ----- stdout -----
-        test.py:2:31: UP007 [*] Use `X | Y` for type annotations
+        test.py:2:31: UP007 (non-pep604-annotation-union) [*] Use `X | Y` for type annotations
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
-        "###);
+        ");
     });
     Ok(())
 }
@@ -4872,11 +4872,11 @@ fn nested_implicit_namespace_package() -> Result<()> {
             .arg("INP")
             .arg("--preview")
             .current_dir(&tempdir)
-            , @r"
+            , @"
         success: false
         exit_code: 1
         ----- stdout -----
-        foo/bar/baz/__init__.py:1:1: INP001 File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
+        foo/bar/baz/__init__.py:1:1: INP001 (implicit-namespace-package) File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
         Found 1 error.
 
         ----- stderr -----
@@ -5144,7 +5144,7 @@ class Foo[_T, __T]:
     pass
 "#
         ),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -5153,7 +5153,7 @@ class Foo[_T, __T]:
         pass
 
     ----- stderr -----
-    test.py:2:14: UP049 Generic class uses private type parameters
+    test.py:2:14: UP049 (private-type-parameter) Generic class uses private type parameters
     Found 2 errors (1 fixed, 1 remaining).
     "
     );
@@ -5220,16 +5220,16 @@ fn a005_module_shadowing_strict() -> Result<()> {
             .arg(r#"lint.flake8-builtins.strict-checking = true"#)
             .args(["--select", "A005"])
             .current_dir(tempdir.path()),
-            @r"
+            @"
         success: false
         exit_code: 1
         ----- stdout -----
-        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        foobar/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        foobar/collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        foobar/collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        abc/__init__.py:1:1: A005 (stdlib-module-shadowing) Module `abc` shadows a Python standard-library module
+        collections/__init__.py:1:1: A005 (stdlib-module-shadowing) Module `collections` shadows a Python standard-library module
+        collections/abc/__init__.py:1:1: A005 (stdlib-module-shadowing) Module `abc` shadows a Python standard-library module
+        foobar/abc/__init__.py:1:1: A005 (stdlib-module-shadowing) Module `abc` shadows a Python standard-library module
+        foobar/collections/__init__.py:1:1: A005 (stdlib-module-shadowing) Module `collections` shadows a Python standard-library module
+        foobar/collections/abc/__init__.py:1:1: A005 (stdlib-module-shadowing) Module `abc` shadows a Python standard-library module
         Found 6 errors.
 
         ----- stderr -----
@@ -5254,12 +5254,12 @@ fn a005_module_shadowing_non_strict() -> Result<()> {
             .arg(r#"lint.flake8-builtins.strict-checking = false"#)
             .args(["--select", "A005"])
             .current_dir(tempdir.path()),
-            @r"
+            @"
         success: false
         exit_code: 1
         ----- stdout -----
-        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        abc/__init__.py:1:1: A005 (stdlib-module-shadowing) Module `abc` shadows a Python standard-library module
+        collections/__init__.py:1:1: A005 (stdlib-module-shadowing) Module `collections` shadows a Python standard-library module
         Found 2 errors.
 
         ----- stderr -----
@@ -5285,12 +5285,12 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
             .args(STDIN_BASE_OPTIONS)
             .args(["--select", "A005"])
             .current_dir(tempdir.path()),
-            @r"
+            @"
         success: false
         exit_code: 1
         ----- stdout -----
-        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        abc/__init__.py:1:1: A005 (stdlib-module-shadowing) Module `abc` shadows a Python standard-library module
+        collections/__init__.py:1:1: A005 (stdlib-module-shadowing) Module `collections` shadows a Python standard-library module
         Found 2 errors.
 
         ----- stderr -----
@@ -5318,11 +5318,11 @@ T = TypeVar("T")
 class A(Generic[T]):
     var: T
 "#),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:6:9: UP046 Generic class `A` uses `Generic` subclass instead of type parameters
+    test.py:6:9: UP046 (non-pep695-generic-class) Generic class `A` uses `Generic` subclass instead of type parameters
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -5557,16 +5557,16 @@ fn cookiecutter_globbing() -> Result<()> {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
                 .args(STDIN_BASE_OPTIONS)
                 .arg("--select=F811")
-                .current_dir(tempdir.path()), @r"
-			success: false
-			exit_code: 1
-			----- stdout -----
-			{{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
-			Found 1 error.
-			[*] 1 fixable with the `--fix` option.
+                .current_dir(tempdir.path()), @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        {{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 (redefined-while-unused) [*] Redefinition of unused `foo` from line 1
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
 
-			----- stderr -----
-		");
+        ----- stderr -----
+        ");
     });
 
     Ok(())
@@ -5615,12 +5615,12 @@ fn semantic_syntax_errors() -> Result<()> {
 
     assert_cmd_snapshot!(
         cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
     main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
-    main.py:1:20: F821 Undefined name `foo`
+    main.py:1:20: F821 (undefined-name) Undefined name `foo`
 
     ----- stderr -----
     "
@@ -5629,12 +5629,12 @@ fn semantic_syntax_errors() -> Result<()> {
     // this should *not* be cached, like normal parse errors
     assert_cmd_snapshot!(
         cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
     main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
-    main.py:1:20: F821 Undefined name `foo`
+    main.py:1:20: F821 (undefined-name) Undefined name `foo`
 
     ----- stderr -----
     "
