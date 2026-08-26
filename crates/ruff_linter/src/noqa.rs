@@ -1391,7 +1391,7 @@ mod tests {
 
     #[test]
     fn noqa_no_code_invalid_suffix() {
-        let source = "# noqa: foo";
+        let source = "# noqa: 1234";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive, @r"
         Err(
@@ -2050,9 +2050,9 @@ mod tests {
     fn noqa_invalid_codes() {
         let source = "# noqa: unused_import, F401, some other code";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
-            MissingCodes,
+            InvalidCodeSuffix,
         )
         ");
         assert_lexed_ranges_match_slices(directive, source);
@@ -2249,7 +2249,7 @@ mod tests {
 
     #[test]
     fn flake8_noqa_no_code_invalid_suffix() {
-        let source = "# flake8: noqa: foo";
+        let source = "# flake8: noqa: 1234";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption, @r"
         Err(
@@ -2357,7 +2357,7 @@ mod tests {
 
     #[test]
     fn ruff_noqa_no_code_invalid_suffix() {
-        let source = "# ruff: noqa: foo";
+        let source = "# ruff: noqa: 1234";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption, @r"
         Err(
