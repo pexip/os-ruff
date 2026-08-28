@@ -7,4 +7,4 @@ override_dh_update_autotools_config:
 	# Do not do this
 
 override_dh_auto_build:
-	cargo build --release --package ruff
+	cargo build --release --package ruff --locked --offline
