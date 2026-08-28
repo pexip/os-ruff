@@ -153,12 +153,7 @@ impl Display for RuleCodeAndBody<'_> {
                 // Do not display an indicator for unapplicable fixes
                 if fix.applies(self.unsafe_fixes.required_applicability()) {
                     if let Some(rule) = self.message.rule() {
-                        write!(
-                            f,
-                            "{code} ({rule_name}) ",
-                            code = rule.noqa_code().to_string().red().bold(),
-                            rule_name = rule.as_ref().to_string().red().bold(),
-                        )?;
+                        write!(f, "{} ", rule.noqa_code().to_string().red().bold())?;
                     }
                     return write!(
                         f,
@@ -173,9 +168,8 @@ impl Display for RuleCodeAndBody<'_> {
         if let Some(rule) = self.message.rule() {
             write!(
                 f,
-                "{code} ({rule_name}) {body}",
+                "{code} {body}",
                 code = rule.noqa_code().to_string().red().bold(),
-                rule_name = rule.as_ref().to_string().red().bold(),
                 body = self.message.body(),
             )
         } else {
@@ -269,13 +263,10 @@ impl Display for MessageCodeFrame<'_> {
 
         let char_length = source.text[source.annotation_range].chars().count();
 
-        let label = self.message.rule().map_or_else(String::new, |rule| {
-            format!(
-                "{code} ({rule_name})",
-                code = rule.noqa_code(),
-                rule_name = rule.as_ref(),
-            )
-        });
+        let label = self
+            .message
+            .rule()
+            .map_or_else(String::new, |rule| rule.noqa_code().to_string());
 
         let snippet = Snippet {
             title: None,

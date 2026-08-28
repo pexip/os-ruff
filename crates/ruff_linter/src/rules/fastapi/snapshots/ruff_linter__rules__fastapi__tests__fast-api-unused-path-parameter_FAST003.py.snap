@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
 ---
-FAST003.py:7:19: FAST003 (fast-api-unused-path-parameter) [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:7:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
   |
 6 | # Errors
 7 | @app.get("/things/{thing_id}")
-  |                   ^^^^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+  |                   ^^^^^^^^^^ FAST003
 8 | async def read_thing(query: str):
 9 |     return {"query": query}
   |
@@ -21,10 +21,10 @@ FAST003.py:7:19: FAST003 (fast-api-unused-path-parameter) [*] Parameter `thing_i
 10 10 | 
 11 11 | 
 
-FAST003.py:12:23: FAST003 (fast-api-unused-path-parameter) [*] Parameter `isbn` appears in route path, but not in `read_thing` signature
+FAST003.py:12:23: FAST003 [*] Parameter `isbn` appears in route path, but not in `read_thing` signature
    |
 12 | @app.get("/books/isbn-{isbn}")
-   |                       ^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                       ^^^^^^ FAST003
 13 | async def read_thing():
 14 |     ...
    |
@@ -40,10 +40,10 @@ FAST003.py:12:23: FAST003 (fast-api-unused-path-parameter) [*] Parameter `isbn` 
 15 15 | 
 16 16 | 
 
-FAST003.py:17:19: FAST003 (fast-api-unused-path-parameter) [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:17:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
    |
 17 | @app.get("/things/{thing_id:path}")
-   |                   ^^^^^^^^^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                   ^^^^^^^^^^^^^^^ FAST003
 18 | async def read_thing(query: str):
 19 |     return {"query": query}
    |
@@ -59,10 +59,10 @@ FAST003.py:17:19: FAST003 (fast-api-unused-path-parameter) [*] Parameter `thing_
 20 20 | 
 21 21 | 
 
-FAST003.py:22:19: FAST003 (fast-api-unused-path-parameter) [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:22:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
    |
 22 | @app.get("/things/{thing_id : path}")
-   |                   ^^^^^^^^^^^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                   ^^^^^^^^^^^^^^^^^ FAST003
 23 | async def read_thing(query: str):
 24 |     return {"query": query}
    |
@@ -78,10 +78,10 @@ FAST003.py:22:19: FAST003 (fast-api-unused-path-parameter) [*] Parameter `thing_
 25 25 | 
 26 26 | 
 
-FAST003.py:27:27: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:27:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
    |
 27 | @app.get("/books/{author}/{title}")
-   |                           ^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                           ^^^^^^^ FAST003
 28 | async def read_thing(author: str):
 29 |     return {"author": author}
    |
@@ -97,10 +97,10 @@ FAST003.py:27:27: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title`
 30 30 | 
 31 31 | 
 
-FAST003.py:32:18: FAST003 (fast-api-unused-path-parameter) [*] Parameter `author_name` appears in route path, but not in `read_thing` signature
+FAST003.py:32:18: FAST003 [*] Parameter `author_name` appears in route path, but not in `read_thing` signature
    |
 32 | @app.get("/books/{author_name}/{title}")
-   |                  ^^^^^^^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                  ^^^^^^^^^^^^^ FAST003
 33 | async def read_thing():
 34 |     ...
    |
@@ -116,10 +116,10 @@ FAST003.py:32:18: FAST003 (fast-api-unused-path-parameter) [*] Parameter `author
 35 35 | 
 36 36 | 
 
-FAST003.py:32:32: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:32:32: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
    |
 32 | @app.get("/books/{author_name}/{title}")
-   |                                ^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                                ^^^^^^^ FAST003
 33 | async def read_thing():
 34 |     ...
    |
@@ -135,26 +135,26 @@ FAST003.py:32:32: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title`
 35 35 | 
 36 36 | 
 
-FAST003.py:37:18: FAST003 (fast-api-unused-path-parameter) Parameter `author` appears in route path, but only as a positional-only argument in `read_thing` signature
+FAST003.py:37:18: FAST003 Parameter `author` appears in route path, but only as a positional-only argument in `read_thing` signature
    |
 37 | @app.get("/books/{author}/{title}")
-   |                  ^^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                  ^^^^^^^^ FAST003
 38 | async def read_thing(author: str, title: str, /):
 39 |     return {"author": author, "title": title}
    |
 
-FAST003.py:37:27: FAST003 (fast-api-unused-path-parameter) Parameter `title` appears in route path, but only as a positional-only argument in `read_thing` signature
+FAST003.py:37:27: FAST003 Parameter `title` appears in route path, but only as a positional-only argument in `read_thing` signature
    |
 37 | @app.get("/books/{author}/{title}")
-   |                           ^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                           ^^^^^^^ FAST003
 38 | async def read_thing(author: str, title: str, /):
 39 |     return {"author": author, "title": title}
    |
 
-FAST003.py:42:27: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:42:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
    |
 42 | @app.get("/books/{author}/{title}/{page}")
-   |                           ^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                           ^^^^^^^ FAST003
 43 | async def read_thing(
 44 |     author: str,
    |
@@ -170,10 +170,10 @@ FAST003.py:42:27: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title`
 47 47 | 
 48 48 | 
 
-FAST003.py:42:35: FAST003 (fast-api-unused-path-parameter) [*] Parameter `page` appears in route path, but not in `read_thing` signature
+FAST003.py:42:35: FAST003 [*] Parameter `page` appears in route path, but not in `read_thing` signature
    |
 42 | @app.get("/books/{author}/{title}/{page}")
-   |                                   ^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                                   ^^^^^^ FAST003
 43 | async def read_thing(
 44 |     author: str,
    |
@@ -189,10 +189,10 @@ FAST003.py:42:35: FAST003 (fast-api-unused-path-parameter) [*] Parameter `page` 
 47 47 | 
 48 48 | 
 
-FAST003.py:49:18: FAST003 (fast-api-unused-path-parameter) [*] Parameter `author` appears in route path, but not in `read_thing` signature
+FAST003.py:49:18: FAST003 [*] Parameter `author` appears in route path, but not in `read_thing` signature
    |
 49 | @app.get("/books/{author}/{title}")
-   |                  ^^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                  ^^^^^^^^ FAST003
 50 | async def read_thing():
 51 |     ...
    |
@@ -208,10 +208,10 @@ FAST003.py:49:18: FAST003 (fast-api-unused-path-parameter) [*] Parameter `author
 52 52 | 
 53 53 | 
 
-FAST003.py:49:27: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:49:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
    |
 49 | @app.get("/books/{author}/{title}")
-   |                           ^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                           ^^^^^^^ FAST003
 50 | async def read_thing():
 51 |     ...
    |
@@ -227,10 +227,10 @@ FAST003.py:49:27: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title`
 52 52 | 
 53 53 | 
 
-FAST003.py:54:27: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:54:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
    |
 54 | @app.get("/books/{author}/{title}")
-   |                           ^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                           ^^^^^^^ FAST003
 55 | async def read_thing(*, author: str):
 56 |     ...
    |
@@ -246,10 +246,10 @@ FAST003.py:54:27: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title`
 57 57 | 
 58 58 | 
 
-FAST003.py:59:27: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:59:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
    |
 59 | @app.get("/books/{author}/{title}")
-   |                           ^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                           ^^^^^^^ FAST003
 60 | async def read_thing(hello, /, *, author: str):
 61 |     ...
    |
@@ -265,10 +265,10 @@ FAST003.py:59:27: FAST003 (fast-api-unused-path-parameter) [*] Parameter `title`
 62 62 | 
 63 63 | 
 
-FAST003.py:64:19: FAST003 (fast-api-unused-path-parameter) [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:64:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
    |
 64 | @app.get("/things/{thing_id}")
-   |                   ^^^^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                   ^^^^^^^^^^ FAST003
 65 | async def read_thing(
 66 |         query: str,
    |
@@ -284,10 +284,10 @@ FAST003.py:64:19: FAST003 (fast-api-unused-path-parameter) [*] Parameter `thing_
 68 68 |     return {"query": query}
 69 69 | 
 
-FAST003.py:71:19: FAST003 (fast-api-unused-path-parameter) [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:71:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
    |
 71 | @app.get("/things/{thing_id}")
-   |                   ^^^^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                   ^^^^^^^^^^ FAST003
 72 | async def read_thing(
 73 |         query: str = "default",
    |
@@ -303,10 +303,10 @@ FAST003.py:71:19: FAST003 (fast-api-unused-path-parameter) [*] Parameter `thing_
 75 75 |     return {"query": query}
 76 76 | 
 
-FAST003.py:78:19: FAST003 (fast-api-unused-path-parameter) [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:78:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
    |
 78 | @app.get("/things/{thing_id}")
-   |                   ^^^^^^^^^^ FAST003 (fast-api-unused-path-parameter)
+   |                   ^^^^^^^^^^ FAST003
 79 | async def read_thing(
 80 |         *, query: str = "default",
    |

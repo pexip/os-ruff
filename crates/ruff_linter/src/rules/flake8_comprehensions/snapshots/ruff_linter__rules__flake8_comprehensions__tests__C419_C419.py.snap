@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C419.py:1:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comprehension
+C419.py:1:5: C419 [*] Unnecessary list comprehension
   |
 1 | any([x.id for x in bar])
-  |     ^^^^^^^^^^^^^^^^^^^ C419 (unnecessary-comprehension-in-call)
+  |     ^^^^^^^^^^^^^^^^^^^ C419
 2 | all([x.id for x in bar])
 3 | any(  # first comment
   |
@@ -17,11 +17,11 @@ C419.py:1:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list compr
 3 3 | any(  # first comment
 4 4 |     [x.id for x in bar],  # second comment
 
-C419.py:2:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comprehension
+C419.py:2:5: C419 [*] Unnecessary list comprehension
   |
 1 | any([x.id for x in bar])
 2 | all([x.id for x in bar])
-  |     ^^^^^^^^^^^^^^^^^^^ C419 (unnecessary-comprehension-in-call)
+  |     ^^^^^^^^^^^^^^^^^^^ C419
 3 | any(  # first comment
 4 |     [x.id for x in bar],  # second comment
   |
@@ -35,12 +35,12 @@ C419.py:2:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list compr
 4 4 |     [x.id for x in bar],  # second comment
 5 5 | )  # third comment
 
-C419.py:4:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comprehension
+C419.py:4:5: C419 [*] Unnecessary list comprehension
   |
 2 | all([x.id for x in bar])
 3 | any(  # first comment
 4 |     [x.id for x in bar],  # second comment
-  |     ^^^^^^^^^^^^^^^^^^^ C419 (unnecessary-comprehension-in-call)
+  |     ^^^^^^^^^^^^^^^^^^^ C419
 5 | )  # third comment
 6 | all(  # first comment
   |
@@ -56,12 +56,12 @@ C419.py:4:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list compr
 6 6 | all(  # first comment
 7 7 |     [x.id for x in bar],  # second comment
 
-C419.py:7:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comprehension
+C419.py:7:5: C419 [*] Unnecessary list comprehension
   |
 5 | )  # third comment
 6 | all(  # first comment
 7 |     [x.id for x in bar],  # second comment
-  |     ^^^^^^^^^^^^^^^^^^^ C419 (unnecessary-comprehension-in-call)
+  |     ^^^^^^^^^^^^^^^^^^^ C419
 8 | )  # third comment
 9 | any({x.id for x in bar})
   |
@@ -77,12 +77,12 @@ C419.py:7:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list compr
 9 9 | any({x.id for x in bar})
 10 10 | 
 
-C419.py:9:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary set comprehension
+C419.py:9:5: C419 [*] Unnecessary set comprehension
    |
  7 |     [x.id for x in bar],  # second comment
  8 | )  # third comment
  9 | any({x.id for x in bar})
-   |     ^^^^^^^^^^^^^^^^^^^ C419 (unnecessary-comprehension-in-call)
+   |     ^^^^^^^^^^^^^^^^^^^ C419
 10 | 
 11 | # OK
    |
@@ -98,7 +98,7 @@ C419.py:9:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary set compre
 11 11 | # OK
 12 12 | all(x.id for x in bar)
 
-C419.py:28:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comprehension
+C419.py:28:5: C419 [*] Unnecessary list comprehension
    |
 26 |   # Special comment handling
 27 |   any(
@@ -109,7 +109,7 @@ C419.py:28:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comp
 31 | |         # random middle comment
 32 | |         for i in range(5)  # rbracket comment
 33 | |     ]  # rpar comment
-   | |_____^ C419 (unnecessary-comprehension-in-call)
+   | |_____^ C419
 34 |       # trailing comment
 35 |   )
    |
@@ -133,7 +133,7 @@ C419.py:28:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comp
 35 34 | )
 36 35 | 
 
-C419.py:39:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comprehension
+C419.py:39:5: C419 [*] Unnecessary list comprehension
    |
 37 |   # Weird case where the function call, opening bracket, and comment are all
 38 |   # on the same line.
@@ -142,7 +142,7 @@ C419.py:39:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comp
 40 | |         # second line comment
 41 | |         i.bit_count() for i in range(5)  # rbracket comment
 42 | |     ]  # rpar comment
-   | |_____^ C419 (unnecessary-comprehension-in-call)
+   | |_____^ C419
 43 |   )
    |
    = help: Remove unnecessary comprehension
@@ -163,11 +163,11 @@ C419.py:39:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary list comp
 44 44 | 
 45 45 | ## Set comprehensions should only be linted
 
-C419.py:49:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary set comprehension
+C419.py:49:5: C419 [*] Unnecessary set comprehension
    |
 48 | # should be linted...
 49 | any({x.id for x in bar})
-   |     ^^^^^^^^^^^^^^^^^^^ C419 (unnecessary-comprehension-in-call)
+   |     ^^^^^^^^^^^^^^^^^^^ C419
 50 | all({x.id for x in bar})
    |
    = help: Remove unnecessary comprehension
@@ -182,12 +182,12 @@ C419.py:49:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary set compr
 51 51 | 
 52 52 | # should be linted in preview...
 
-C419.py:50:5: C419 (unnecessary-comprehension-in-call) [*] Unnecessary set comprehension
+C419.py:50:5: C419 [*] Unnecessary set comprehension
    |
 48 | # should be linted...
 49 | any({x.id for x in bar})
 50 | all({x.id for x in bar})
-   |     ^^^^^^^^^^^^^^^^^^^ C419 (unnecessary-comprehension-in-call)
+   |     ^^^^^^^^^^^^^^^^^^^ C419
 51 | 
 52 | # should be linted in preview...
    |

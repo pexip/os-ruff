@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-trailing_comment.py:8:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
+trailing_comment.py:8:1: I001 [*] Import block is un-sorted or un-formatted
    |
  6 |   pass
  7 |   
@@ -13,7 +13,7 @@ trailing_comment.py:8:1: I001 (unsorted-imports) [*] Import block is un-sorted o
 13 | | )# some comment
 14 | | 
 15 | | pass
-   | |_^ I001 (unsorted-imports)
+   | |_^ I001
 16 |   
 17 |   from foo import (
    |
@@ -35,7 +35,7 @@ trailing_comment.py:8:1: I001 (unsorted-imports) [*] Import block is un-sorted o
 15 14 | pass
 16 15 | 
 
-trailing_comment.py:17:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
+trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
    |
 15 |   pass
 16 |   
@@ -49,7 +49,7 @@ trailing_comment.py:17:1: I001 (unsorted-imports) [*] Import block is un-sorted 
 24 | | )
 25 | | 
 26 | | pass
-   | |_^ I001 (unsorted-imports)
+   | |_^ I001
 27 |   
 28 |   from mylib import (
    |
@@ -67,7 +67,7 @@ trailing_comment.py:17:1: I001 (unsorted-imports) [*] Import block is un-sorted 
 21 19 |     MyClient,
 22 20 |     MyMgmtClient,
 
-trailing_comment.py:35:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
+trailing_comment.py:35:1: I001 [*] Import block is un-sorted or un-formatted
    |
 33 |   pass
 34 |   
@@ -77,7 +77,7 @@ trailing_comment.py:35:1: I001 (unsorted-imports) [*] Import block is un-sorted 
 38 | | )
 39 | | 
 40 | | pass
-   | |_^ I001 (unsorted-imports)
+   | |_^ I001
 41 |   
 42 |   from mylib import (
    |
@@ -96,7 +96,7 @@ trailing_comment.py:35:1: I001 (unsorted-imports) [*] Import block is un-sorted 
 40 37 | pass
 41 38 | 
 
-trailing_comment.py:42:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
+trailing_comment.py:42:1: I001 [*] Import block is un-sorted or un-formatted
    |
 40 |   pass
 41 |   
@@ -106,7 +106,7 @@ trailing_comment.py:42:1: I001 (unsorted-imports) [*] Import block is un-sorted 
 45 | | )
 46 | | 
 47 | | pass
-   | |_^ I001 (unsorted-imports)
+   | |_^ I001
 48 |   
 49 |   # a
    |
@@ -125,7 +125,7 @@ trailing_comment.py:42:1: I001 (unsorted-imports) [*] Import block is un-sorted 
 47 44 | pass
 48 45 | 
 
-trailing_comment.py:50:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
+trailing_comment.py:50:1: I001 [*] Import block is un-sorted or un-formatted
    |
 49 |   # a
 50 | / from mylib import ( # b

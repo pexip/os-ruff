@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC403_numpy.py:24:1: DOC403 (docstring-extraneous-yields) Docstring has a "Yields" section but the function doesn't yield anything
+DOC403_numpy.py:24:1: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
    |
 22 |           A number
 23 |   
@@ -10,12 +10,12 @@ DOC403_numpy.py:24:1: DOC403 (docstring-extraneous-yields) Docstring has a "Yiel
 26 | |     str
 27 | |         A string
 28 | |     """
-   | |____^ DOC403 (docstring-extraneous-yields)
+   | |____^ DOC403
 29 |       print('test')
    |
    = help: Remove the "Yields" section
 
-DOC403_numpy.py:44:1: DOC403 (docstring-extraneous-yields) Docstring has a "Yields" section but the function doesn't yield anything
+DOC403_numpy.py:44:1: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
    |
 42 |               A number
 43 |   
@@ -24,7 +24,7 @@ DOC403_numpy.py:44:1: DOC403 (docstring-extraneous-yields) Docstring has a "Yiel
 46 | |         str
 47 | |             A string
 48 | |         """
-   | |________^ DOC403 (docstring-extraneous-yields)
+   | |________^ DOC403
 49 |           print('test')
    |
    = help: Remove the "Yields" section

@@ -57,12 +57,12 @@ pub(crate) fn expand<'a>(
         }
 
         impl std::str::FromStr for #prefix_ident {
-            type Err = crate::registry::FromCodeOrNameError;
+            type Err = crate::registry::FromCodeError;
 
             fn from_str(code: &str) -> Result<Self, Self::Err> {
                 match code {
                     #(#attributes #variant_strs => Ok(Self::#variant_idents),)*
-                    _ => Err(crate::registry::FromCodeOrNameError::UnknownCode)
+                    _ => Err(crate::registry::FromCodeError::Unknown)
                 }
             }
         }
