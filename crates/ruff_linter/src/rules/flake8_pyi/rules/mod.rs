@@ -1,3 +1,14 @@
+use std::fmt;
+
+use anyhow::Result;
+
+use ruff_python_ast::{Expr, ExprContext, ExprName, ExprSubscript, ExprTuple, name::Name};
+use ruff_python_codegen::Generator;
+use ruff_text_size::{Ranged, TextRange};
+
+use crate::checkers::ast::TypingImporter;
+use crate::{Applicability, Edit, Fix};
+
 pub(crate) use any_eq_ne_annotation::*;
 pub(crate) use bad_generator_return_type::*;
 pub(crate) use bad_version_info_comparison::*;
@@ -5,7 +16,7 @@ pub(crate) use bytestring_usage::*;
 pub(crate) use collections_named_tuple::*;
 pub(crate) use complex_assignment_in_stub::*;
 pub(crate) use complex_if_statement_in_stub::*;
-pub(crate) use custom_type_var_return_type::*;
+pub(crate) use custom_type_var_for_self::*;
 pub(crate) use docstring_in_stubs::*;
 pub(crate) use duplicate_literal_member::*;
 pub(crate) use duplicate_union_member::*;
@@ -25,9 +36,9 @@ pub(crate) use prefix_type_params::*;
 pub(crate) use quoted_annotation_in_stub::*;
 pub(crate) use redundant_final_literal::*;
 pub(crate) use redundant_literal_union::*;
+pub(crate) use redundant_none_literal::*;
 pub(crate) use redundant_numeric_union::*;
 pub(crate) use simple_defaults::*;
-use std::fmt;
 pub(crate) use str_or_repr_defined_in_stub::*;
 pub(crate) use string_or_bytes_too_long::*;
 pub(crate) use stub_body_multiple_statements::*;
@@ -48,7 +59,7 @@ mod bytestring_usage;
 mod collections_named_tuple;
 mod complex_assignment_in_stub;
 mod complex_if_statement_in_stub;
-mod custom_type_var_return_type;
+mod custom_type_var_for_self;
 mod docstring_in_stubs;
 mod duplicate_literal_member;
 mod duplicate_union_member;
@@ -68,6 +79,7 @@ mod prefix_type_params;
 mod quoted_annotation_in_stub;
 mod redundant_final_literal;
 mod redundant_literal_union;
+mod redundant_none_literal;
 mod redundant_numeric_union;
 mod simple_defaults;
 mod str_or_repr_defined_in_stub;
@@ -104,4 +116,43 @@ impl fmt::Display for TypingModule {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.write_str(self.as_str())
     }
+}
+
+/// Generate a [`Fix`] for two or more type expressions, e.g. `typing.Union[int, float, complex]`.
+fn generate_union_fix(
+    generator: Generator,
+    importer: &TypingImporter,
+    nodes: Vec<&Expr>,
+    annotation: &Expr,
+    applicability: Applicability,
+) -> Result<Fix> {
+    debug_assert!(nodes.len() >= 2, "At least two nodes required");
+
+    let (import_edit, binding) = importer.import(annotation.start())?;
+
+    // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
+    let new_expr = Expr::Subscript(ExprSubscript {
+        range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        value: Box::new(Expr::Name(ExprName {
+            id: Name::new(binding),
+            ctx: ExprContext::Store,
+            range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        })),
+        slice: Box::new(Expr::Tuple(ExprTuple {
+            elts: nodes.into_iter().cloned().collect(),
+            range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            ctx: ExprContext::Load,
+            parenthesized: false,
+        })),
+        ctx: ExprContext::Load,
+    });
+
+    Ok(Fix::applicable_edits(
+        Edit::range_replacement(generator.expr(&new_expr), annotation.range()),
+        [import_edit],
+        applicability,
+    ))
 }

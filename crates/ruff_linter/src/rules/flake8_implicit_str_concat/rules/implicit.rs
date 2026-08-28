@@ -1,14 +1,18 @@
+use std::borrow::Cow;
+
 use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
+use crate::checkers::ast::LintContext;
 use crate::settings::LinterSettings;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for implicitly concatenated strings on a single line.
@@ -31,15 +35,15 @@ use crate::settings::LinterSettings;
 /// ```python
 /// z = "The quick brown fox."
 /// ```
-#[violation]
-pub struct SingleLineImplicitStringConcatenation;
+#[derive(ViolationMetadata)]
+pub(crate) struct SingleLineImplicitStringConcatenation;
 
 impl Violation for SingleLineImplicitStringConcatenation {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Implicitly concatenated string literals on one line")
+        "Implicitly concatenated string literals on one line".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -78,20 +82,29 @@ impl Violation for SingleLineImplicitStringConcatenation {
 /// ## Options
 /// - `lint.flake8-implicit-str-concat.allow-multiline`
 ///
+/// ## Formatter compatibility
+/// Using this rule with `allow-multiline = false` can be incompatible with the
+/// formatter because the [formatter] can introduce new multi-line implicitly
+/// concatenated strings. We recommend to either:
+///
+/// * Enable `ISC001` to disallow all implicit concatenated strings
+/// * Setting `allow-multiline = true`
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
-#[violation]
-pub struct MultiLineImplicitStringConcatenation;
+/// [formatter]:https://docs.astral.sh/ruff/formatter/
+#[derive(ViolationMetadata)]
+pub(crate) struct MultiLineImplicitStringConcatenation;
 
 impl Violation for MultiLineImplicitStringConcatenation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Implicitly concatenated string literals over multiple lines")
+        "Implicitly concatenated string literals over multiple lines".to_string()
     }
 }
 
 /// ISC001, ISC002
 pub(crate) fn implicit(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
@@ -133,22 +146,20 @@ pub(crate) fn implicit(
         };
 
         if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
-            diagnostics.push(Diagnostic::new(
+            context.report_diagnostic_if_enabled(
                 MultiLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
-            ));
+            );
         } else {
-            let mut diagnostic = Diagnostic::new(
+            if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                 SingleLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
-            );
-
-            if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
-                diagnostic.set_fix(fix);
+            ) {
+                if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
+                    diagnostic.set_fix(fix);
+                }
             }
-
-            diagnostics.push(diagnostic);
-        };
+        }
     }
 }
 
@@ -172,8 +183,15 @@ fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator
         return None;
     }
 
-    let a_body = &a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()];
+    let mut a_body =
+        Cow::Borrowed(&a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()]);
     let b_body = &b_text[b_leading_quote.len()..b_text.len() - b_trailing_quote.len()];
+
+    if a_leading_quote.find(['r', 'R']).is_none()
+        && matches!(b_body.bytes().next(), Some(b'0'..=b'7'))
+    {
+        normalize_ending_octal(&mut a_body);
+    }
 
     let concatenation = format!("{a_leading_quote}{a_body}{b_body}{a_trailing_quote}");
     let range = TextRange::new(a_range.start(), b_range.end());
@@ -182,4 +200,40 @@ fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator
         concatenation,
         range,
     )))
+}
+
+/// Pads an octal at the end of the string
+/// to three digits, if necessary.
+fn normalize_ending_octal(text: &mut Cow<'_, str>) {
+    // Early return for short strings
+    if text.len() < 2 {
+        return;
+    }
+
+    let mut rev_bytes = text.bytes().rev();
+    if let Some(last_byte @ b'0'..=b'7') = rev_bytes.next() {
+        // "\y" -> "\00y"
+        if has_odd_consecutive_backslashes(&mut rev_bytes.clone()) {
+            let prefix = &text[..text.len() - 2];
+            *text = Cow::Owned(format!("{prefix}\\00{}", last_byte as char));
+        }
+        // "\xy" -> "\0xy"
+        else if let Some(penultimate_byte @ b'0'..=b'7') = rev_bytes.next() {
+            if has_odd_consecutive_backslashes(&mut rev_bytes.clone()) {
+                let prefix = &text[..text.len() - 3];
+                *text = Cow::Owned(format!(
+                    "{prefix}\\0{}{}",
+                    penultimate_byte as char, last_byte as char
+                ));
+            }
+        }
+    }
+}
+
+fn has_odd_consecutive_backslashes(mut itr: impl Iterator<Item = u8>) -> bool {
+    let mut odd_backslashes = false;
+    while let Some(b'\\') = itr.next() {
+        odd_backslashes = !odd_backslashes;
+    }
+    odd_backslashes
 }

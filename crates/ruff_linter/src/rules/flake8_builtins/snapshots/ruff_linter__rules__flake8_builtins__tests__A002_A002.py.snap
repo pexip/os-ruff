@@ -1,66 +1,58 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
 ---
-A002.py:1:11: A002 (builtin-argument-shadowing) Argument `str` is shadowing a Python builtin
+A002.py:1:11: A002 (builtin-argument-shadowing) Function argument `str` is shadowing a Python builtin
   |
 1 | def func1(str, /, type, *complex, Exception, **getattr):
   |           ^^^ A002 (builtin-argument-shadowing)
 2 |     pass
   |
 
-A002.py:1:19: A002 (builtin-argument-shadowing) Argument `type` is shadowing a Python builtin
+A002.py:1:19: A002 (builtin-argument-shadowing) Function argument `type` is shadowing a Python builtin
   |
 1 | def func1(str, /, type, *complex, Exception, **getattr):
   |                   ^^^^ A002 (builtin-argument-shadowing)
 2 |     pass
   |
 
-A002.py:1:26: A002 (builtin-argument-shadowing) Argument `complex` is shadowing a Python builtin
+A002.py:1:26: A002 (builtin-argument-shadowing) Function argument `complex` is shadowing a Python builtin
   |
 1 | def func1(str, /, type, *complex, Exception, **getattr):
   |                          ^^^^^^^ A002 (builtin-argument-shadowing)
 2 |     pass
   |
 
-A002.py:1:35: A002 (builtin-argument-shadowing) Argument `Exception` is shadowing a Python builtin
+A002.py:1:35: A002 (builtin-argument-shadowing) Function argument `Exception` is shadowing a Python builtin
   |
 1 | def func1(str, /, type, *complex, Exception, **getattr):
   |                                   ^^^^^^^^^ A002 (builtin-argument-shadowing)
 2 |     pass
   |
 
-A002.py:1:48: A002 (builtin-argument-shadowing) Argument `getattr` is shadowing a Python builtin
+A002.py:1:48: A002 (builtin-argument-shadowing) Function argument `getattr` is shadowing a Python builtin
   |
 1 | def func1(str, /, type, *complex, Exception, **getattr):
   |                                                ^^^^^^^ A002 (builtin-argument-shadowing)
 2 |     pass
   |
 
-A002.py:5:17: A002 (builtin-argument-shadowing) Argument `bytes` is shadowing a Python builtin
+A002.py:5:17: A002 (builtin-argument-shadowing) Function argument `bytes` is shadowing a Python builtin
   |
 5 | async def func2(bytes):
   |                 ^^^^^ A002 (builtin-argument-shadowing)
 6 |     pass
   |
 
-A002.py:9:17: A002 (builtin-argument-shadowing) Argument `id` is shadowing a Python builtin
+A002.py:9:17: A002 (builtin-argument-shadowing) Function argument `id` is shadowing a Python builtin
    |
  9 | async def func3(id, dir):
    |                 ^^ A002 (builtin-argument-shadowing)
 10 |     pass
    |
 
-A002.py:9:21: A002 (builtin-argument-shadowing) Argument `dir` is shadowing a Python builtin
+A002.py:9:21: A002 (builtin-argument-shadowing) Function argument `dir` is shadowing a Python builtin
    |
  9 | async def func3(id, dir):
    |                     ^^^ A002 (builtin-argument-shadowing)
 10 |     pass
-   |
-
-A002.py:13:16: A002 (builtin-argument-shadowing) Argument `float` is shadowing a Python builtin
-   |
-13 | map([], lambda float: ...)
-   |                ^^^^^ A002 (builtin-argument-shadowing)
-14 | 
-15 | from typing import override, overload
    |

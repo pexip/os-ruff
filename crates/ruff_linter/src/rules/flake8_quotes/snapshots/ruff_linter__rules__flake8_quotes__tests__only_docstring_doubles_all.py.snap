@@ -5,7 +5,7 @@ doubles_all.py:1:1: Q002 (bad-quotes-docstring) [*] Double quote docstring found
   |
 1 | """This is a docstring."""
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002 (bad-quotes-docstring)
-2 | 
+2 |
 3 | this_is_an_inline_string = "double quote string"
   |
   = help: Replace double quotes docstring with single quotes

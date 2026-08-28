@@ -3,8 +3,8 @@ use std::fs::{self, File};
 use std::hash::Hasher;
 use std::io::{self, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
@@ -13,20 +13,21 @@ use itertools::Itertools;
 use log::{debug, error};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
+use ruff_linter::codes::Rule;
 use rustc_hash::FxHashMap;
-use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_diagnostics::{DiagnosticKind, Fix};
-use ruff_linter::message::{DiagnosticMessage, Message};
-use ruff_linter::{warn_user, VERSION};
+use ruff_diagnostics::Fix;
+use ruff_linter::message::OldDiagnostic;
+use ruff_linter::package::PackageRoot;
+use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{TextRange, TextSize};
-use ruff_workspace::resolver::Resolver;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use ruff_workspace::Settings;
+use ruff_workspace::resolver::Resolver;
 
 use crate::diagnostics::Diagnostics;
 
@@ -85,7 +86,7 @@ pub(crate) struct Cache {
     changes: Mutex<Vec<Change>>,
     /// The "current" timestamp used as cache for the updates of
     /// [`FileCache::last_seen`]
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     last_seen_cache: u64,
 }
 
@@ -111,23 +112,24 @@ impl Cache {
                 return Cache::empty(path, package_root);
             }
             Err(err) => {
-                warn_user!("Failed to open cache file '{}': {err}", path.display());
+                warn_user!("Failed to open cache file `{}`: {err}", path.display());
                 return Cache::empty(path, package_root);
             }
         };
 
-        let mut package: PackageCache = match bincode::deserialize_from(BufReader::new(file)) {
-            Ok(package) => package,
-            Err(err) => {
-                warn_user!("Failed parse cache file '{}': {err}", path.display());
-                return Cache::empty(path, package_root);
-            }
-        };
+        let mut package: PackageCache =
+            match bincode::decode_from_reader(BufReader::new(file), bincode::config::standard()) {
+                Ok(package) => package,
+                Err(err) => {
+                    warn_user!("Failed parse cache file `{}`: {err}", path.display());
+                    return Cache::empty(path, package_root);
+                }
+            };
 
         // Sanity check.
         if package.package_root != package_root {
             warn_user!(
-                "Different package root in cache: expected '{}', got '{}'",
+                "Different package root in cache: expected `{}`, got `{}`",
                 package_root.display(),
                 package.package_root.display(),
             );
@@ -145,7 +147,7 @@ impl Cache {
         Cache::new(path, package)
     }
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     fn new(path: PathBuf, package: PackageCache) -> Self {
         Cache {
             path,
@@ -174,8 +176,8 @@ impl Cache {
 
         // Serialize to in-memory buffer because hyperfine benchmark showed that it's faster than
         // using a `BufWriter` and our cache files are small enough that streaming isn't necessary.
-        let serialized =
-            bincode::serialize(&self.package).context("Failed to serialize cache data")?;
+        let serialized = bincode::encode_to_vec(&self.package, bincode::config::standard())
+            .context("Failed to serialize cache data")?;
         temp_file
             .write_all(&serialized)
             .context("Failed to write serialized cache to temporary file.")?;
@@ -185,7 +187,7 @@ impl Cache {
             // the user is running Ruff from multiple processes over the same directory).
             if cfg!(windows) && err.error.kind() == io::ErrorKind::PermissionDenied {
                 warn_user!(
-                    "Failed to write cache file '{}': {}",
+                    "Failed to write cache file `{}`: {}",
                     self.path.display(),
                     err.error
                 );
@@ -203,7 +205,7 @@ impl Cache {
     }
 
     /// Applies the pending changes without storing the cache to disk.
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     pub(crate) fn save(&mut self) -> bool {
         /// Maximum duration for which we keep a file in cache that hasn't been seen.
         const MAX_LAST_SEEN: Duration = Duration::from_secs(30 * 24 * 60 * 60); // 30 days.
@@ -310,7 +312,7 @@ impl Cache {
 }
 
 /// On disk representation of a cache of a package.
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(bincode::Encode, Debug, bincode::Decode)]
 struct PackageCache {
     /// Path to the root of the package.
     ///
@@ -322,7 +324,7 @@ struct PackageCache {
 }
 
 /// On disk representation of the cache per source file.
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(bincode::Decode, Debug, bincode::Encode)]
 pub(crate) struct FileCache {
     /// Key that determines if the cached item is still valid.
     key: u64,
@@ -339,20 +341,23 @@ impl FileCache {
     /// Convert the file cache into `Diagnostics`, using `path` as file name.
     pub(crate) fn to_diagnostics(&self, path: &Path) -> Option<Diagnostics> {
         self.data.lint.as_ref().map(|lint| {
-            let messages = if lint.messages.is_empty() {
+            let diagnostics = if lint.messages.is_empty() {
                 Vec::new()
             } else {
                 let file = SourceFileBuilder::new(path.to_string_lossy(), &*lint.source).finish();
                 lint.messages
                     .iter()
                     .map(|msg| {
-                        Message::Diagnostic(DiagnosticMessage {
-                            kind: msg.kind.clone(),
-                            range: msg.range,
-                            fix: msg.fix.clone(),
-                            file: file.clone(),
-                            noqa_offset: msg.noqa_offset,
-                        })
+                        OldDiagnostic::lint(
+                            &msg.body,
+                            msg.suggestion.as_ref(),
+                            msg.range,
+                            msg.fix.clone(),
+                            msg.parent,
+                            file.clone(),
+                            msg.noqa_offset,
+                            msg.rule,
+                        )
                     })
                     .collect()
             };
@@ -361,12 +366,12 @@ impl FileCache {
             } else {
                 FxHashMap::default()
             };
-            Diagnostics::new(messages, notebook_indexes)
+            Diagnostics::new(diagnostics, notebook_indexes)
         })
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, bincode::Decode, bincode::Encode)]
 struct FileCacheData {
     lint: Option<LintCacheData>,
     formatted: bool,
@@ -404,7 +409,7 @@ pub(crate) fn init(path: &Path) -> Result<()> {
     Ok(())
 }
 
-#[derive(Deserialize, Debug, Serialize, PartialEq)]
+#[derive(bincode::Decode, Debug, bincode::Encode, PartialEq)]
 pub(crate) struct LintCacheData {
     /// Imports made.
     // pub(super) imports: ImportMap,
@@ -417,35 +422,42 @@ pub(crate) struct LintCacheData {
     /// This will be empty if `messages` is empty.
     pub(super) source: String,
     /// Notebook index if this file is a Jupyter Notebook.
+    #[bincode(with_serde)]
     pub(super) notebook_index: Option<NotebookIndex>,
 }
 
 impl LintCacheData {
-    pub(crate) fn from_messages(
-        messages: &[Message],
+    pub(crate) fn from_diagnostics(
+        diagnostics: &[OldDiagnostic],
         notebook_index: Option<NotebookIndex>,
     ) -> Self {
-        let source = if let Some(msg) = messages.first() {
+        let source = if let Some(msg) = diagnostics.first() {
             msg.source_file().source_text().to_owned()
         } else {
             String::new() // No messages, no need to keep the source!
         };
 
-        let messages = messages
+        let messages = diagnostics
             .iter()
-            .filter_map(|message| message.as_diagnostic_message())
-            .map(|msg| {
+            // Parse the kebab-case rule name into a `Rule`. This will fail for syntax errors, so
+            // this also serves to filter them out, but we shouldn't be caching files with syntax
+            // errors anyway.
+            .filter_map(|msg| Some((msg.name().parse().ok()?, msg)))
+            .map(|(rule, msg)| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
-                    &msg.file,
-                    messages.first().unwrap().source_file(),
+                    msg.source_file(),
+                    diagnostics.first().unwrap().source_file(),
                     "message uses a different source file"
                 );
                 CacheMessage {
-                    kind: msg.kind.clone(),
-                    range: msg.range,
-                    fix: msg.fix.clone(),
-                    noqa_offset: msg.noqa_offset,
+                    rule,
+                    body: msg.body().to_string(),
+                    suggestion: msg.suggestion().map(ToString::to_string),
+                    range: msg.range(),
+                    parent: msg.parent,
+                    fix: msg.fix().cloned(),
+                    noqa_offset: msg.noqa_offset(),
                 }
             })
             .collect();
@@ -459,13 +471,24 @@ impl LintCacheData {
 }
 
 /// On disk representation of a diagnostic message.
-#[derive(Deserialize, Debug, Serialize, PartialEq)]
+#[derive(bincode::Decode, Debug, bincode::Encode, PartialEq)]
 pub(super) struct CacheMessage {
-    kind: DiagnosticKind,
+    /// The rule for the cached diagnostic.
+    #[bincode(with_serde)]
+    rule: Rule,
+    /// The message body to display to the user, to explain the diagnostic.
+    body: String,
+    /// The message to display to the user, to explain the suggested fix.
+    suggestion: Option<String>,
     /// Range into the message's [`FileCache::source`].
+    #[bincode(with_serde)]
     range: TextRange,
+    #[bincode(with_serde)]
+    parent: Option<TextSize>,
+    #[bincode(with_serde)]
     fix: Option<Fix>,
-    noqa_offset: TextSize,
+    #[bincode(with_serde)]
+    noqa_offset: Option<TextSize>,
 }
 
 pub(crate) trait PackageCaches {
@@ -497,7 +520,7 @@ pub(crate) struct PackageCacheMap<'a>(FxHashMap<&'a Path, Cache>);
 
 impl<'a> PackageCacheMap<'a> {
     pub(crate) fn init(
-        package_roots: &FxHashMap<&'a Path, Option<&'a Path>>,
+        package_roots: &FxHashMap<&'a Path, Option<PackageRoot<'a>>>,
         resolver: &Resolver,
     ) -> Self {
         fn init_cache(path: &Path) {
@@ -513,7 +536,9 @@ impl<'a> PackageCacheMap<'a> {
         Self(
             package_roots
                 .iter()
-                .map(|(package, package_root)| package_root.unwrap_or(package))
+                .map(|(package, package_root)| {
+                    package_root.map(PackageRoot::path).unwrap_or(package)
+                })
                 .unique()
                 .par_bridge()
                 .map(|cache_root| {
@@ -581,21 +606,23 @@ mod tests {
     use std::time::SystemTime;
 
     use anyhow::Result;
-    use filetime::{set_file_mtime, FileTime};
+    use filetime::{FileTime, set_file_mtime};
     use itertools::Itertools;
+    use ruff_linter::settings::LinterSettings;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
-    use ruff_linter::message::Message;
+    use ruff_linter::message::OldDiagnostic;
+    use ruff_linter::package::PackageRoot;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
-    use ruff_python_ast::PySourceType;
+    use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_workspace::Settings;
 
     use crate::cache::{self, FileCache, FileCacheData, FileCacheKey};
     use crate::cache::{Cache, RelativePathBuf};
-    use crate::commands::format::{format_path, FormatCommandError, FormatMode, FormatResult};
-    use crate::diagnostics::{lint_path, Diagnostics};
+    use crate::commands::format::{FormatCommandError, FormatMode, FormatResult, format_path};
+    use crate::diagnostics::{Diagnostics, lint_path};
 
     #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
     #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]
@@ -607,6 +634,10 @@ mod tests {
 
         let settings = Settings {
             cache_dir,
+            linter: LinterSettings {
+                unresolved_target_version: PythonVersion::latest().into(),
+                ..Default::default()
+            },
             ..Settings::default()
         };
 
@@ -641,7 +672,7 @@ mod tests {
 
                 let diagnostics = lint_path(
                     &path,
-                    Some(&package_root),
+                    Some(PackageRoot::root(&package_root)),
                     &settings.linter,
                     Some(&cache),
                     flags::Noqa::Enabled,
@@ -649,7 +680,7 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics.messages.iter().any(Message::is_syntax_error) {
+                if diagnostics.inner.iter().any(OldDiagnostic::is_syntax_error) {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);
@@ -674,7 +705,7 @@ mod tests {
 
             assert!(
                 cache.package.files.contains_key(relative_path),
-                "missing file from cache: '{}'",
+                "missing file from cache: `{}`",
                 relative_path.display()
             );
         }
@@ -683,7 +714,7 @@ mod tests {
         for path in paths {
             got_diagnostics += lint_path(
                 &path,
-                Some(&package_root),
+                Some(PackageRoot::root(&package_root)),
                 &settings.linter,
                 Some(&cache),
                 flags::Noqa::Enabled,
@@ -693,7 +724,10 @@ mod tests {
             .unwrap();
         }
 
-        assert_eq!(expected_diagnostics, got_diagnostics);
+        assert_eq!(
+            expected_diagnostics, got_diagnostics,
+            "left == {expected_diagnostics:#?}, right == {got_diagnostics:#?}",
+        );
     }
 
     #[test]
@@ -819,7 +853,6 @@ mod tests {
         // Regression test for issue #3086.
 
         #[cfg(unix)]
-        #[allow(clippy::items_after_statements)]
         fn flip_execute_permission_bit(path: &Path) -> io::Result<()> {
             use std::os::unix::fs::PermissionsExt;
             let file = fs::OpenOptions::new().write(true).open(path)?;
@@ -828,7 +861,6 @@ mod tests {
         }
 
         #[cfg(windows)]
-        #[allow(clippy::items_after_statements)]
         fn flip_read_only_permission(path: &Path) -> io::Result<()> {
             let file = fs::OpenOptions::new().write(true).open(path)?;
             let mut perms = file.metadata()?.permissions();
@@ -1056,7 +1088,7 @@ mod tests {
         ) -> Result<Diagnostics, anyhow::Error> {
             lint_path(
                 &self.package_root.join(path),
-                Some(&self.package_root),
+                Some(PackageRoot::root(&self.package_root)),
                 &self.settings.linter,
                 Some(cache),
                 flags::Noqa::Enabled,

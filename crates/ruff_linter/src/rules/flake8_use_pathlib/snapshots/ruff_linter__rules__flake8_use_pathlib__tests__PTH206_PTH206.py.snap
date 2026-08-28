@@ -95,6 +95,6 @@ PTH206.py:17:30: PTH206 (os-sep-split) Replace `.split(os.sep)` with `Path.parts
 16 | file_name.split(os.sep)
 17 | (os.path.abspath(file_name)).split(os.sep)
    |                              ^^^^^ PTH206 (os-sep-split)
-18 | 
+18 |
 19 | # OK
    |

@@ -88,3 +88,17 @@ FBT.py:90:19: FBT001 (boolean-type-hint-positional-argument) Boolean-typed posit
    |                   ^^^^^ FBT001 (boolean-type-hint-positional-argument)
 91 |         pass
    |
+
+FBT.py:100:10: FBT001 (boolean-type-hint-positional-argument) Boolean-typed positional argument in function definition
+    |
+100 | def func(x: Union[list, Optional[int | str | float | bool]]):
+    |          ^ FBT001 (boolean-type-hint-positional-argument)
+101 |     pass
+    |
+
+FBT.py:104:10: FBT001 (boolean-type-hint-positional-argument) Boolean-typed positional argument in function definition
+    |
+104 | def func(x: bool | str):
+    |          ^ FBT001 (boolean-type-hint-positional-argument)
+105 |     pass
+    |

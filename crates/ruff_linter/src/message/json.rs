@@ -2,14 +2,14 @@ use std::io::Write;
 
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use ruff_diagnostics::Edit;
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{OneIndexed, SourceCode, SourceLocation};
+use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
 use ruff_text_size::Ranged;
 
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::Edit;
+use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 
 #[derive(Default)]
 pub struct JsonEmitter;
@@ -18,17 +18,23 @@ impl Emitter for JsonEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        serde_json::to_writer_pretty(writer, &ExpandedMessages { messages, context })?;
+        serde_json::to_writer_pretty(
+            writer,
+            &ExpandedMessages {
+                diagnostics,
+                context,
+            },
+        )?;
 
         Ok(())
     }
 }
 
 struct ExpandedMessages<'a> {
-    messages: &'a [Message],
+    diagnostics: &'a [OldDiagnostic],
     context: &'a EmitterContext<'a>,
 }
 
@@ -37,9 +43,9 @@ impl Serialize for ExpandedMessages<'_> {
     where
         S: Serializer,
     {
-        let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
+        let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
 
-        for message in self.messages {
+        for message in self.diagnostics {
             let value = message_to_json_value(message, self.context);
             s.serialize_element(&value)?;
         }
@@ -48,9 +54,10 @@ impl Serialize for ExpandedMessages<'_> {
     }
 }
 
-pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext) -> Value {
-    let source_code = message.source_file().to_source_code();
-    let notebook_index = context.notebook_index(message.filename());
+pub(crate) fn message_to_json_value(message: &OldDiagnostic, context: &EmitterContext) -> Value {
+    let source_file = message.source_file();
+    let source_code = source_file.to_source_code();
+    let notebook_index = context.notebook_index(&message.filename());
 
     let fix = message.fix().map(|fix| {
         json!({
@@ -60,35 +67,43 @@ pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext)
         })
     });
 
-    let mut start_location = source_code.source_location(message.start());
-    let mut end_location = source_code.source_location(message.end());
+    let mut start_location = source_code.line_column(message.start());
+    let mut end_location = source_code.line_column(message.end());
     let mut noqa_location = message
         .noqa_offset()
-        .map(|offset| source_code.source_location(offset));
+        .map(|offset| source_code.line_column(offset));
     let mut notebook_cell_index = None;
 
     if let Some(notebook_index) = notebook_index {
         notebook_cell_index = Some(
             notebook_index
-                .cell(start_location.row)
+                .cell(start_location.line)
                 .unwrap_or(OneIndexed::MIN),
         );
-        start_location = notebook_index.translate_location(&start_location);
-        end_location = notebook_index.translate_location(&end_location);
-        noqa_location = noqa_location.map(|location| notebook_index.translate_location(&location));
+        start_location = notebook_index.translate_line_column(&start_location);
+        end_location = notebook_index.translate_line_column(&end_location);
+        noqa_location =
+            noqa_location.map(|location| notebook_index.translate_line_column(&location));
     }
 
     json!({
-        "code": message.rule().map(|rule| rule.noqa_code().to_string()),
-        "name": message.rule().map(|rule| rule.as_ref().to_string()),
-        "url": message.rule().and_then(|rule| rule.url()),
+        "code": message.noqa_code().map(|code| code.to_string()),
+        "name": message.rule.map(|rule| rule.name().to_string()),
+        "url": message.to_url(),
         "message": message.body(),
         "fix": fix,
         "cell": notebook_cell_index,
-        "location": start_location,
-        "end_location": end_location,
+        "location": location_to_json(start_location),
+        "end_location": location_to_json(end_location),
         "filename": message.filename(),
-        "noqa_row": noqa_location.map(|location| location.row)
+        "noqa_row": noqa_location.map(|location| location.line)
+    })
+}
+
+fn location_to_json(location: LineColumn) -> serde_json::Value {
+    json!({
+        "row": location.line,
+        "column": location.column
     })
 }
 
@@ -106,8 +121,8 @@ impl Serialize for ExpandedEdits<'_> {
         let mut s = serializer.serialize_seq(Some(self.edits.len()))?;
 
         for edit in self.edits {
-            let mut location = self.source_code.source_location(edit.start());
-            let mut end_location = self.source_code.source_location(edit.end());
+            let mut location = self.source_code.line_column(edit.start());
+            let mut end_location = self.source_code.line_column(edit.end());
 
             if let Some(notebook_index) = self.notebook_index {
                 // There exists a newline between each cell's source code in the
@@ -119,44 +134,44 @@ impl Serialize for ExpandedEdits<'_> {
                 // If it does, we need to translate the end location to the last
                 // character of the previous cell.
                 match (
-                    notebook_index.cell(location.row),
-                    notebook_index.cell(end_location.row),
+                    notebook_index.cell(location.line),
+                    notebook_index.cell(end_location.line),
                 ) {
                     (Some(start_cell), Some(end_cell)) if start_cell != end_cell => {
                         debug_assert_eq!(end_location.column.get(), 1);
 
-                        let prev_row = end_location.row.saturating_sub(1);
-                        end_location = SourceLocation {
-                            row: notebook_index.cell_row(prev_row).unwrap_or(OneIndexed::MIN),
+                        let prev_row = end_location.line.saturating_sub(1);
+                        end_location = LineColumn {
+                            line: notebook_index.cell_row(prev_row).unwrap_or(OneIndexed::MIN),
                             column: self
                                 .source_code
-                                .source_location(self.source_code.line_end_exclusive(prev_row))
+                                .line_column(self.source_code.line_end_exclusive(prev_row))
                                 .column,
                         };
                     }
                     (Some(_), None) => {
                         debug_assert_eq!(end_location.column.get(), 1);
 
-                        let prev_row = end_location.row.saturating_sub(1);
-                        end_location = SourceLocation {
-                            row: notebook_index.cell_row(prev_row).unwrap_or(OneIndexed::MIN),
+                        let prev_row = end_location.line.saturating_sub(1);
+                        end_location = LineColumn {
+                            line: notebook_index.cell_row(prev_row).unwrap_or(OneIndexed::MIN),
                             column: self
                                 .source_code
-                                .source_location(self.source_code.line_end_exclusive(prev_row))
+                                .line_column(self.source_code.line_end_exclusive(prev_row))
                                 .column,
                         };
                     }
                     _ => {
-                        end_location = notebook_index.translate_location(&end_location);
+                        end_location = notebook_index.translate_line_column(&end_location);
                     }
                 }
-                location = notebook_index.translate_location(&location);
+                location = notebook_index.translate_line_column(&location);
             }
 
             let value = json!({
                 "content": edit.content().unwrap_or_default(),
-                "location": location,
-                "end_location": end_location
+                "location": location_to_json(location),
+                "end_location": location_to_json(end_location)
             });
 
             s.serialize_element(&value)?;
@@ -170,16 +185,16 @@ impl Serialize for ExpandedEdits<'_> {
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::message::tests::{
-        capture_emitter_notebook_output, capture_emitter_output, create_messages,
-        create_notebook_messages, create_syntax_error_messages,
-    };
     use crate::message::JsonEmitter;
+    use crate::message::tests::{
+        capture_emitter_notebook_output, capture_emitter_output, create_diagnostics,
+        create_notebook_diagnostics, create_syntax_error_diagnostics,
+    };
 
     #[test]
     fn output() {
         let mut emitter = JsonEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -187,7 +202,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = JsonEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -195,8 +210,9 @@ mod tests {
     #[test]
     fn notebook_output() {
         let mut emitter = JsonEmitter;
-        let (messages, notebook_indexes) = create_notebook_messages();
-        let content = capture_emitter_notebook_output(&mut emitter, &messages, &notebook_indexes);
+        let (diagnostics, notebook_indexes) = create_notebook_diagnostics();
+        let content =
+            capture_emitter_notebook_output(&mut emitter, &diagnostics, &notebook_indexes);
 
         assert_snapshot!(content);
     }

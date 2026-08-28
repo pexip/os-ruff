@@ -1,10 +1,10 @@
 use ruff_python_ast::Parameters;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `__eq__` and `__ne__` implementations that use `typing.Any` as
@@ -27,22 +27,22 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// class Foo:
 ///     def __eq__(self, obj: typing.Any) -> bool: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// class Foo:
 ///     def __eq__(self, obj: object) -> bool: ...
 /// ```
 /// ## References
 /// - [Python documentation: The `Any` type](https://docs.python.org/3/library/typing.html#the-any-type)
 /// - [Mypy documentation: Any vs. object](https://mypy.readthedocs.io/en/latest/dynamic_typing.html#any-vs-object)
-#[violation]
-pub struct AnyEqNeAnnotation {
+#[derive(ViolationMetadata)]
+pub(crate) struct AnyEqNeAnnotation {
     method_name: String,
 }
 
@@ -54,12 +54,12 @@ impl AlwaysFixableViolation for AnyEqNeAnnotation {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `object`")
+        "Replace with `object`".to_string()
     }
 }
 
 /// PYI032
-pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters: &Parameters) {
+pub(crate) fn any_eq_ne_annotation(checker: &Checker, name: &str, parameters: &Parameters) {
     if !matches!(name, "__eq__" | "__ne__") {
         return;
     }
@@ -68,7 +68,7 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters
         return;
     }
 
-    let Some(annotation) = &parameters.args[1].parameter.annotation else {
+    let Some(annotation) = &parameters.args[1].annotation() else {
         return;
     };
 
@@ -78,23 +78,26 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters
         return;
     }
 
-    if semantic.match_typing_expr(annotation, "Any") {
-        let mut diagnostic = Diagnostic::new(
-            AnyEqNeAnnotation {
-                method_name: name.to_string(),
-            },
-            annotation.range(),
-        );
-        // Ex) `def __eq__(self, obj: Any): ...`
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
-                "object",
-                annotation.start(),
-                semantic,
-            )?;
-            let binding_edit = Edit::range_replacement(binding, annotation.range());
-            Ok(Fix::safe_edits(binding_edit, import_edit))
-        });
-        checker.diagnostics.push(diagnostic);
+    if !checker.match_maybe_stringized_annotation(annotation, |expr| {
+        semantic.match_typing_expr(expr, "Any")
+    }) {
+        return;
     }
+
+    let mut diagnostic = checker.report_diagnostic(
+        AnyEqNeAnnotation {
+            method_name: name.to_string(),
+        },
+        annotation.range(),
+    );
+    // Ex) `def __eq__(self, obj: Any): ...`
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+            "object",
+            annotation.start(),
+            semantic,
+        )?;
+        let binding_edit = Edit::range_replacement(binding, annotation.range());
+        Ok(Fix::safe_edits(binding_edit, import_edit))
+    });
 }

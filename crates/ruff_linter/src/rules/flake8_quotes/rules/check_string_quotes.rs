@@ -1,13 +1,13 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StringLike;
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
-use super::super::settings::Quote;
+use crate::rules::flake8_quotes::settings::Quote;
 
 /// ## What it does
 /// Checks for inline strings that use single quotes or double quotes,
@@ -36,8 +36,8 @@ use super::super::settings::Quote;
 /// redundant.
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct BadQuotesInlineString {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadQuotesInlineString {
     preferred_quote: Quote,
 }
 
@@ -46,19 +46,18 @@ impl Violation for BadQuotesInlineString {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadQuotesInlineString { preferred_quote } = self;
-        match preferred_quote {
-            Quote::Double => format!("Single quotes found but double quotes preferred"),
-            Quote::Single => format!("Double quotes found but single quotes preferred"),
+        match self.preferred_quote {
+            Quote::Double => "Single quotes found but double quotes preferred".to_string(),
+            Quote::Single => "Double quotes found but single quotes preferred".to_string(),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let BadQuotesInlineString { preferred_quote } = self;
-        match preferred_quote {
-            Quote::Double => Some("Replace single quotes with double quotes".to_string()),
-            Quote::Single => Some("Replace double quotes with single quotes".to_string()),
-        }
+        let title = match self.preferred_quote {
+            Quote::Double => "Replace single quotes with double quotes",
+            Quote::Single => "Replace double quotes with single quotes",
+        };
+        Some(title.to_string())
     }
 }
 
@@ -94,8 +93,8 @@ impl Violation for BadQuotesInlineString {
 /// redundant.
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct BadQuotesMultilineString {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadQuotesMultilineString {
     preferred_quote: Quote,
 }
 
@@ -104,8 +103,8 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
     fn message(&self) -> String {
         let BadQuotesMultilineString { preferred_quote } = self;
         match preferred_quote {
-            Quote::Double => format!("Single quote multiline found but double quotes preferred"),
-            Quote::Single => format!("Double quote multiline found but single quotes preferred"),
+            Quote::Double => "Single quote multiline found but double quotes preferred".to_string(),
+            Quote::Single => "Double quote multiline found but single quotes preferred".to_string(),
         }
     }
 
@@ -149,8 +148,8 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
 /// redundant.
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
-#[violation]
-pub struct BadQuotesDocstring {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadQuotesDocstring {
     preferred_quote: Quote,
 }
 
@@ -159,16 +158,14 @@ impl Violation for BadQuotesDocstring {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadQuotesDocstring { preferred_quote } = self;
-        match preferred_quote {
-            Quote::Double => format!("Single quote docstring found but double quotes preferred"),
-            Quote::Single => format!("Double quote docstring found but single quotes preferred"),
+        match self.preferred_quote {
+            Quote::Double => "Single quote docstring found but double quotes preferred".to_string(),
+            Quote::Single => "Double quote docstring found but single quotes preferred".to_string(),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let BadQuotesDocstring { preferred_quote } = self;
-        match preferred_quote {
+        match self.preferred_quote {
             Quote::Double => Some("Replace single quotes docstring with double quotes".to_string()),
             Quote::Single => Some("Replace double quotes docstring with single quotes".to_string()),
         }
@@ -253,8 +250,8 @@ fn text_ends_at_quote(locator: &Locator, range: TextRange, quote: Quote) -> bool
 }
 
 /// Q002
-fn docstring(checker: &mut Checker, range: TextRange) {
-    let quotes_settings = &checker.settings.flake8_quotes;
+fn docstring(checker: &Checker, range: TextRange) {
+    let quotes_settings = &checker.settings().flake8_quotes;
     let locator = checker.locator();
 
     let text = locator.slice(range);
@@ -264,12 +261,12 @@ fn docstring(checker: &mut Checker, range: TextRange) {
     {
         // Fixing this would result in a one-sided multi-line docstring, which would
         // introduce a syntax error.
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(
             BadQuotesDocstring {
                 preferred_quote: quotes_settings.docstring_quotes,
             },
             range,
-        ));
+        );
         return;
     }
 
@@ -280,7 +277,7 @@ fn docstring(checker: &mut Checker, range: TextRange) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         BadQuotesDocstring {
             preferred_quote: quotes_settings.docstring_quotes,
         },
@@ -301,12 +298,11 @@ fn docstring(checker: &mut Checker, range: TextRange) {
         fixed_contents,
         range,
     )));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Q000, Q001
-fn strings(checker: &mut Checker, sequence: &[TextRange]) {
-    let quotes_settings = &checker.settings.flake8_quotes;
+fn strings(checker: &Checker, sequence: &[TextRange]) {
+    let quotes_settings = &checker.settings().flake8_quotes;
     let locator = checker.locator();
 
     let trivia = sequence
@@ -336,7 +332,7 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
     for (range, trivia) in sequence.iter().zip(trivia) {
         if trivia.is_multiline {
             // If multiline strings aren't enforced, ignore it.
-            if !checker.enabled(Rule::BadQuotesMultilineString) {
+            if !checker.is_rule_enabled(Rule::BadQuotesMultilineString) {
                 continue;
             }
 
@@ -356,7 +352,7 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 continue;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 BadQuotesMultilineString {
                     preferred_quote: quotes_settings.multiline_quotes,
                 },
@@ -376,13 +372,12 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 fixed_contents,
                 *range,
             )));
-            checker.diagnostics.push(diagnostic);
         } else if trivia.last_quote_char != quotes_settings.inline_quotes.as_char()
             // If we're not using the preferred type, only allow use to avoid escapes.
             && !relax_quote
         {
             // If inline strings aren't enforced, ignore it.
-            if !checker.enabled(Rule::BadQuotesInlineString) {
+            if !checker.is_rule_enabled(Rule::BadQuotesInlineString) {
                 continue;
             }
 
@@ -394,12 +389,12 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
                     *range,
-                ));
+                );
                 continue;
             }
 
@@ -409,16 +404,16 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
                     *range,
-                ));
+                );
                 continue;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 BadQuotesInlineString {
                     preferred_quote: quotes_settings.inline_quotes,
                 },
@@ -436,13 +431,12 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
                 fixed_contents,
                 *range,
             )));
-            checker.diagnostics.push(diagnostic);
         }
     }
 }
 
 /// Generate `flake8-quote` diagnostics from a token stream.
-pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike) {
+pub(crate) fn check_string_quotes(checker: &Checker, string_like: StringLike) {
     // Ignore if the string is part of a forward reference. For example,
     // `x: "Literal['foo', 'bar']"`.
     if checker.semantic().in_string_type_definition() {
@@ -450,20 +444,24 @@ pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike
     }
 
     // TODO(dhruvmanila): Support checking for escaped quotes in f-strings.
-    if checker.semantic().in_f_string_replacement_field() {
+    if checker
+        .semantic()
+        .in_interpolated_string_replacement_field()
+    {
         return;
     }
 
     let ranges: Vec<_> = string_like.parts().map(|part| part.range()).collect();
 
     if checker.semantic().in_pep_257_docstring() {
-        if checker.enabled(Rule::BadQuotesDocstring) {
+        if checker.is_rule_enabled(Rule::BadQuotesDocstring) {
             for range in ranges {
                 docstring(checker, range);
             }
         }
     } else {
-        if checker.any_enabled(&[Rule::BadQuotesInlineString, Rule::BadQuotesMultilineString]) {
+        if checker.any_rule_enabled(&[Rule::BadQuotesInlineString, Rule::BadQuotesMultilineString])
+        {
             strings(checker, &ranges);
         }
     }

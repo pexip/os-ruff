@@ -1,8 +1,8 @@
 use ruff_python_ast::StmtImportFrom;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::{Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, fix};
 
 /// ## What it does
@@ -16,16 +16,16 @@ use crate::{checkers::ast::Checker, fix};
 /// statement has no effect and should be omitted.
 ///
 /// ## References
-/// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
-#[violation]
-pub struct FutureAnnotationsInStub;
+/// - [Static Typing with Python: Type Stubs](https://typing.python.org/en/latest/source/stubs.html)
+#[derive(ViolationMetadata)]
+pub(crate) struct FutureAnnotationsInStub;
 
 impl Violation for FutureAnnotationsInStub {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`from __future__ import annotations` has no effect in stub files, since type checkers automatically treat stubs as having those semantics")
+        "`from __future__ import annotations` has no effect in stub files, since type checkers automatically treat stubs as having those semantics".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -34,35 +34,39 @@ impl Violation for FutureAnnotationsInStub {
 }
 
 /// PYI044
-pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom) {
-    if let StmtImportFrom {
+pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
+    let StmtImportFrom {
         range,
-        module: Some(name),
+        module: Some(module_name),
         names,
         ..
     } = target
-    {
-        if name == "__future__" && names.iter().any(|alias| &*alias.name == "annotations") {
-            let mut diagnostic = Diagnostic::new(FutureAnnotationsInStub, *range);
+    else {
+        return;
+    };
 
-            if checker.settings.preview.is_enabled() {
-                let stmt = checker.semantic().current_statement();
-
-                diagnostic.try_set_fix(|| {
-                    let edit = fix::edits::remove_unused_imports(
-                        std::iter::once("annotations"),
-                        stmt,
-                        None,
-                        checker.locator(),
-                        checker.stylist(),
-                        checker.indexer(),
-                    )?;
-
-                    Ok(Fix::safe_edit(edit))
-                });
-            }
-
-            checker.diagnostics.push(diagnostic);
-        }
+    if module_name != "__future__" {
+        return;
     }
+
+    if names.iter().all(|alias| &*alias.name != "annotations") {
+        return;
+    }
+
+    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, *range);
+
+    let stmt = checker.semantic().current_statement();
+
+    diagnostic.try_set_fix(|| {
+        let edit = fix::edits::remove_unused_imports(
+            std::iter::once("annotations"),
+            stmt,
+            None,
+            checker.locator(),
+            checker.stylist(),
+            checker.indexer(),
+        )?;
+
+        Ok(Fix::safe_edit(edit))
+    });
 }

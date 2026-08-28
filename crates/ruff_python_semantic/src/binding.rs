@@ -4,18 +4,17 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 
 use crate::all::DunderAllName;
-use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_index::{IndexSlice, IndexVec, newtype_index};
 use ruff_python_ast::helpers::extract_handled_exceptions;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::ScopeId;
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
 use crate::nodes::NodeId;
 use crate::reference::ResolvedReferenceId;
-use crate::ScopeId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
@@ -136,6 +135,44 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::IN_EXCEPT_HANDLER)
     }
 
+    /// Return `true` if this [`Binding`] took place inside an `assert` statement,
+    /// e.g. `y` in:
+    /// ```python
+    /// assert (y := x**2), y
+    /// ```
+    pub const fn in_assert_statement(&self) -> bool {
+        self.flags.contains(BindingFlags::IN_ASSERT_STATEMENT)
+    }
+
+    /// Return `true` if this [`Binding`] represents a [PEP 613] type alias
+    /// e.g. `OptString` in:
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// OptString: TypeAlias = str | None
+    /// ```
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    pub const fn is_annotated_type_alias(&self) -> bool {
+        self.flags.intersects(BindingFlags::ANNOTATED_TYPE_ALIAS)
+    }
+
+    /// Return `true` if this [`Binding`] represents a [PEP 695] type alias
+    /// e.g. `OptString` in:
+    /// ```python
+    /// type OptString = str | None
+    /// ```
+    ///
+    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+    pub const fn is_deferred_type_alias(&self) -> bool {
+        self.flags.intersects(BindingFlags::DEFERRED_TYPE_ALIAS)
+    }
+
+    /// Return `true` if this [`Binding`] represents either kind of type alias
+    pub const fn is_type_alias(&self) -> bool {
+        self.flags.intersects(BindingFlags::TYPE_ALIAS)
+    }
+
     /// Return `true` if this binding "redefines" the given binding, as per Pyflake's definition of
     /// redefinition.
     pub fn redefines(&self, existing: &Binding) -> bool {
@@ -228,14 +265,23 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns the name of the binding (e.g., `x` in `x = 1`).
-    pub fn name<'b>(&self, locator: &Locator<'b>) -> &'b str {
-        locator.slice(self.range)
+    pub fn name<'b>(&self, source: &'b str) -> &'b str {
+        &source[self.range]
     }
 
     /// Returns the statement in which the binding was defined.
     pub fn statement<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b Stmt> {
         self.source
             .map(|statement_id| semantic.statement(statement_id))
+    }
+
+    /// Returns the expression in which the binding was defined
+    /// (e.g. for the binding `x` in `y = (x := 1)`, return the node representing `x := 1`).
+    ///
+    /// This is only really applicable for assignment expressions.
+    pub fn expression<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b ast::Expr> {
+        self.source
+            .and_then(|expression_id| semantic.parent_expression(expression_id))
     }
 
     /// Returns the range of the binding's parent.
@@ -367,6 +413,27 @@ bitflags! {
         ///     y = 42
         /// ```
         const IN_EXCEPT_HANDLER = 1 << 10;
+
+        /// The binding represents a [PEP 613] explicit type alias.
+        ///
+        /// [PEP 613]: https://peps.python.org/pep-0613/
+        const ANNOTATED_TYPE_ALIAS = 1 << 11;
+
+        /// The binding represents a [PEP 695] type statement
+        ///
+        /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+        const DEFERRED_TYPE_ALIAS = 1 << 12;
+
+        /// The binding took place inside an `assert` statement
+        ///
+        /// For example, `x` in the following snippet:
+        /// ```python
+        /// assert (x := y**2) > 42, x
+        /// ```
+        const IN_ASSERT_STATEMENT = 1 << 13;
+
+        /// The binding represents any type alias.
+        const TYPE_ALIAS = Self::ANNOTATED_TYPE_ALIAS.bits() | Self::DEFERRED_TYPE_ALIAS.bits();
     }
 }
 
@@ -378,7 +445,7 @@ impl Ranged for Binding<'_> {
 
 /// ID uniquely identifying a [Binding] in a program.
 ///
-/// Using a `u32` to identify [Binding]s should is sufficient because Ruff only supports documents with a
+/// Using a `u32` to identify [Binding]s should be sufficient because Ruff only supports documents with a
 /// size smaller than or equal to `u32::max`. A document with the size of `u32::max` must have fewer than `u32::max`
 /// bindings because bindings must be separated by whitespace (and have an assignment).
 #[newtype_index]
@@ -405,7 +472,7 @@ impl<'a> Deref for Bindings<'a> {
     }
 }
 
-impl<'a> DerefMut for Bindings<'a> {
+impl DerefMut for Bindings<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -610,10 +677,10 @@ pub enum BindingKind<'a> {
 bitflags! {
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
     pub struct Exceptions: u8 {
-        const NAME_ERROR = 0b0000_0001;
-        const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
-        const IMPORT_ERROR = 0b0000_0100;
-        const ATTRIBUTE_ERROR = 0b000_100;
+        const NAME_ERROR = 1 << 0;
+        const MODULE_NOT_FOUND_ERROR = 1 << 1;
+        const IMPORT_ERROR = 1 << 2;
+        const ATTRIBUTE_ERROR = 1 << 3;
     }
 }
 
@@ -647,6 +714,15 @@ pub trait Imported<'a> {
     /// Returns the member name of the imported symbol. For a straight import, this is equivalent
     /// to the qualified name; for a `from` import, this is the name of the imported symbol.
     fn member_name(&self) -> Cow<'a, str>;
+
+    /// Returns the source module of the imported symbol.
+    ///
+    /// For example:
+    ///
+    /// - `import foo` returns `["foo"]`
+    /// - `import foo.bar` returns `["foo","bar"]`
+    /// - `from foo import bar` returns `["foo"]`
+    fn source_name(&self) -> &[&'a str];
 }
 
 impl<'a> Imported<'a> for Import<'a> {
@@ -663,6 +739,10 @@ impl<'a> Imported<'a> for Import<'a> {
     /// For example, given `import foo`, returns `"foo"`.
     fn member_name(&self) -> Cow<'a, str> {
         Cow::Owned(self.qualified_name().to_string())
+    }
+
+    fn source_name(&self) -> &[&'a str] {
+        self.qualified_name.segments()
     }
 }
 
@@ -681,6 +761,10 @@ impl<'a> Imported<'a> for SubmoduleImport<'a> {
     fn member_name(&self) -> Cow<'a, str> {
         Cow::Owned(self.qualified_name().to_string())
     }
+
+    fn source_name(&self) -> &[&'a str] {
+        self.qualified_name.segments()
+    }
 }
 
 impl<'a> Imported<'a> for FromImport<'a> {
@@ -698,6 +782,10 @@ impl<'a> Imported<'a> for FromImport<'a> {
     fn member_name(&self) -> Cow<'a, str> {
         Cow::Borrowed(self.qualified_name.segments()[self.qualified_name.segments().len() - 1])
     }
+
+    fn source_name(&self) -> &[&'a str] {
+        self.module_name()
+    }
 }
 
 /// A wrapper around an import [`BindingKind`] that can be any of the three types of imports.
@@ -708,7 +796,7 @@ pub enum AnyImport<'a, 'ast> {
     FromImport(&'a FromImport<'ast>),
 }
 
-impl<'a, 'ast> Imported<'ast> for AnyImport<'a, 'ast> {
+impl<'ast> Imported<'ast> for AnyImport<'_, 'ast> {
     fn qualified_name(&self) -> &QualifiedName<'ast> {
         match self {
             Self::Import(import) => import.qualified_name(),
@@ -730,6 +818,14 @@ impl<'a, 'ast> Imported<'ast> for AnyImport<'a, 'ast> {
             Self::Import(import) => import.member_name(),
             Self::SubmoduleImport(import) => import.member_name(),
             Self::FromImport(import) => import.member_name(),
+        }
+    }
+
+    fn source_name(&self) -> &[&'ast str] {
+        match self {
+            Self::Import(import) => import.source_name(),
+            Self::SubmoduleImport(import) => import.source_name(),
+            Self::FromImport(import) => import.source_name(),
         }
     }
 }

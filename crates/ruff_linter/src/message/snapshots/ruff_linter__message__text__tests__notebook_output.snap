@@ -15,7 +15,7 @@ notebook.ipynb:cell 2:2:8: F401 (unused-import) [*] `math` imported but unused
 1 | # cell 2
 2 | import math
   |        ^^^^ F401 (unused-import)
-3 | 
+3 |
 4 | print('hello world')
   |
   = help: Remove unused import: `math`

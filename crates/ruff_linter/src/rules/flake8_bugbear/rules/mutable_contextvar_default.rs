@@ -1,11 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_expr, is_mutable_func};
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_expr, is_mutable_func};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -19,9 +20,9 @@ use crate::checkers::ast::Checker;
 /// the `ContextVar`. If the object is modified, those modifications will persist
 /// across calls, which can lead to unexpected behavior.
 ///
-/// Instead, prefer to use immutable data structures; or, take `None` as a
-/// default, and initialize a new mutable object inside for each call using the
-/// `.set()` method.
+/// Instead, prefer to use immutable data structures. Alternatively, take
+/// `None` as a default, and initialize a new mutable object inside for each
+/// call using the `.set()` method.
 ///
 /// Types outside the standard library can be marked as immutable with the
 /// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
@@ -51,14 +52,14 @@ use crate::checkers::ast::Checker;
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 ///
 /// ## References
-/// - [Python documentation: [`contextvars` — Context Variables](https://docs.python.org/3/library/contextvars.html)
-#[violation]
-pub struct MutableContextvarDefault;
+/// - [Python documentation: `contextvars` — Context Variables](https://docs.python.org/3/library/contextvars.html)
+#[derive(ViolationMetadata)]
+pub(crate) struct MutableContextvarDefault;
 
 impl Violation for MutableContextvarDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not use mutable data structures for `ContextVar` defaults")
+        "Do not use mutable data structures for `ContextVar` defaults".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -67,7 +68,7 @@ impl Violation for MutableContextvarDefault {
 }
 
 /// B039
-pub(crate) fn mutable_contextvar_default(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::CONTEXTVARS) {
         return;
     }
@@ -81,7 +82,7 @@ pub(crate) fn mutable_contextvar_default(checker: &mut Checker, call: &ast::Expr
     };
 
     let extend_immutable_calls: Vec<QualifiedName> = checker
-        .settings
+        .settings()
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
@@ -96,13 +97,11 @@ pub(crate) fn mutable_contextvar_default(checker: &mut Checker, call: &ast::Expr
                     && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)))
         && checker
             .semantic()
-            .resolve_qualified_name(&call.func)
+            .resolve_qualified_name(map_subscript(&call.func))
             .is_some_and(|qualified_name| {
                 matches!(qualified_name.segments(), ["contextvars", "ContextVar"])
             })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(MutableContextvarDefault, default.range()));
+        checker.report_diagnostic(MutableContextvarDefault, default.range());
     }
 }

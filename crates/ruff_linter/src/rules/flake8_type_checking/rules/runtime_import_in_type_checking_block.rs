@@ -3,9 +3,8 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{Imported, NodeId, Scope};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_semantic::{Imported, NodeId, Scope, ScopeId};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -14,13 +13,15 @@ use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::rules::flake8_type_checking::helpers::{filter_contained, quote_annotation};
 use crate::rules::flake8_type_checking::imports::ImportBinding;
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for runtime imports defined in a type-checking block.
+/// Checks for imports that are required at runtime but are only defined in
+/// type-checking blocks.
 ///
 /// ## Why is this bad?
-/// The type-checking block is not executed at runtime, so the import will not
-/// be available at runtime.
+/// The type-checking block is not executed at runtime, so if the only definition
+/// of a symbol is in a type-checking block, it will not be available at runtime.
 ///
 /// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
@@ -51,9 +52,9 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 /// - `lint.flake8-type-checking.quote-annotations`
 ///
 /// ## References
-/// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
-#[violation]
-pub struct RuntimeImportInTypeCheckingBlock {
+/// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
+#[derive(ViolationMetadata)]
+pub(crate) struct RuntimeImportInTypeCheckingBlock {
     qualified_name: String,
     strategy: Strategy,
 }
@@ -96,14 +97,18 @@ enum Action {
     Ignore,
 }
 
-/// TCH004
-pub(crate) fn runtime_import_in_type_checking_block(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+/// TC004
+pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &Scope) {
     // Collect all runtime imports by statement.
     let mut actions: FxHashMap<(NodeId, Action), Vec<ImportBinding>> = FxHashMap::default();
+
+    // If we have a module-level __getattr__ method we don't necessarily know that the
+    // references in __all__ refer to typing-only imports, the __getattr__ might be
+    // able to handle that attribute access and return the correct thing at runtime.
+    let ignore_dunder_all_references = checker
+        .semantic()
+        .lookup_symbol_in_scope("__getattr__", ScopeId::global(), false)
+        .is_some();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
@@ -118,10 +123,10 @@ pub(crate) fn runtime_import_in_type_checking_block(
 
         if binding.context.is_typing()
             && binding.references().any(|reference_id| {
-                checker
-                    .semantic()
-                    .reference(reference_id)
-                    .in_runtime_context()
+                let reference = checker.semantic().reference(reference_id);
+
+                reference.in_runtime_context()
+                    && !(ignore_dunder_all_references && reference.in_dunder_all_definition())
             })
         {
             let Some(node_id) = binding.source else {
@@ -151,7 +156,15 @@ pub(crate) fn runtime_import_in_type_checking_block(
             } else {
                 // Determine whether the member should be fixed by moving the import out of the
                 // type-checking block, or by quoting its references.
-                if checker.settings.flake8_type_checking.quote_annotations
+                // TODO: We should check `reference.in_annotated_type_alias()`
+                //       as well to match the behavior of the flake8 plugin
+                //       although maybe the best way forward is to add an
+                //       additional setting to configure whether quoting
+                //       or moving the import is preferred for type aliases
+                //       since some people will consistently use their
+                //       type aliases at runtimes, while others won't, so
+                //       the best solution is unclear.
+                if checker.settings().flake8_type_checking.quote_annotations
                     && binding.references().all(|reference_id| {
                         let reference = checker.semantic().reference(reference_id);
                         reference.in_typing_context() || reference.in_runtime_evaluated_annotation()
@@ -185,7 +198,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     ..
                 } in imports
                 {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         RuntimeImportInTypeCheckingBlock {
                             qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::MoveImport,
@@ -198,14 +211,13 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     if let Some(fix) = fix.as_ref() {
                         diagnostic.set_fix(fix.clone());
                     }
-                    diagnostics.push(diagnostic);
                 }
             }
 
             // Generate a diagnostic for every import, but share a fix across all imports within the same
             // statement (excluding those that are ignored).
             Action::Quote => {
-                let fix = quote_imports(checker, node_id, &imports).ok();
+                let fix = quote_imports(checker, node_id, &imports);
 
                 for ImportBinding {
                     import,
@@ -214,7 +226,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     ..
                 } in imports
                 {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         RuntimeImportInTypeCheckingBlock {
                             qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::QuoteUsages,
@@ -224,10 +236,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());
                     }
-                    if let Some(fix) = fix.as_ref() {
-                        diagnostic.set_fix(fix.clone());
-                    }
-                    diagnostics.push(diagnostic);
+                    diagnostic.set_fix(fix.clone());
                 }
             }
 
@@ -241,7 +250,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     ..
                 } in imports
                 {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         RuntimeImportInTypeCheckingBlock {
                             qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::MoveImport,
@@ -251,7 +260,6 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());
                     }
-                    diagnostics.push(diagnostic);
                 }
             }
         }
@@ -259,7 +267,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
 }
 
 /// Generate a [`Fix`] to quote runtime usages for imports in a type-checking block.
-fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Fix {
     let quote_reference_edits = filter_contained(
         imports
             .iter()
@@ -270,23 +278,23 @@ fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) 
                         Some(quote_annotation(
                             reference.expression_id()?,
                             checker.semantic(),
-                            checker.locator(),
                             checker.stylist(),
-                            checker.generator(),
+                            checker.locator(),
+                            checker.default_string_flags(),
                         ))
                     } else {
                         None
                     }
                 })
             })
-            .collect::<Result<Vec<_>>>()?,
+            .collect::<Vec<_>>(),
     );
 
     let mut rest = quote_reference_edits.into_iter();
     let head = rest.next().expect("Expected at least one reference");
-    Ok(Fix::unsafe_edits(head, rest).isolate(Checker::isolation(
+    Fix::unsafe_edits(head, rest).isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
-    )))
+    ))
 }
 
 /// Generate a [`Fix`] to remove runtime imports from a type-checking block.

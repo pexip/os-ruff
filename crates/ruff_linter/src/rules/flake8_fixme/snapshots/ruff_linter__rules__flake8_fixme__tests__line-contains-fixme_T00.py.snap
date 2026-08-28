@@ -11,9 +11,11 @@ T00.py:7:3: FIX001 (line-contains-fixme) Line contains FIXME, consider resolving
   |
 
 T00.py:8:3: FIX001 (line-contains-fixme) Line contains FIXME, consider resolving the issue
-  |
-6 | # hack: hack
-7 | # FIXME: fixme
-8 | # fixme: fixme
-  |   ^^^^^ FIX001 (line-contains-fixme)
-  |
+   |
+ 6 | # hack: hack
+ 7 | # FIXME: fixme
+ 8 | # fixme: fixme
+   |   ^^^^^ FIX001 (line-contains-fixme)
+ 9 |
+10 | # test # TODO: todo
+   |

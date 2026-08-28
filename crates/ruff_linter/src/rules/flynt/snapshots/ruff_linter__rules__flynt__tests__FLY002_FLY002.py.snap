@@ -110,7 +110,7 @@ FLY002.py:10:7: FLY002 (static-join-to-f-string) [*] Consider `f"{secrets.token_
  9 | ok5 = "a".join([random(), random()])  # OK (simple calls)
 10 | ok6 = "a".join([secrets.token_urlsafe(), secrets.token_hex()])  # OK (attr calls)
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLY002 (static-join-to-f-string)
-11 | 
+11 |
 12 | nok1 = "x".join({"4", "5", "yee"})  # Not OK (set)
    |
    = help: Replace with `f"{secrets.token_urlsafe()}a{secrets.token_hex()}"`

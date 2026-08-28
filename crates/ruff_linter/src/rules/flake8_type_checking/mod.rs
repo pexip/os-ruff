@@ -6,62 +6,103 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
     use crate::test::{test_path, test_snippet};
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
-    #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TCH005.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_1.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_10.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_11.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_12.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_13.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_14.pyi"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_15.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_16.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_17.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_2.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_3.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_4.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_5.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_6.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_7.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_8.py"))]
-    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_9.py"))]
+    #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TC005.py"))]
+    #[test_case(Rule::RuntimeCastValue, Path::new("TC006.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_1.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_10.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_11.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_12.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_13.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_14.pyi"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_15.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_16.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_17.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_2.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_3.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_4.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_5.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_6.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_7.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_8.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_9.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_1.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_2.py"))]
-    #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
-    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TCH003.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
+    #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TC001.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TC003.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("kw_only.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("snapshot.py"))]
-    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TCH002.py"))]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("singledispatchmethod.py")
+    )]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TC002.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("singledispatch.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("typing_modules_1.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("typing_modules_2.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    // we test these rules as a pair, since they're opposites of one another
+    // so we want to make sure their fixes are not going around in circles.
+    #[test_case(Rule::UnquotedTypeAlias, Path::new("TC007.py"))]
+    #[test_case(Rule::QuotedTypeAlias, Path::new("TC008.py"))]
+    #[test_case(Rule::QuotedTypeAlias, Path::new("TC008_typing_execution_context.py"))]
+    fn type_alias_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnquotedTypeAlias,
+                Rule::QuotedTypeAlias,
+            ]),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::QuotedTypeAlias, Path::new("TC008_union_syntax_pre_py310.py"))]
+    fn type_alias_rules_pre_py310(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("pre_py310_{}_{}", rule_code.name(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY39.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote2.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote2.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote3.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote3.py"))]
     fn quote(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("quote_{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("quote_{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -72,7 +113,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -80,7 +121,7 @@ mod tests {
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("kw_only.py"))]
     fn strict(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("strict_{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("strict_{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -91,7 +132,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -107,7 +148,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -124,7 +165,7 @@ mod tests {
         Path::new("exempt_type_checking_3.py")
     )]
     fn exempt_type_checking(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -136,7 +177,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -161,7 +202,7 @@ mod tests {
         Path::new("runtime_evaluated_base_classes_5.py")
     )]
     fn runtime_evaluated_base_classes(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -175,7 +216,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -192,7 +233,7 @@ mod tests {
         Path::new("runtime_evaluated_decorators_3.py")
     )]
     fn runtime_evaluated_decorators(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -207,7 +248,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -218,7 +259,7 @@ mod tests {
         Path::new("module/undefined.py")
     )]
     fn base_class_same_file(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -229,7 +270,34 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("module/app.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("module/routes.py"))]
+    fn decorator_same_file(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    runtime_required_decorators: vec![
+                        "fastapi.FastAPI.get".to_string(),
+                        "fastapi.FastAPI.put".to_string(),
+                        "module.app.AppContainer.app.get".to_string(),
+                        "module.app.AppContainer.app.put".to_string(),
+                        "module.app.app.get".to_string(),
+                        "module.app.app.put".to_string(),
+                        "module.app.app_container.app.get".to_string(),
+                        "module.app.app_container.app.put".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -422,11 +490,86 @@ mod tests {
     ",
         "multiple_modules_different_types"
     )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING, TypeAlias
+        if TYPE_CHECKING:
+            from foo import Foo  # TC004
+
+        a: TypeAlias = Foo | None  # OK
+    ",
+        "tc004_precedence_over_tc007"
+    )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        from typing import TypeAlias
+
+        a: TypeAlias = 'int | None'  # TC008
+        b: TypeAlias = 'int' | None  # TC010
+    ",
+        "tc010_precedence_over_tc008"
+    )]
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,
             &settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules()),
         );
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+    }
+
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        TYPE_CHECKING = False
+        if TYPE_CHECKING:
+            from types import TracebackType
+
+        def foo(tb: TracebackType): ...
+    ",
+        "github_issue_15681_regression_test"
+    )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        import pathlib  # TC003
+
+        TYPE_CHECKING = False
+        if TYPE_CHECKING:
+            from types import TracebackType
+
+        def foo(tb: TracebackType) -> pathlib.Path: ...
+    ",
+        "github_issue_15681_fix_test"
+    )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        TYPE_CHECKING = False
+        if TYPE_CHECKING:
+            from typing import Any, Literal, Never, Self
+        else:
+            def __getattr__(name: str):
+                pass
+
+        __all__ = ['TYPE_CHECKING', 'Any', 'Literal', 'Never', 'Self']
+    ",
+        "github_issue_16045"
+    )]
+    fn contents_preview(contents: &str, snapshot: &str) {
+        let diagnostics = test_snippet(
+            contents,
+            &settings::LinterSettings {
+                preview: settings::types::PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules())
+            },
+        );
+        assert_diagnostics!(snapshot, diagnostics);
     }
 }

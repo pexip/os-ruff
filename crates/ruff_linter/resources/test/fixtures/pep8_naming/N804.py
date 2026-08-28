@@ -76,3 +76,14 @@ class RenamingInMethodBodyClass(ABCMeta):
 
 def func(x):
     return x
+
+foo = {}
+class Bar(type(foo)):
+    def foo_method(self):
+        pass
+
+# https://github.com/astral-sh/ruff/issues/18459
+class Example:
+    @classmethod
+    def function(this):
+        cls = 1234

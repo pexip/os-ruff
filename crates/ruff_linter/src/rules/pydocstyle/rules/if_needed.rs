@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_overload;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
@@ -66,25 +66,22 @@ use crate::docstrings::Docstring;
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: `typing.overload`](https://docs.python.org/3/library/typing.html#typing.overload)
-#[violation]
-pub struct OverloadWithDocstring;
+#[derive(ViolationMetadata)]
+pub(crate) struct OverloadWithDocstring;
 
 impl Violation for OverloadWithDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Function decorated with `@overload` shouldn't contain a docstring")
+        "Function decorated with `@overload` shouldn't contain a docstring".to_string()
     }
 }
 
 /// D418
-pub(crate) fn if_needed(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn if_needed(checker: &Checker, docstring: &Docstring) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
     if is_overload(&function.decorator_list, checker.semantic()) {
-        checker.diagnostics.push(Diagnostic::new(
-            OverloadWithDocstring,
-            function.identifier(),
-        ));
+        checker.report_diagnostic(OverloadWithDocstring, function.identifier());
     }
 }

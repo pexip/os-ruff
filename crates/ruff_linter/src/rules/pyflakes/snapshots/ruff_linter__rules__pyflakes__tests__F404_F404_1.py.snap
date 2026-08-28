@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F404_1.py:5:1: F404 (late-future-import) `from __future__` imports must occur at the beginning of the file
   |
 3 | """Non-docstring"""
-4 | 
+4 |
 5 | from __future__ import absolute_import
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F404 (late-future-import)
   |

@@ -10,6 +10,7 @@ separate_local_folder_imports.py:1:1: I001 (unsorted-imports) [*] Import block i
 5 | | from . import leading_prefix
 6 | | from .. import trailing_prefix
 7 | | from ruff import check
+  | |______________________^ I001 (unsorted-imports)
   |
   = help: Organize imports
 

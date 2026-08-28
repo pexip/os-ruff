@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::Quote;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for docstrings that use `'''triple single quotes'''` instead of
@@ -37,8 +37,8 @@ use crate::docstrings::Docstring;
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
-#[violation]
-pub struct TripleSingleQuotes {
+#[derive(ViolationMetadata)]
+pub(crate) struct TripleSingleQuotes {
     expected_quote: Quote,
 }
 
@@ -47,29 +47,25 @@ impl Violation for TripleSingleQuotes {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TripleSingleQuotes { expected_quote } = self;
-        match expected_quote {
-            Quote::Double => format!(r#"Use triple double quotes `"""`"#),
-            Quote::Single => format!(r"Use triple single quotes `'''`"),
+        match self.expected_quote {
+            Quote::Double => r#"Use triple double quotes `"""`"#.to_string(),
+            Quote::Single => r"Use triple single quotes `'''`".to_string(),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let TripleSingleQuotes { expected_quote } = self;
-        Some(match expected_quote {
-            Quote::Double => format!("Convert to triple double quotes"),
-            Quote::Single => format!("Convert to triple single quotes"),
-        })
+        let title = match self.expected_quote {
+            Quote::Double => "Convert to triple double quotes",
+            Quote::Single => "Convert to triple single quotes",
+        };
+        Some(title.to_string())
     }
 }
 
 /// D300
-pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
-    let leading_quote = docstring.leading_quote();
-
-    let prefixes = leading_quote
-        .trim_end_matches(|c| c == '\'' || c == '"')
-        .to_owned();
+pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
+    let opener = docstring.opener();
+    let prefixes = docstring.prefix_str();
 
     let expected_quote = if docstring.body().contains("\"\"\"") {
         if docstring.body().contains("\'\'\'") {
@@ -82,9 +78,9 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
 
     match expected_quote {
         Quote::Single => {
-            if !leading_quote.ends_with("'''") {
-                let mut diagnostic =
-                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+            if !opener.ends_with("'''") {
+                let mut diagnostic = checker
+                    .report_diagnostic(TripleSingleQuotes { expected_quote }, docstring.range());
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('\'') {
@@ -93,14 +89,12 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
                         docstring.range(),
                     )));
                 }
-
-                checker.diagnostics.push(diagnostic);
             }
         }
         Quote::Double => {
-            if !leading_quote.ends_with("\"\"\"") {
-                let mut diagnostic =
-                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+            if !opener.ends_with("\"\"\"") {
+                let mut diagnostic = checker
+                    .report_diagnostic(TripleSingleQuotes { expected_quote }, docstring.range());
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('"') {
@@ -109,8 +103,6 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
                         docstring.range(),
                     )));
                 }
-
-                checker.diagnostics.push(diagnostic);
             }
         }
     }

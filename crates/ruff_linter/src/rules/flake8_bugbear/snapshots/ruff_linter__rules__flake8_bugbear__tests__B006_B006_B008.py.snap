@@ -61,7 +61,7 @@ B006_B008.py:77:31: B006 (mutable-argument-default) [*] Do not use mutable data 
    |
 77 |   def multiline_arg_wrong(value={
    |  _______________________________^
-78 | | 
+78 | |
 79 | | }):
    | |_^ B006 (mutable-argument-default)
 80 |       ...
@@ -83,7 +83,7 @@ B006_B008.py:77:31: B006 (mutable-argument-default) [*] Do not use mutable data 
 B006_B008.py:82:36: B006 (mutable-argument-default) Do not use mutable data structures for argument defaults
    |
 80 |     ...
-81 | 
+81 |
 82 | def single_line_func_wrong(value = {}): ...
    |                                    ^^ B006 (mutable-argument-default)
    |

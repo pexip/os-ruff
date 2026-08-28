@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:19:5: D405 (capitalize-section-name) [*] Section name should be properly capitalized ("returns")
+sections.py:19:5: D405 (non-capitalized-section-name) [*] Section name should be properly capitalized ("returns")
    |
 17 |     """Toggle the gizmo.
-18 | 
+18 |
 19 |     returns
-   |     ^^^^^^^ D405 (capitalize-section-name)
+   |     ^^^^^^^ D405 (non-capitalized-section-name)
 20 |     -------
 21 |     A value of some sort.
    |
@@ -22,12 +22,12 @@ sections.py:19:5: D405 (capitalize-section-name) [*] Section name should be prop
 21 21 |     A value of some sort.
 22 22 | 
 
-sections.py:218:5: D405 (capitalize-section-name) [*] Section name should be properly capitalized ("Short summary")
+sections.py:218:5: D405 (non-capitalized-section-name) [*] Section name should be properly capitalized ("Short summary")
     |
 216 |     """Toggle the gizmo.
-217 | 
+217 |
 218 |     Short summary
-    |     ^^^^^^^^^^^^^ D405 (capitalize-section-name)
+    |     ^^^^^^^^^^^^^ D405 (non-capitalized-section-name)
 219 |     -------------
     |
     = help: Capitalize "Short summary"
@@ -41,3 +41,24 @@ sections.py:218:5: D405 (capitalize-section-name) [*] Section name should be pro
 219 219 |     -------------
 220 220 | 
 221 221 |     This is the function's description, which will also specify what it
+
+sections.py:573:5: D405 (non-capitalized-section-name) [*] Section name should be properly capitalized ("returns")
+    |
+571 |         arg: Here's a note.
+572 |
+573 |     returns:
+    |     ^^^^^^^ D405 (non-capitalized-section-name)
+574 |         Here's another note.
+575 |     """
+    |
+    = help: Capitalize "returns"
+
+ℹ Safe fix
+570 570 |     Args:
+571 571 |         arg: Here's a note.
+572 572 | 
+573     |-    returns:
+    573 |+    Returns:
+574 574 |         Here's another note.
+575 575 |     """
+576 576 |

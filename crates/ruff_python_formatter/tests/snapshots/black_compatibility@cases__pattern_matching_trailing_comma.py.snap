@@ -26,7 +26,7 @@ match more := (than, one), indeed,:
 ```diff
 --- Black
 +++ Ruff
-@@ -8,13 +8,16 @@
+@@ -8,7 +8,10 @@
          pass
  
  
@@ -37,15 +37,7 @@ match more := (than, one), indeed,:
 +):
      case _, (5, 6):
          pass
--    case (
-+    case [
-         [[5], (6)],
-         [7],
--    ):
-+    ]:
-         pass
-     case _:
-         pass
+     case (
 ```
 
 ## Ruff Output
@@ -67,10 +59,10 @@ match (
 ):
     case _, (5, 6):
         pass
-    case [
+    case (
         [[5], (6)],
         [7],
-    ]:
+    ):
         pass
     case _:
         pass

@@ -7,7 +7,7 @@ continue_in_finally.py:5:9: PLE0116 (continue-in-finally) `continue` not support
 4 |     finally:
 5 |         continue  # [continue-in-finally]
   |         ^^^^^^^^ PLE0116 (continue-in-finally)
-6 | 
+6 |
 7 | while True:
   |
 
@@ -26,7 +26,7 @@ continue_in_finally.py:26:17: PLE0116 (continue-in-finally) `continue` not suppo
 25 |             case "aa":
 26 |                 continue  # [continue-in-finally]
    |                 ^^^^^^^^ PLE0116 (continue-in-finally)
-27 | 
+27 |
 28 | while True:
    |
 
@@ -36,7 +36,7 @@ continue_in_finally.py:33:13: PLE0116 (continue-in-finally) `continue` not suppo
 32 |         with "aa" as f:
 33 |             continue  # [continue-in-finally]
    |             ^^^^^^^^ PLE0116 (continue-in-finally)
-34 | 
+34 |
 35 | while True:
    |
 
@@ -55,7 +55,7 @@ continue_in_finally.py:41:9: PLE0116 (continue-in-finally) `continue` not suppor
 40 |             continue  # [continue-in-finally]
 41 |         continue  # [continue-in-finally]
    |         ^^^^^^^^ PLE0116 (continue-in-finally)
-42 | 
+42 |
 43 |         def test():
    |
 
@@ -73,7 +73,7 @@ continue_in_finally.py:56:9: PLE0116 (continue-in-finally) `continue` not suppor
 55 |     finally:
 56 |         continue  # [continue-in-finally]
    |         ^^^^^^^^ PLE0116 (continue-in-finally)
-57 | 
+57 |
 58 |         def test():
    |
 
@@ -83,7 +83,7 @@ continue_in_finally.py:69:9: PLE0116 (continue-in-finally) `continue` not suppor
 68 |             continue
 69 |         continue  # [continue-in-finally]
    |         ^^^^^^^^ PLE0116 (continue-in-finally)
-70 | 
+70 |
 71 |         while True:
    |
 
@@ -93,7 +93,7 @@ continue_in_finally.py:74:13: PLE0116 (continue-in-finally) `continue` not suppo
 73 |         else:
 74 |             continue  # [continue-in-finally]
    |             ^^^^^^^^ PLE0116 (continue-in-finally)
-75 | 
+75 |
 76 |         def test():
    |
 

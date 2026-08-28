@@ -25,7 +25,7 @@ SLOT001.py:16:7: SLOT001 (no-slots-in-tuple-subclass) Subclasses of `tuple` shou
 SLOT001.py:26:7: SLOT001 (no-slots-in-tuple-subclass) Subclasses of `tuple` should define `__slots__`
    |
 24 | import builtins
-25 | 
+25 |
 26 | class AlsoBad(builtins.tuple[int, int]):  # SLOT001
    |       ^^^^^^^ SLOT001 (no-slots-in-tuple-subclass)
 27 |     pass

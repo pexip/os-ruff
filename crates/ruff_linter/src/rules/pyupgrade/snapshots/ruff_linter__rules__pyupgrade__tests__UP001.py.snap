@@ -22,7 +22,7 @@ UP001.py:6:5: UP001 (useless-metaclass-type) [*] `__metaclass__ = type` is impli
 5 | class B:
 6 |     __metaclass__ = type
   |     ^^^^^^^^^^^^^^^^^^^^ UP001 (useless-metaclass-type)
-7 | 
+7 |
 8 |     def __init__(self) -> None:
   |
   = help: Remove `__metaclass__ = type`

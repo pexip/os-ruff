@@ -7,7 +7,7 @@ leading_prefix.py:1:8: I001 (unsorted-imports) Import block is un-sorted or un-f
   |  ________^
 2 | | import os
   | |_________^ I001 (unsorted-imports)
-3 |   
+3 |
 4 |   if True:
   |
   = help: Organize imports
@@ -19,7 +19,7 @@ leading_prefix.py:5:12: I001 (unsorted-imports) Import block is un-sorted or un-
   |  ____________^
 6 | |     import os
   | |_____________^ I001 (unsorted-imports)
-7 |   
+7 |
 8 |   if True:
   |
   = help: Organize imports
@@ -30,7 +30,7 @@ leading_prefix.py:10:9: I001 (unsorted-imports) Import block is un-sorted or un-
  9 |     x = 1; \
 10 |         import os
    |         ^^^^^^^^^ I001 (unsorted-imports)
-11 | 
+11 |
 12 | x = 1; \
    |
    = help: Organize imports

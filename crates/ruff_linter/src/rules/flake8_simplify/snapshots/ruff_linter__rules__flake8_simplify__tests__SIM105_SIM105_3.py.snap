@@ -5,8 +5,7 @@ SIM105_3.py:10:5: SIM105 (suppressible-exception) Use `contextlib.suppress(Value
    |
  8 |   def bar():
  9 |       # SIM105
-10 |       try:
-   |  _____^
+10 | /     try:
 11 | |         foo()
 12 | |     except ValueError:
 13 | |         pass

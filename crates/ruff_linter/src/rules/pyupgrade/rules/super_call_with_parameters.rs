@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `super` calls that pass redundant arguments.
@@ -40,28 +40,33 @@ use crate::checkers::ast::Checker;
 ///         super().foo()
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing the arguments from a call
+/// may delete comments that are attached to the arguments.
+///
 /// ## References
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
 /// - [super/MRO, Python's most misunderstood feature.](https://www.youtube.com/watch?v=X1PQ7zzltz4)
-#[violation]
-pub struct SuperCallWithParameters;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuperCallWithParameters;
 
 impl AlwaysFixableViolation for SuperCallWithParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `super()` instead of `super(__class__, self)`")
+        "Use `super()` instead of `super(__class__, self)`".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Remove `__super__` parameters".to_string()
+        "Remove `super()` parameters".to_string()
     }
 }
 
 /// UP008
-pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)
-    if !is_super_call_with_arguments(call) {
+    if !is_super_call_with_arguments(call, checker) {
         return;
     }
     let scope = checker.semantic().current_scope();
@@ -90,13 +95,7 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
     };
 
     // Extract the name of the first argument to the enclosing function.
-    let Some(ParameterWithDefault {
-        parameter: Parameter {
-            name: parent_arg, ..
-        },
-        ..
-    }) = parent_parameters.args.first()
-    else {
+    let Some(parent_arg) = parent_parameters.args.first() else {
         return;
     };
 
@@ -122,7 +121,9 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
         return;
     };
 
-    if !(first_arg_id == parent_name.as_str() && second_arg_id == parent_arg.as_str()) {
+    if !((first_arg_id == "__class__" || first_arg_id == parent_name.as_str())
+        && second_arg_id == parent_arg.name().as_str())
+    {
         return;
     }
 
@@ -145,7 +146,7 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
             .resolve_qualified_name(func)
             .is_some_and(|name| name.segments() == ["dataclasses", "dataclass"])
         {
-            arguments.find_keyword("slots").map_or(false, |keyword| {
+            arguments.find_keyword("slots").is_some_and(|keyword| {
                 matches!(
                     keyword.value,
                     Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. })
@@ -158,19 +159,14 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(SuperCallWithParameters, call.arguments.range());
+    let mut diagnostic = checker.report_diagnostic(SuperCallWithParameters, call.arguments.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
         call.arguments.start() + TextSize::new(1),
         call.arguments.end() - TextSize::new(1),
     )));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.
-fn is_super_call_with_arguments(call: &ast::ExprCall) -> bool {
-    if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
-        id == "super" && !call.arguments.is_empty()
-    } else {
-        false
-    }
+fn is_super_call_with_arguments(call: &ast::ExprCall, checker: &Checker) -> bool {
+    checker.semantic().match_builtin_expr(&call.func, "super") && !call.arguments.is_empty()
 }

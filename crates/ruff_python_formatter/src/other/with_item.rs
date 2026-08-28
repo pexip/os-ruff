@@ -1,14 +1,13 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::WithItem;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, parenthesized, Parentheses, Parenthesize,
+    Parentheses, Parenthesize, is_expression_parenthesized, parenthesized,
 };
 use crate::prelude::*;
-use crate::preview::is_with_single_item_pre_39_enabled;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum WithItemLayout {
     /// A with item that is the `with`s only context manager and its context expression is parenthesized.
     ///
@@ -69,13 +68,18 @@ pub enum WithItemLayout {
     ///     a
     // ): ...
     /// ```
-    #[default]
-    ParenthesizedContextManagers,
+    ParenthesizedContextManagers { single: bool },
 }
 
 #[derive(Default)]
 pub struct FormatWithItem {
     layout: WithItemLayout,
+}
+
+impl Default for WithItemLayout {
+    fn default() -> Self {
+        WithItemLayout::ParenthesizedContextManagers { single: false }
+    }
 }
 
 impl FormatRuleWithOptions<WithItem, PyFormatContext<'_>> for FormatWithItem {
@@ -90,6 +94,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
     fn fmt_fields(&self, item: &WithItem, f: &mut PyFormatter) -> FormatResult<()> {
         let WithItem {
             range: _,
+            node_index: _,
             context_expr,
             optional_vars,
         } = item;
@@ -97,6 +102,10 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         let comments = f.context().comments().clone();
         let trailing_as_comments = comments.dangling(item);
 
+        // WARNING: The `is_parenthesized` returns false-positives
+        // if the `with` has a single item without a target.
+        // E.g., it returns `true` for `with (a)` even though the parentheses
+        // belong to the with statement and not the expression but it can't determine that.
         let is_parenthesized = is_expression_parenthesized(
             context_expr.into(),
             f.context().comments().ranges(),
@@ -105,14 +114,17 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
 
         match self.layout {
             // Remove the parentheses of the `with_items` if the with statement adds parentheses
-            WithItemLayout::ParenthesizedContextManagers => {
-                if is_parenthesized {
-                    // ...except if the with item is parenthesized, then use this with item as a preferred breaking point
-                    // or when it has comments, then parenthesize it to prevent comments from moving.
+            WithItemLayout::ParenthesizedContextManagers { single } => {
+                // ...except if the with item is parenthesized and it's not the only with item or it has a target.
+                // Then use the context expression as a preferred breaking point.
+                let prefer_breaking_context_expression =
+                    (optional_vars.is_some() || !single) && is_parenthesized;
+
+                if prefer_breaking_context_expression {
                     maybe_parenthesize_expression(
                         context_expr,
                         item,
-                        Parenthesize::IfBreaksOrIfRequired,
+                        Parenthesize::IfBreaksParenthesizedNested,
                     )
                     .fmt(f)?;
                 } else {
@@ -136,9 +148,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
             }
 
             WithItemLayout::Python38OrOlder { single } => {
-                let parenthesize = if (single && is_with_single_item_pre_39_enabled(f.context()))
-                    || is_parenthesized
-                {
+                let parenthesize = if single || is_parenthesized {
                     Parenthesize::IfBreaks
                 } else {
                     Parenthesize::IfRequired

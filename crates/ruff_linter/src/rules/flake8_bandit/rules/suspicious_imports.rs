@@ -1,32 +1,36 @@
 //! Check for imports of or from suspicious modules.
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_imports.html>
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for imports of the`telnetlib` module.
+/// Checks for imports of the `telnetlib` module.
 ///
 /// ## Why is this bad?
-/// Telnet is considered insecure. Instead, use SSH or another encrypted
+/// Telnet is considered insecure. It is deprecated since version 3.11, and
+/// was removed in version 3.13. Instead, use SSH or another encrypted
 /// protocol.
 ///
 /// ## Example
 /// ```python
 /// import telnetlib
 /// ```
-#[violation]
-pub struct SuspiciousTelnetlibImport;
+///
+/// ## References
+/// - [Python documentation: `telnetlib` - Telnet client](https://docs.python.org/3.12/library/telnetlib.html#module-telnetlib)
+/// - [PEP 594: `telnetlib`](https://peps.python.org/pep-0594/#telnetlib)
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousTelnetlibImport;
 
 impl Violation for SuspiciousTelnetlibImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`telnetlib` and related modules are considered insecure. Use SSH or another encrypted protocol.")
+        "`telnetlib` and related modules are considered insecure. Use SSH or another encrypted protocol.".to_string()
     }
 }
 
@@ -41,13 +45,16 @@ impl Violation for SuspiciousTelnetlibImport {
 /// ```python
 /// import ftplib
 /// ```
-#[violation]
-pub struct SuspiciousFtplibImport;
+///
+/// ## References
+/// - [Python documentation: `ftplib` - FTP protocol client](https://docs.python.org/3/library/ftplib.html)
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousFtplibImport;
 
 impl Violation for SuspiciousFtplibImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`ftplib` and related modules are considered insecure. Use SSH, SFTP, SCP, or another encrypted protocol.")
+        "`ftplib` and related modules are considered insecure. Use SSH, SFTP, SCP, or another encrypted protocol.".to_string()
     }
 }
 
@@ -63,15 +70,16 @@ impl Violation for SuspiciousFtplibImport {
 /// ```python
 /// import pickle
 /// ```
-/// /// ## References
-/// - [Python Docs](https://docs.python.org/3/library/pickle.html)
-#[violation]
-pub struct SuspiciousPickleImport;
+///
+/// ## References
+/// - [Python documentation: `pickle` — Python object serialization](https://docs.python.org/3/library/pickle.html)
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousPickleImport;
 
 impl Violation for SuspiciousPickleImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure")
+        "`pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure".to_string()
     }
 }
 
@@ -86,13 +94,13 @@ impl Violation for SuspiciousPickleImport {
 /// ```python
 /// import subprocess
 /// ```
-#[violation]
-pub struct SuspiciousSubprocessImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousSubprocessImport;
 
 impl Violation for SuspiciousSubprocessImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`subprocess` module is possibly insecure")
+        "`subprocess` module is possibly insecure".to_string()
     }
 }
 
@@ -109,13 +117,13 @@ impl Violation for SuspiciousSubprocessImport {
 /// ```python
 /// import xml.etree.cElementTree
 /// ```
-#[violation]
-pub struct SuspiciousXmlEtreeImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlEtreeImport;
 
 impl Violation for SuspiciousXmlEtreeImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`xml.etree` methods are vulnerable to XML attacks")
+        "`xml.etree` methods are vulnerable to XML attacks".to_string()
     }
 }
 
@@ -132,13 +140,13 @@ impl Violation for SuspiciousXmlEtreeImport {
 /// ```python
 /// import xml.sax
 /// ```
-#[violation]
-pub struct SuspiciousXmlSaxImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlSaxImport;
 
 impl Violation for SuspiciousXmlSaxImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`xml.sax` methods are vulnerable to XML attacks")
+        "`xml.sax` methods are vulnerable to XML attacks".to_string()
     }
 }
 
@@ -155,13 +163,13 @@ impl Violation for SuspiciousXmlSaxImport {
 /// ```python
 /// import xml.dom.expatbuilder
 /// ```
-#[violation]
-pub struct SuspiciousXmlExpatImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlExpatImport;
 
 impl Violation for SuspiciousXmlExpatImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`xml.dom.expatbuilder` is vulnerable to XML attacks")
+        "`xml.dom.expatbuilder` is vulnerable to XML attacks".to_string()
     }
 }
 
@@ -178,13 +186,13 @@ impl Violation for SuspiciousXmlExpatImport {
 /// ```python
 /// import xml.dom.minidom
 /// ```
-#[violation]
-pub struct SuspiciousXmlMinidomImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlMinidomImport;
 
 impl Violation for SuspiciousXmlMinidomImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`xml.dom.minidom` is vulnerable to XML attacks")
+        "`xml.dom.minidom` is vulnerable to XML attacks".to_string()
     }
 }
 
@@ -201,13 +209,13 @@ impl Violation for SuspiciousXmlMinidomImport {
 /// ```python
 /// import xml.dom.pulldom
 /// ```
-#[violation]
-pub struct SuspiciousXmlPulldomImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlPulldomImport;
 
 impl Violation for SuspiciousXmlPulldomImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`xml.dom.pulldom` is vulnerable to XML attacks")
+        "`xml.dom.pulldom` is vulnerable to XML attacks".to_string()
     }
 }
 
@@ -231,13 +239,13 @@ impl Violation for SuspiciousXmlPulldomImport {
 /// ```
 ///
 /// [deprecated]: https://github.com/tiran/defusedxml/blob/c7445887f5e1bcea470a16f61369d29870cfcfe1/README.md#defusedxmllxml
-#[violation]
-pub struct SuspiciousLxmlImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousLxmlImport;
 
 impl Violation for SuspiciousLxmlImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`lxml` is vulnerable to XML attacks")
+        "`lxml` is vulnerable to XML attacks".to_string()
     }
 }
 
@@ -254,13 +262,13 @@ impl Violation for SuspiciousLxmlImport {
 /// ```python
 /// import xmlrpc
 /// ```
-#[violation]
-pub struct SuspiciousXmlrpcImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousXmlrpcImport;
 
 impl Violation for SuspiciousXmlrpcImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("XMLRPC is vulnerable to remote XML attacks")
+        "XMLRPC is vulnerable to remote XML attacks".to_string()
     }
 }
 
@@ -280,13 +288,13 @@ impl Violation for SuspiciousXmlrpcImport {
 ///
 /// ## References
 /// - [httpoxy website](https://httpoxy.org/)
-#[violation]
-pub struct SuspiciousHttpoxyImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousHttpoxyImport;
 
 impl Violation for SuspiciousHttpoxyImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided")
+        "`httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided".to_string()
     }
 }
 
@@ -305,15 +313,14 @@ impl Violation for SuspiciousHttpoxyImport {
 ///
 /// ## References
 /// - [Buffer Overflow Issue](https://github.com/pycrypto/pycrypto/issues/176)
-#[violation]
-pub struct SuspiciousPycryptoImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousPycryptoImport;
 
 impl Violation for SuspiciousPycryptoImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`pycrypto` library is known to have publicly disclosed buffer overflow vulnerability"
-        )
+        "`pycrypto` library is known to have publicly disclosed buffer overflow vulnerability"
+            .to_string()
     }
 }
 
@@ -331,92 +338,71 @@ impl Violation for SuspiciousPycryptoImport {
 ///
 /// ## References
 /// - [Buffer Overflow Issue](https://github.com/pycrypto/pycrypto/issues/176)
-#[violation]
-pub struct SuspiciousPyghmiImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct SuspiciousPyghmiImport;
 
 impl Violation for SuspiciousPyghmiImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("An IPMI-related module is being imported. Prefer an encrypted protocol over IPMI.")
+        "An IPMI-related module is being imported. Prefer an encrypted protocol over IPMI."
+            .to_string()
     }
 }
 
 /// S401, S402, S403, S404, S405, S406, S407, S408, S409, S410, S411, S412, S413, S415
-pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
+    // Skip stub files.
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     match stmt {
         Stmt::Import(ast::StmtImport { names, .. }) => {
             for name in names {
                 match name.name.as_str() {
-                    "telnetlib" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousTelnetlibImport),
-                        name.range,
-                    ),
-                    "ftplib" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousFtplibImport),
-                        name.range,
-                    ),
-                    "pickle" | "cPickle" | "dill" | "shelve" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousPickleImport),
-                        name.range,
-                    ),
-                    "subprocess" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousSubprocessImport),
-                        name.range,
-                    ),
-                    "xml.etree.cElementTree" | "xml.etree.ElementTree" => {
-                        check_and_push_diagnostic(
-                            checker,
-                            DiagnosticKind::from(SuspiciousXmlEtreeImport),
-                            name.range,
-                        );
+                    "telnetlib" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousTelnetlibImport, name.range);
                     }
-                    "xml.sax" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousXmlSaxImport),
-                        name.range,
-                    ),
-                    "xml.dom.expatbuilder" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousXmlExpatImport),
-                        name.range,
-                    ),
-                    "xml.dom.minidom" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousXmlMinidomImport),
-                        name.range,
-                    ),
-                    "xml.dom.pulldom" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousXmlPulldomImport),
-                        name.range,
-                    ),
-                    "lxml" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousLxmlImport),
-                        name.range,
-                    ),
-                    "xmlrpc" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousXmlrpcImport),
-                        name.range,
-                    ),
+                    "ftplib" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousFtplibImport, name.range);
+                    }
+                    "pickle" | "cPickle" | "dill" | "shelve" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousPickleImport, name.range);
+                    }
+                    "subprocess" => {
+                        checker
+                            .report_diagnostic_if_enabled(SuspiciousSubprocessImport, name.range);
+                    }
+                    "xml.etree.cElementTree" | "xml.etree.ElementTree" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousXmlEtreeImport, name.range);
+                    }
+                    "xml.sax" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousXmlSaxImport, name.range);
+                    }
+                    "xml.dom.expatbuilder" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousXmlExpatImport, name.range);
+                    }
+                    "xml.dom.minidom" => {
+                        checker
+                            .report_diagnostic_if_enabled(SuspiciousXmlMinidomImport, name.range);
+                    }
+                    "xml.dom.pulldom" => {
+                        checker
+                            .report_diagnostic_if_enabled(SuspiciousXmlPulldomImport, name.range);
+                    }
+                    "lxml" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousLxmlImport, name.range);
+                    }
+                    "xmlrpc" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousXmlrpcImport, name.range);
+                    }
                     "Crypto.Cipher" | "Crypto.Hash" | "Crypto.IO" | "Crypto.Protocol"
                     | "Crypto.PublicKey" | "Crypto.Random" | "Crypto.Signature" | "Crypto.Util" => {
-                        check_and_push_diagnostic(
-                            checker,
-                            DiagnosticKind::from(SuspiciousPycryptoImport),
-                            name.range,
-                        );
+                        checker.report_diagnostic_if_enabled(SuspiciousPycryptoImport, name.range);
                     }
-                    "pyghmi" => check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousPyghmiImport),
-                        name.range,
-                    ),
+                    "pyghmi" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousPyghmiImport, name.range);
+                    }
                     _ => {}
                 }
             }
@@ -424,113 +410,107 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
         Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
             let Some(identifier) = module else { return };
             match identifier.as_str() {
-                "telnetlib" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousTelnetlibImport),
-                    identifier.range(),
-                ),
-                "ftplib" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousFtplibImport),
-                    identifier.range(),
-                ),
-                "pickle" | "cPickle" | "dill" | "shelve" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousPickleImport),
-                    identifier.range(),
-                ),
-                "subprocess" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousSubprocessImport),
-                    identifier.range(),
-                ),
+                "telnetlib" => {
+                    checker.report_diagnostic_if_enabled(
+                        SuspiciousTelnetlibImport,
+                        identifier.range(),
+                    );
+                }
+                "ftplib" => {
+                    checker
+                        .report_diagnostic_if_enabled(SuspiciousFtplibImport, identifier.range());
+                }
+                "pickle" | "cPickle" | "dill" | "shelve" => {
+                    checker
+                        .report_diagnostic_if_enabled(SuspiciousPickleImport, identifier.range());
+                }
+                "subprocess" => {
+                    checker.report_diagnostic_if_enabled(
+                        SuspiciousSubprocessImport,
+                        identifier.range(),
+                    );
+                }
                 "xml.etree" => {
                     for name in names {
                         if matches!(name.name.as_str(), "cElementTree" | "ElementTree") {
-                            check_and_push_diagnostic(
-                                checker,
-                                DiagnosticKind::from(SuspiciousXmlEtreeImport),
+                            checker.report_diagnostic_if_enabled(
+                                SuspiciousXmlEtreeImport,
                                 identifier.range(),
                             );
                         }
                     }
                 }
                 "xml.etree.cElementTree" | "xml.etree.ElementTree" => {
-                    check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousXmlEtreeImport),
-                        identifier.range(),
-                    );
+                    checker
+                        .report_diagnostic_if_enabled(SuspiciousXmlEtreeImport, identifier.range());
                 }
                 "xml" => {
                     for name in names {
                         if name.name.as_str() == "sax" {
-                            check_and_push_diagnostic(
-                                checker,
-                                DiagnosticKind::from(SuspiciousXmlSaxImport),
+                            checker.report_diagnostic_if_enabled(
+                                SuspiciousXmlSaxImport,
                                 identifier.range(),
                             );
                         }
                     }
                 }
-                "xml.sax" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousXmlSaxImport),
-                    identifier.range(),
-                ),
+                "xml.sax" => {
+                    checker
+                        .report_diagnostic_if_enabled(SuspiciousXmlSaxImport, identifier.range());
+                }
                 "xml.dom" => {
                     for name in names {
                         match name.name.as_str() {
-                            "expatbuilder" => check_and_push_diagnostic(
-                                checker,
-                                DiagnosticKind::from(SuspiciousXmlExpatImport),
-                                identifier.range(),
-                            ),
-                            "minidom" => check_and_push_diagnostic(
-                                checker,
-                                DiagnosticKind::from(SuspiciousXmlMinidomImport),
-                                identifier.range(),
-                            ),
-                            "pulldom" => check_and_push_diagnostic(
-                                checker,
-                                DiagnosticKind::from(SuspiciousXmlPulldomImport),
-                                identifier.range(),
-                            ),
-                            _ => (),
+                            "expatbuilder" => {
+                                checker.report_diagnostic_if_enabled(
+                                    SuspiciousXmlExpatImport,
+                                    identifier.range(),
+                                );
+                            }
+                            "minidom" => {
+                                checker.report_diagnostic_if_enabled(
+                                    SuspiciousXmlMinidomImport,
+                                    identifier.range(),
+                                );
+                            }
+                            "pulldom" => {
+                                checker.report_diagnostic_if_enabled(
+                                    SuspiciousXmlPulldomImport,
+                                    identifier.range(),
+                                );
+                            }
+                            _ => {}
                         }
                     }
                 }
-                "xml.dom.expatbuilder" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousXmlExpatImport),
-                    identifier.range(),
-                ),
-                "xml.dom.minidom" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousXmlMinidomImport),
-                    identifier.range(),
-                ),
-                "xml.dom.pulldom" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousXmlPulldomImport),
-                    identifier.range(),
-                ),
-                "lxml" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousLxmlImport),
-                    identifier.range(),
-                ),
-                "xmlrpc" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousXmlrpcImport),
-                    identifier.range(),
-                ),
+                "xml.dom.expatbuilder" => {
+                    checker
+                        .report_diagnostic_if_enabled(SuspiciousXmlExpatImport, identifier.range());
+                }
+                "xml.dom.minidom" => {
+                    checker.report_diagnostic_if_enabled(
+                        SuspiciousXmlMinidomImport,
+                        identifier.range(),
+                    );
+                }
+                "xml.dom.pulldom" => {
+                    checker.report_diagnostic_if_enabled(
+                        SuspiciousXmlPulldomImport,
+                        identifier.range(),
+                    );
+                }
+                "lxml" => {
+                    checker.report_diagnostic_if_enabled(SuspiciousLxmlImport, identifier.range());
+                }
+                "xmlrpc" => {
+                    checker
+                        .report_diagnostic_if_enabled(SuspiciousXmlrpcImport, identifier.range());
+                }
                 "wsgiref.handlers" => {
                     for name in names {
                         if name.name.as_str() == "CGIHandler" {
-                            check_and_push_diagnostic(
-                                checker,
-                                DiagnosticKind::from(SuspiciousHttpoxyImport),
+                            checker.report_diagnostic_if_enabled(
+                                SuspiciousHttpoxyImport,
                                 identifier.range(),
                             );
                         }
@@ -539,9 +519,8 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                 "twisted.web.twcgi" => {
                     for name in names {
                         if name.name.as_str() == "CGIScript" {
-                            check_and_push_diagnostic(
-                                checker,
-                                DiagnosticKind::from(SuspiciousHttpoxyImport),
+                            checker.report_diagnostic_if_enabled(
+                                SuspiciousHttpoxyImport,
                                 identifier.range(),
                             );
                         }
@@ -560,9 +539,8 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                                 | "Signature"
                                 | "Util"
                         ) {
-                            check_and_push_diagnostic(
-                                checker,
-                                DiagnosticKind::from(SuspiciousPycryptoImport),
+                            checker.report_diagnostic_if_enabled(
+                                SuspiciousPycryptoImport,
                                 identifier.range(),
                             );
                         }
@@ -570,31 +548,16 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                 }
                 "Crypto.Cipher" | "Crypto.Hash" | "Crypto.IO" | "Crypto.Protocol"
                 | "Crypto.PublicKey" | "Crypto.Random" | "Crypto.Signature" | "Crypto.Util" => {
-                    check_and_push_diagnostic(
-                        checker,
-                        DiagnosticKind::from(SuspiciousPycryptoImport),
-                        identifier.range(),
-                    );
+                    checker
+                        .report_diagnostic_if_enabled(SuspiciousPycryptoImport, identifier.range());
                 }
-                "pyghmi" => check_and_push_diagnostic(
-                    checker,
-                    DiagnosticKind::from(SuspiciousPyghmiImport),
-                    identifier.range(),
-                ),
+                "pyghmi" => {
+                    checker
+                        .report_diagnostic_if_enabled(SuspiciousPyghmiImport, identifier.range());
+                }
                 _ => {}
             }
         }
         _ => panic!("Expected Stmt::Import | Stmt::ImportFrom"),
-    };
-}
-
-fn check_and_push_diagnostic(
-    checker: &mut Checker,
-    diagnostic_kind: DiagnosticKind,
-    range: TextRange,
-) {
-    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, range);
-    if checker.enabled(diagnostic.kind.rule()) {
-        checker.diagnostics.push(diagnostic);
     }
 }

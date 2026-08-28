@@ -394,7 +394,7 @@ self_assigning_variable.py:28:2: PLW0127 (self-assigning-variable) Self-assignme
 27 | (foo, bar) = (foo, bar) = baz
 28 | (foo, bar) = baz = (foo, bar) = 1
    |  ^^^ PLW0127 (self-assigning-variable)
-29 | 
+29 |
 30 | # Non-errors.
    |
 
@@ -404,6 +404,6 @@ self_assigning_variable.py:28:7: PLW0127 (self-assigning-variable) Self-assignme
 27 | (foo, bar) = (foo, bar) = baz
 28 | (foo, bar) = baz = (foo, bar) = 1
    |       ^^^ PLW0127 (self-assigning-variable)
-29 | 
+29 |
 30 | # Non-errors.
    |

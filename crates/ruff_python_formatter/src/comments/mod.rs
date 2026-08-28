@@ -98,7 +98,6 @@ pub(crate) use format::{
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges, SuppressionKind};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 pub(crate) use visitor::collect_comments;
 
@@ -258,8 +257,7 @@ impl<'a> Comments<'a> {
             let map = if comment_ranges.is_empty() {
                 CommentsMap::new()
             } else {
-                let mut builder =
-                    CommentsMapBuilder::new(Locator::new(source_code.as_str()), comment_ranges);
+                let mut builder = CommentsMapBuilder::new(source_code.as_str(), comment_ranges);
                 CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
                 builder.finish()
             };
@@ -424,12 +422,47 @@ impl<'a> Comments<'a> {
             dangling.mark_formatted();
         }
 
-        node.visit_preorder(&mut MarkVerbatimCommentsAsFormattedVisitor(self));
+        node.visit_source_order(&mut MarkVerbatimCommentsAsFormattedVisitor(self));
     }
 
     /// Returns an object that implements [Debug] for nicely printing the [`Comments`].
     pub(crate) fn debug(&'a self, source_code: SourceCode<'a>) -> DebugComments<'a> {
         DebugComments::new(&self.data.comments, source_code)
+    }
+
+    /// Returns true if the node itself or any of its descendants have comments.
+    pub(crate) fn contains_comments(&self, node: AnyNodeRef) -> bool {
+        use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
+
+        struct Visitor<'a> {
+            comments: &'a Comments<'a>,
+            has_comment: bool,
+        }
+
+        impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
+            fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+                if self.has_comment {
+                    TraversalSignal::Skip
+                } else if self.comments.has(node) {
+                    self.has_comment = true;
+                    TraversalSignal::Skip
+                } else {
+                    TraversalSignal::Traverse
+                }
+            }
+        }
+
+        if self.has(node) {
+            return true;
+        }
+
+        let mut visitor = Visitor {
+            comments: self,
+            has_comment: false,
+        };
+        node.visit_source_order(&mut visitor);
+
+        visitor.has_comment
     }
 }
 
@@ -481,7 +514,7 @@ mod tests {
 
     use ruff_formatter::SourceCode;
     use ruff_python_ast::{Mod, PySourceType};
-    use ruff_python_parser::{parse, AsMode, Parsed};
+    use ruff_python_parser::{ParseOptions, Parsed, parse};
     use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
@@ -496,8 +529,8 @@ mod tests {
         fn from_code(source: &'a str) -> Self {
             let source_code = SourceCode::new(source);
             let source_type = PySourceType::Python;
-            let parsed =
-                parse(source, source_type.as_mode()).expect("Expect source to be valid Python");
+            let parsed = parse(source, ParseOptions::from(source_type))
+                .expect("Expect source to be valid Python");
             let comment_ranges = CommentRanges::from(parsed.tokens());
 
             CommentsTestCase {

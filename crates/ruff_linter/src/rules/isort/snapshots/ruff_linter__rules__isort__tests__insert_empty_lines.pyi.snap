@@ -5,10 +5,9 @@ insert_empty_lines.pyi:1:1: I001 (unsorted-imports) [*] Import block is un-sorte
   |
 1 | / import a
 2 | | import b
-3 | | x = 1
-  | |_^ I001 (unsorted-imports)
+  | |________^ I001 (unsorted-imports)
+3 |   x = 1
 4 |   import os
-5 |   import sys
   |
   = help: Organize imports
 
@@ -26,10 +25,9 @@ insert_empty_lines.pyi:4:1: I001 (unsorted-imports) [*] Import block is un-sorte
 3 |   x = 1
 4 | / import os
 5 | | import sys
-6 | | def f():
-  | |_^ I001 (unsorted-imports)
+  | |__________^ I001 (unsorted-imports)
+6 |   def f():
 7 |       pass
-8 |   if True:
   |
   = help: Organize imports
 
@@ -48,10 +46,8 @@ insert_empty_lines.pyi:14:1: I001 (unsorted-imports) [*] Import block is un-sort
 13 |   y = 1
 14 | / import os
 15 | | import sys
-16 | | """Docstring"""
-   | |_^ I001 (unsorted-imports)
-17 |   
-18 |   if True:
+   | |__________^ I001 (unsorted-imports)
+16 |   """Docstring"""
    |
    = help: Organize imports
 

@@ -25,7 +25,7 @@ RUF100_0.py:13:12: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E5
 12 |     # Invalid
 13 |     d = 1  # noqa: E501
    |            ^^^^^^^^^^^^ RUF100 (unused-noqa)
-14 | 
+14 |
 15 |     # Invalid
    |
    = help: Remove unused `noqa` directive
@@ -45,7 +45,7 @@ RUF100_0.py:16:12: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `F8
 15 |     # Invalid
 16 |     d = 1  # noqa: F841, E501
    |            ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
-17 | 
+17 |
 18 |     # Invalid (and unimplemented or not enabled)
    |
    = help: Remove unused `noqa` directive
@@ -65,7 +65,7 @@ RUF100_0.py:19:12: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `F8
 18 |     # Invalid (and unimplemented or not enabled)
 19 |     d = 1  # noqa: F841, W191, F821
    |            ^^^^^^^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
-20 | 
+20 |
 21 |     # Invalid (but external)
    |
    = help: Remove unused `noqa` directive
@@ -85,7 +85,7 @@ RUF100_0.py:22:12: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `F8
 21 |     # Invalid (but external)
 22 |     d = 1  # noqa: F841, V101
    |            ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
-23 | 
+23 |
 24 |     # Invalid (but external)
    |
    = help: Remove unused `noqa` directive
@@ -105,7 +105,7 @@ RUF100_0.py:25:12: RUF100 (unused-noqa) [*] Unused `noqa` directive (unknown: `V
 24 |     # Invalid (but external)
 25 |     d = 1  # noqa: V500
    |            ^^^^^^^^^^^^ RUF100 (unused-noqa)
-26 | 
+26 |
 27 |     # fmt: off
    |
    = help: Remove unused `noqa` directive
@@ -126,7 +126,7 @@ RUF100_0.py:29:12: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E5
 28 |     # Invalid - no space before #
 29 |     d = 1  # noqa: E501
    |            ^^^^^^^^^^^^ RUF100 (unused-noqa)
-30 | 
+30 |
 31 |     # Invalid - many spaces before #
    |
    = help: Remove unused `noqa` directive
@@ -183,7 +183,7 @@ RUF100_0.py:58:6: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `F84
 57 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
 58 | """  # noqa: E501, F841
    |      ^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
-59 | 
+59 |
 60 | # Invalid
    |
    = help: Remove unused `noqa` directive
@@ -203,7 +203,7 @@ RUF100_0.py:66:6: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `E50
 65 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 66 | """  # noqa: E501
    |      ^^^^^^^^^^^^ RUF100 (unused-noqa)
-67 | 
+67 |
 68 | # Invalid
    |
    = help: Remove unused `noqa` directive
@@ -223,7 +223,7 @@ RUF100_0.py:74:6: RUF100 (unused-noqa) [*] Unused blanket `noqa` directive
 73 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 74 | """  # noqa
    |      ^^^^^^ RUF100 (unused-noqa)
-75 | 
+75 |
 76 | # Valid
    |
    = help: Remove unused `noqa` directive
@@ -260,7 +260,7 @@ RUF100_0.py:88:8: F401 (unused-import) [*] `shelve` imported but unused
 RUF100_0.py:93:89: E501 (line-too-long) Line too long (89 > 88)
    |
 91 | print(sys.path)
-92 | 
+92 |
 93 | "shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"  # noqa: F401
    |                                                                                         ^ E501 (line-too-long)
    |
@@ -268,7 +268,7 @@ RUF100_0.py:93:89: E501 (line-too-long) Line too long (89 > 88)
 RUF100_0.py:93:92: RUF100 (unused-noqa) [*] Unused `noqa` directive (unused: `F401`)
    |
 91 | print(sys.path)
-92 | 
+92 |
 93 | "shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"  # noqa: F401
    |                                                                                            ^^^^^^^^^^^^ RUF100 (unused-noqa)
    |
@@ -347,7 +347,7 @@ RUF100_0.py:118:12: RUF100 (unused-noqa) [*] Unused `noqa` directive (duplicated
 117 | def f():
 118 |     x = 2  # noqa: F841, F841, X200
     |            ^^^^^^^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
-119 | 
+119 |
 120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
     |
     = help: Remove unused `noqa` directive
@@ -365,10 +365,10 @@ RUF100_0.py:118:12: RUF100 (unused-noqa) [*] Unused `noqa` directive (duplicated
 RUF100_0.py:120:19: RUF100 (unused-noqa) [*] Unused `noqa` directive (duplicated: `SIM300`, `SIM300`)
     |
 118 |     x = 2  # noqa: F841, F841, X200
-119 | 
+119 |
 120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
-121 | 
+121 |
 122 |     z = 2  # noqa: F841 F841  F841, F841, F841
     |
     = help: Remove unused `noqa` directive
@@ -386,10 +386,10 @@ RUF100_0.py:120:19: RUF100 (unused-noqa) [*] Unused `noqa` directive (duplicated
 RUF100_0.py:122:12: RUF100 (unused-noqa) [*] Unused `noqa` directive (duplicated: `F841`, `F841`, `F841`, `F841`)
     |
 120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
-121 | 
+121 |
 122 |     z = 2  # noqa: F841 F841  F841, F841, F841
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100 (unused-noqa)
-123 | 
+123 |
 124 |     return
     |
     = help: Remove unused `noqa` directive

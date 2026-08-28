@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_trivia::indentation_at_offset;
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of a classmethod being made without the decorator.
@@ -32,17 +32,17 @@ use crate::fix;
 ///     @classmethod
 ///     def bar(cls): ...
 /// ```
-#[violation]
-pub struct NoClassmethodDecorator;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoClassmethodDecorator;
 
 impl AlwaysFixableViolation for NoClassmethodDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Class method defined without decorator")
+        "Class method defined without decorator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add @classmethod decorator")
+        "Add @classmethod decorator".to_string()
     }
 }
 
@@ -68,17 +68,17 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 ///     @staticmethod
 ///     def bar(arg1, arg2): ...
 /// ```
-#[violation]
-pub struct NoStaticmethodDecorator;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoStaticmethodDecorator;
 
 impl AlwaysFixableViolation for NoStaticmethodDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Static method defined without decorator")
+        "Static method defined without decorator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add @staticmethod decorator")
+        "Add @staticmethod decorator".to_string()
     }
 }
 
@@ -88,25 +88,25 @@ enum MethodType {
 }
 
 /// PLR0202
-pub(crate) fn no_classmethod_decorator(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn no_classmethod_decorator(checker: &Checker, stmt: &Stmt) {
     get_undecorated_methods(checker, stmt, &MethodType::Classmethod);
 }
 
 /// PLR0203
-pub(crate) fn no_staticmethod_decorator(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn no_staticmethod_decorator(checker: &Checker, stmt: &Stmt) {
     get_undecorated_methods(checker, stmt, &MethodType::Staticmethod);
 }
 
-fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type: &MethodType) {
+fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &MethodType) {
     let Stmt::ClassDef(class_def) = class_stmt else {
         return;
     };
 
     let mut explicit_decorator_calls: HashMap<Name, &Stmt> = HashMap::default();
 
-    let (method_name, diagnostic_type): (&str, DiagnosticKind) = match method_type {
-        MethodType::Classmethod => ("classmethod", NoClassmethodDecorator.into()),
-        MethodType::Staticmethod => ("staticmethod", NoStaticmethodDecorator.into()),
+    let method_name = match method_type {
+        MethodType::Classmethod => "classmethod",
+        MethodType::Staticmethod => "staticmethod",
     };
 
     // gather all explicit *method calls
@@ -135,16 +135,16 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
                             if target_name == *id {
                                 explicit_decorator_calls.insert(id.clone(), stmt);
                             }
-                        };
+                        }
                     }
                 }
             }
-        };
+        }
     }
 
     if explicit_decorator_calls.is_empty() {
         return;
-    };
+    }
 
     for stmt in &class_def.body {
         if let Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -170,12 +170,15 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
                 continue;
             }
 
-            let mut diagnostic = Diagnostic::new(
-                diagnostic_type.clone(),
-                TextRange::new(stmt.range().start(), stmt.range().start()),
-            );
+            let range = TextRange::new(stmt.range().start(), stmt.range().start());
+            let mut diagnostic = match method_type {
+                MethodType::Classmethod => checker.report_diagnostic(NoClassmethodDecorator, range),
+                MethodType::Staticmethod => {
+                    checker.report_diagnostic(NoStaticmethodDecorator, range)
+                }
+            };
 
-            let indentation = indentation_at_offset(stmt.range().start(), checker.locator());
+            let indentation = indentation_at_offset(stmt.range().start(), checker.source());
 
             match indentation {
                 Some(indentation) => {
@@ -191,12 +194,11 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
                             checker.indexer(),
                         )],
                     ));
-                    checker.diagnostics.push(diagnostic);
                 }
                 None => {
                     continue;
                 }
-            };
-        };
+            }
+        }
     }
 }

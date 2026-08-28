@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 B022.py:9:6: B022 (useless-contextlib-suppress) No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and therefore this context manager is redundant
    |
  7 | from contextlib import suppress
- 8 | 
+ 8 |
  9 | with contextlib.suppress():
    |      ^^^^^^^^^^^^^^^^^^^^^ B022 (useless-contextlib-suppress)
 10 |     raise ValueError
@@ -13,7 +13,7 @@ B022.py:9:6: B022 (useless-contextlib-suppress) No arguments passed to `contextl
 B022.py:12:6: B022 (useless-contextlib-suppress) No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and therefore this context manager is redundant
    |
 10 |     raise ValueError
-11 | 
+11 |
 12 | with suppress():
    |      ^^^^^^^^^^ B022 (useless-contextlib-suppress)
 13 |     raise ValueError

@@ -1,13 +1,12 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Edit;
-use ruff_diagnostics::Fix;
-use ruff_diagnostics::FixAvailability;
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Number;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Edit;
+use crate::Fix;
+use crate::FixAvailability;
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -42,13 +41,13 @@ use crate::checkers::ast::Checker;
 /// the same key. However, `min(data, key=itemgetter(0))` will return the _first_
 /// "minimum" element in the list in the same scenario.
 ///
-/// AS such, this rule's fix is marked as unsafe when the `reverse` keyword is used.
+/// As such, this rule's fix is marked as unsafe when the `reverse` keyword is used.
 ///
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
-#[violation]
-pub struct SortedMinMax {
+#[derive(ViolationMetadata)]
+pub(crate) struct SortedMinMax {
     min_max: MinMax,
 }
 
@@ -57,28 +56,29 @@ impl Violation for SortedMinMax {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Self { min_max } = self;
-        match min_max {
+        match self.min_max {
             MinMax::Min => {
-                format!("Prefer `min` over `sorted()` to compute the minimum value in a sequence")
+                "Prefer `min` over `sorted()` to compute the minimum value in a sequence"
+                    .to_string()
             }
             MinMax::Max => {
-                format!("Prefer `max` over `sorted()` to compute the maximum value in a sequence")
+                "Prefer `max` over `sorted()` to compute the maximum value in a sequence"
+                    .to_string()
             }
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Self { min_max } = self;
-        match min_max {
-            MinMax::Min => Some("Replace with `min`".to_string()),
-            MinMax::Max => Some("Replace with `max`".to_string()),
-        }
+        let title = match self.min_max {
+            MinMax::Min => "Replace with `min`",
+            MinMax::Max => "Replace with `max`",
+        };
+        Some(title.to_string())
     }
 }
 
 /// FURB192
-pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscript) {
+pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) {
     if subscript.ctx.is_store() || subscript.ctx.is_del() {
         return;
     }
@@ -177,7 +177,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         (Index::Last, true) => MinMax::Min,
     };
 
-    let mut diagnostic = Diagnostic::new(SortedMinMax { min_max }, subscript.range());
+    let mut diagnostic = checker.report_diagnostic(SortedMinMax { min_max }, subscript.range());
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
         diagnostic.set_fix({
@@ -199,8 +199,6 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
             }
         });
     }
-
-    checker.diagnostics.push(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

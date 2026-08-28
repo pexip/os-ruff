@@ -43,7 +43,7 @@ LOG007.py:10:1: LOG007 (exception-without-exc-info) Use of `logging.exception` w
 LOG007.py:17:1: LOG007 (exception-without-exc-info) Use of `logging.exception` with falsy `exc_info`
    |
 15 | from logging import exception
-16 | 
+16 |
 17 | exception("foo", exc_info=False)  # LOG007
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ LOG007 (exception-without-exc-info)
 18 | exception("foo", exc_info=True)  # OK

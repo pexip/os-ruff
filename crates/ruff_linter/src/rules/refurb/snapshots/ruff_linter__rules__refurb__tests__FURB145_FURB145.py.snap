@@ -110,7 +110,7 @@ FURB145.py:9:7: FURB145 (slice-copy) [*] Prefer `copy` method over slicing
  8 | l[:]
  9 | print(l[:])
    |       ^^^^ FURB145 (slice-copy)
-10 | 
+10 |
 11 | # False negatives.
    |
    = help: Replace with `copy()`

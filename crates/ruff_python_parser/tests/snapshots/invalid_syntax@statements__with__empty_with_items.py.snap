@@ -7,19 +7,23 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/with/empty_wi
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..105,
         body: [
             With(
                 StmtWith {
+                    node_index: AtomicNodeIndex(..),
                     range: 88..98,
                     is_async: false,
                     items: [],
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 95..98,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 95..98,
                                     },
                                 ),
@@ -30,12 +34,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 100..105,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 100..105,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 100..101,
                                     id: Name("x"),
                                     ctx: Load,
@@ -44,6 +51,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 104..105,
                                     id: Name("y"),
                                     ctx: Load,
@@ -61,9 +69,9 @@ Module(
 
   |
 2 | # The parser should recover from this syntax error.
-3 | 
+3 |
 4 | with : ...
   |      ^ Syntax Error: Expected the start of an expression after `with` keyword
-5 | 
+5 |
 6 | x + y
   |

@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::{flake8_builtins, flake8_pie, pylint, refurb};
+use crate::rules::{flake8_builtins, flake8_pie, pylint};
 
 /// Run lint rules over all deferred lambdas in the [`SemanticModel`].
 pub(crate) fn deferred_lambdas(checker: &mut Checker) {
@@ -15,16 +15,13 @@ pub(crate) fn deferred_lambdas(checker: &mut Checker) {
                 unreachable!("Expected Expr::Lambda");
             };
 
-            if checker.enabled(Rule::UnnecessaryLambda) {
+            if checker.is_rule_enabled(Rule::UnnecessaryLambda) {
                 pylint::rules::unnecessary_lambda(checker, lambda);
             }
-            if checker.enabled(Rule::ReimplementedContainerBuiltin) {
+            if checker.is_rule_enabled(Rule::ReimplementedContainerBuiltin) {
                 flake8_pie::rules::reimplemented_container_builtin(checker, lambda);
             }
-            if checker.enabled(Rule::ReimplementedOperator) {
-                refurb::rules::reimplemented_operator(checker, &lambda.into());
-            }
-            if checker.enabled(Rule::BuiltinLambdaArgumentShadowing) {
+            if checker.is_rule_enabled(Rule::BuiltinLambdaArgumentShadowing) {
                 flake8_builtins::rules::builtin_lambda_argument_shadowing(checker, lambda);
             }
         }

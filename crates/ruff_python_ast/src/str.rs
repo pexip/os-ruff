@@ -1,12 +1,11 @@
-use std::fmt;
-
 use aho_corasick::{AhoCorasick, AhoCorasickKind, Anchored, Input, MatchKind, StartKind};
-use once_cell::sync::Lazy;
+use std::fmt;
+use std::sync::LazyLock;
 
 use ruff_text_size::{TextLen, TextRange};
 
 /// Enumeration of the two kinds of quotes that can be used
-/// for Python string/f-string/bytestring literals
+/// for Python string/f/t-string/bytestring literals
 #[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq, is_macro::Is)]
 pub enum Quote {
     /// E.g. `'`
@@ -22,6 +21,14 @@ impl Quote {
         match self {
             Self::Single => '\'',
             Self::Double => '"',
+        }
+    }
+
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Single => "'",
+            Self::Double => "\"",
         }
     }
 
@@ -58,6 +65,24 @@ impl TryFrom<char> for Quote {
             '"' => Ok(Quote::Double),
             _ => Err(()),
         }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum TripleQuotes {
+    Yes,
+    No,
+}
+
+impl TripleQuotes {
+    #[must_use]
+    pub const fn is_yes(self) -> bool {
+        matches!(self, Self::Yes)
+    }
+
+    #[must_use]
+    pub const fn is_no(self) -> bool {
+        matches!(self, Self::No)
     }
 }
 
@@ -205,7 +230,7 @@ pub fn raw_contents_range(contents: &str) -> Option<TextRange> {
 }
 
 /// An [`AhoCorasick`] matcher for string and byte literal prefixes.
-static PREFIX_MATCHER: Lazy<AhoCorasick> = Lazy::new(|| {
+static PREFIX_MATCHER: LazyLock<AhoCorasick> = LazyLock::new(|| {
     AhoCorasick::builder()
         .start_kind(StartKind::Anchored)
         .match_kind(MatchKind::LeftmostLongest)

@@ -1,10 +1,10 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
 
@@ -38,8 +38,8 @@ use crate::rules::pylint::helpers::type_param_name;
 /// - [PEP 484 – Type Hints: Generics](https://peps.python.org/pep-0484/#generics)
 ///
 /// [PEP 484]:https://peps.python.org/pep-0484/#generics
-#[violation]
-pub struct TypeParamNameMismatch {
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeParamNameMismatch {
     kind: VarKind,
     var_name: String,
     param_name: String,
@@ -58,7 +58,7 @@ impl Violation for TypeParamNameMismatch {
 }
 
 /// PLC0132
-pub(crate) fn type_param_name_mismatch(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
+pub(crate) fn type_param_name_mismatch(checker: &Checker, value: &Expr, targets: &[Expr]) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;
@@ -119,14 +119,14 @@ pub(crate) fn type_param_name_mismatch(checker: &mut Checker, value: &Expr, targ
         return;
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(
         TypeParamNameMismatch {
             kind,
             var_name: var_name.to_string(),
             param_name: param_name.to_string(),
         },
         value.range(),
-    ));
+    );
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

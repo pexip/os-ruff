@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -16,51 +16,44 @@ use crate::checkers::ast::Checker;
 /// analyze your code.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if (3, 10) <= sys.version_info < (3, 12):
-///     ...
+/// if (3, 10) <= sys.version_info < (3, 12): ...
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info >= (3, 10) and sys.version_info < (3, 12):
-///     ...
+/// if sys.version_info >= (3, 10) and sys.version_info < (3, 12): ...
 /// ```
 ///
 /// ## References
-/// The [typing documentation on stub files](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
-#[violation]
-pub struct ComplexIfStatementInStub;
+/// - [Typing documentation: Version and platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
+#[derive(ViolationMetadata)]
+pub(crate) struct ComplexIfStatementInStub;
 
 impl Violation for ComplexIfStatementInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`if` test must be a simple comparison against `sys.platform` or `sys.version_info`"
-        )
+        "`if` test must be a simple comparison against `sys.platform` or `sys.version_info`"
+            .to_string()
     }
 }
 
 /// PYI002
-pub(crate) fn complex_if_statement_in_stub(checker: &mut Checker, test: &Expr) {
+pub(crate) fn complex_if_statement_in_stub(checker: &Checker, test: &Expr) {
     let Expr::Compare(ast::ExprCompare {
         left, comparators, ..
     }) = test
     else {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+        checker.report_diagnostic(ComplexIfStatementInStub, test.range());
         return;
     };
 
     if comparators.len() != 1 {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+        checker.report_diagnostic(ComplexIfStatementInStub, test.range());
         return;
     }
 
@@ -81,7 +74,5 @@ pub(crate) fn complex_if_statement_in_stub(checker: &mut Checker, test: &Expr) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ComplexIfStatementInStub, test.range()));
+    checker.report_diagnostic(ComplexIfStatementInStub, test.range());
 }

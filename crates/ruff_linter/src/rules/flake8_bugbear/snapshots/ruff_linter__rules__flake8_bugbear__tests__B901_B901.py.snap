@@ -7,7 +7,7 @@ B901.py:9:9: B901 (return-in-generator) Using `yield` and `return {value}` in a 
  8 |     if True:
  9 |         return [1, 2, 3]
    |         ^^^^^^^^^^^^^^^^ B901 (return-in-generator)
-10 | 
+10 |
 11 |     yield 3
    |
 
@@ -16,6 +16,6 @@ B901.py:36:5: B901 (return-in-generator) Using `yield` and `return {value}` in a
 35 | def broken2():
 36 |     return [3, 2, 1]
    |     ^^^^^^^^^^^^^^^^ B901 (return-in-generator)
-37 | 
+37 |
 38 |     yield from not_broken()
    |

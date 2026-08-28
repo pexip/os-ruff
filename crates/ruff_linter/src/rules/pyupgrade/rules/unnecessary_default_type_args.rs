@@ -1,25 +1,29 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
-/// Checks for unnecessary default type arguments.
+/// Checks for unnecessary default type arguments for `Generator` and
+/// `AsyncGenerator` on Python 3.13+.
 ///
 /// ## Why is this bad?
 /// Python 3.13 introduced the ability for type parameters to specify default
-/// values. As such, the default type arguments for some types in the standard
-/// library (e.g., Generator, AsyncGenerator) are now optional.
+/// values. Following this change, several standard-library classes were
+/// updated to add default values for some of their type parameters. For
+/// example, `Generator[int]` is now equivalent to
+/// `Generator[int, None, None]`, as the second and third type parameters of
+/// `Generator` now default to `None`.
 ///
-/// Omitting type parameters that match the default values can make the code
+/// Omitting type arguments that match the default values can make the code
 /// more concise and easier to read.
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```python
-/// from typing import Generator, AsyncGenerator
+/// from collections.abc import Generator, AsyncGenerator
 ///
 ///
 /// def sync_gen() -> Generator[int, None, None]:
@@ -33,7 +37,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 ///
 /// ```python
-/// from typing import Generator, AsyncGenerator
+/// from collections.abc import Generator, AsyncGenerator
 ///
 ///
 /// def sync_gen() -> Generator[int]:
@@ -44,27 +48,33 @@ use crate::checkers::ast::Checker;
 ///     yield 42
 /// ```
 ///
-/// ## References
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the type annotation contains comments.
 ///
+/// ## Options
+/// - `target-version`
+///
+/// ## References
 /// - [PEP 696 – Type Defaults for Type Parameters](https://peps.python.org/pep-0696/)
-/// - [typing.Generator](https://docs.python.org/3.13/library/typing.html#typing.Generator)
-/// - [typing.AsyncGenerator](https://docs.python.org/3.13/library/typing.html#typing.AsyncGenerator)
-#[violation]
-pub struct UnnecessaryDefaultTypeArgs;
+/// - [Annotating generators and coroutines](https://docs.python.org/3/library/typing.html#annotating-generators-and-coroutines)
+/// - [Python documentation: `typing.Generator`](https://docs.python.org/3/library/typing.html#typing.Generator)
+/// - [Python documentation: `typing.AsyncGenerator`](https://docs.python.org/3/library/typing.html#typing.AsyncGenerator)
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDefaultTypeArgs;
 
 impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary default type arguments")
+        "Unnecessary default type arguments".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove default type arguments")
+        "Remove default type arguments".to_string()
     }
 }
 
 /// UP043
-pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return;
     };
@@ -73,6 +83,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) 
         elts,
         ctx: _,
         range: _,
+        node_index: _,
         parenthesized: _,
     }) = slice.as_ref()
     else {
@@ -92,28 +103,42 @@ pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryDefaultTypeArgs, expr.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        checker
-            .generator()
-            .expr(&Expr::Subscript(ast::ExprSubscript {
-                value: value.clone(),
-                slice: Box::new(if let [elt] = valid_elts.as_slice() {
-                    elt.clone()
-                } else {
-                    Expr::Tuple(ast::ExprTuple {
-                        elts: valid_elts,
-                        ctx: ast::ExprContext::Load,
-                        range: TextRange::default(),
-                        parenthesized: true,
-                    })
-                }),
-                ctx: ast::ExprContext::Load,
-                range: TextRange::default(),
-            })),
-        expr.range(),
-    )));
-    checker.diagnostics.push(diagnostic);
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryDefaultTypeArgs, expr.range());
+
+    let applicability = if checker
+        .comment_ranges()
+        .has_comments(expr, checker.source())
+    {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(
+            checker
+                .generator()
+                .expr(&Expr::Subscript(ast::ExprSubscript {
+                    value: value.clone(),
+                    slice: Box::new(if let [elt] = valid_elts.as_slice() {
+                        elt.clone()
+                    } else {
+                        Expr::Tuple(ast::ExprTuple {
+                            elts: valid_elts,
+                            ctx: ast::ExprContext::Load,
+                            range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            parenthesized: true,
+                        })
+                    }),
+                    ctx: ast::ExprContext::Load,
+                    range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                })),
+            expr.range(),
+        ),
+        applicability,
+    ));
 }
 
 /// Trim trailing `None` literals from the given elements.
@@ -140,9 +165,20 @@ impl DefaultedTypeAnnotation {
     /// includes default type arguments.
     fn from_expr(expr: &Expr, semantic: &ruff_python_semantic::SemanticModel) -> Option<Self> {
         let qualified_name = semantic.resolve_qualified_name(expr)?;
-        if semantic.match_typing_qualified_name(&qualified_name, "Generator") {
+
+        if semantic.match_typing_qualified_name(&qualified_name, "Generator")
+            || matches!(
+                qualified_name.segments(),
+                ["collections", "abc", "Generator"]
+            )
+        {
             Some(Self::Generator)
-        } else if semantic.match_typing_qualified_name(&qualified_name, "AsyncGenerator") {
+        } else if semantic.match_typing_qualified_name(&qualified_name, "AsyncGenerator")
+            || matches!(
+                qualified_name.segments(),
+                ["collections", "abc", "AsyncGenerator"]
+            )
+        {
             Some(Self::AsyncGenerator)
         } else {
             None

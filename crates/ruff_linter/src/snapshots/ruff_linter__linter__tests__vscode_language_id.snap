@@ -5,7 +5,7 @@ vscode_language_id.ipynb:cell 3:1:8: F401 (unused-import) [*] `os` imported but 
   |
 1 | import os
   |        ^^ F401 (unused-import)
-2 | 
+2 |
 3 | print("hello world")
   |
   = help: Remove unused import: `os`

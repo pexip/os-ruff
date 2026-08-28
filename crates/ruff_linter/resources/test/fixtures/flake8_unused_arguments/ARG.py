@@ -55,6 +55,18 @@ class C:
     def f(x):
         print("Hello, world!")
 
+    def f(self, x):
+        msg[0] = "..."
+        raise NotImplementedError(msg)
+
+    def f(self, x):
+        msg = "..."
+        raise NotImplementedError(foo)
+
+    def f(self, x):
+        msg = "..."
+        raise NotImplementedError("must use msg")
+
     ###
     # Unused arguments attached to empty functions (OK).
     ###
@@ -106,6 +118,15 @@ class C:
 
     def f(self, x):
         raise NotImplemented("...")
+
+    def f(self, x):
+        msg = "..."
+        raise NotImplementedError(msg)
+
+    def f(self, x, y):
+        """Docstring."""
+        msg = f"{x}..."
+        raise NotImplementedError(msg)
 
     ###
     # Unused functions attached to abstract methods (OK).
@@ -189,6 +210,9 @@ def f(a, b):
 # Unused arguments on magic methods.
 ###
 class C:
+    def __new__(cls, x):
+        print("Hello, world!")
+
     def __init__(self, x) -> None:
         print("Hello, world!")
 
@@ -196,6 +220,12 @@ class C:
         return "Hello, world!"
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
+        print("Hello, world!")
+
+    def __init_subclass__(cls, x) -> None:
+        print("Hello, world!")
+
+    def __class_getitem__(cls, x):
         print("Hello, world!")
 
 

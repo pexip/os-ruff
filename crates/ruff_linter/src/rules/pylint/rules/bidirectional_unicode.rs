@@ -1,6 +1,7 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::Line;
+
+use crate::{Violation, checkers::ast::LintContext};
 
 const BIDI_UNICODE: [char; 10] = [
     '\u{202A}', //{LEFT-TO-RIGHT EMBEDDING}
@@ -13,7 +14,7 @@ const BIDI_UNICODE: [char; 10] = [
     '\u{2068}', //{FIRST STRONG ISOLATE}
     '\u{2069}', //{POP DIRECTIONAL ISOLATE}
     // The following was part of PEP 672:
-    // https://www.python.org/dev/peps/pep-0672/
+    // https://peps.python.org/pep-0672/
     // so the list above might not be complete
     '\u{200F}', //{RIGHT-TO-LEFT MARK}
                 // We don't use
@@ -40,22 +41,20 @@ const BIDI_UNICODE: [char; 10] = [
 /// ```
 ///
 /// ## References
-/// - [PEP 672](https://peps.python.org/pep-0672/#bidirectional-text)
-#[violation]
-pub struct BidirectionalUnicode;
+/// - [PEP 672: Bidirectional Text](https://peps.python.org/pep-0672/#bidirectional-text)
+#[derive(ViolationMetadata)]
+pub(crate) struct BidirectionalUnicode;
 
 impl Violation for BidirectionalUnicode {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Contains control characters that can permit obfuscated code")
+        "Contains control characters that can permit obfuscated code".to_string()
     }
 }
 
 /// PLE2502
-pub(crate) fn bidirectional_unicode(line: &Line) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
+pub(crate) fn bidirectional_unicode(line: &Line, context: &LintContext) {
     if line.contains(BIDI_UNICODE) {
-        diagnostics.push(Diagnostic::new(BidirectionalUnicode, line.full_range()));
+        context.report_diagnostic(BidirectionalUnicode, line.full_range());
     }
-    diagnostics
 }

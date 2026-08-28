@@ -6,7 +6,7 @@ F811_17.py:6:12: F811 (redefined-while-unused) [*] Redefinition of unused `fu` f
 5 | def bar():
 6 |     import fu
   |            ^^ F811 (redefined-while-unused)
-7 | 
+7 |
 8 |     def baz():
   |
   = help: Remove definition: `fu`

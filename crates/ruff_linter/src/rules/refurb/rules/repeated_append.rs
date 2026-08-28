@@ -1,8 +1,8 @@
 use rustc_hash::FxHashMap;
 
 use ast::traversal;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::traversal::EnclosingSuite;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_list;
@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for consecutive calls to `append`.
@@ -43,8 +44,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
-#[violation]
-pub struct RepeatedAppend {
+#[derive(ViolationMetadata)]
+pub(crate) struct RepeatedAppend {
     name: String,
     replacement: SourceCodeSnippet,
 }
@@ -75,7 +76,7 @@ impl Violation for RepeatedAppend {
 }
 
 /// FURB113
-pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
     let Some(appends) = match_consecutive_appends(stmt, checker.semantic()) else {
         return;
     };
@@ -85,48 +86,40 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    // group borrows from checker, so we can't directly push into checker.diagnostics
-    let diagnostics: Vec<Diagnostic> = group_appends(appends)
-        .iter()
-        .filter_map(|group| {
-            // Groups with just one element are fine, and shouldn't be replaced by `extend`.
-            if group.appends.len() <= 1 {
-                return None;
-            }
+    for group in group_appends(appends) {
+        // Groups with just one element are fine, and shouldn't be replaced by `extend`.
+        if group.appends.len() <= 1 {
+            continue;
+        }
 
-            let replacement = make_suggestion(group, checker.generator());
+        let replacement = make_suggestion(&group, checker.generator());
 
-            let mut diagnostic = Diagnostic::new(
-                RepeatedAppend {
-                    name: group.name().to_string(),
-                    replacement: SourceCodeSnippet::new(replacement.clone()),
-                },
-                group.range(),
-            );
+        let mut diagnostic = checker.report_diagnostic(
+            RepeatedAppend {
+                name: group.name().to_string(),
+                replacement: SourceCodeSnippet::new(replacement.clone()),
+            },
+            group.range(),
+        );
 
-            // We only suggest a fix when all appends in a group are clumped together. If they're
-            // non-consecutive, fixing them is much more difficult.
-            //
-            // Avoid fixing if there are comments in between the appends:
-            //
-            // ```python
-            // a.append(1)
-            // # comment
-            // a.append(2)
-            // ```
-            if group.is_consecutive && !checker.comment_ranges().intersects(group.range()) {
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
-                    replacement,
-                    group.start(),
-                    group.end(),
-                )));
-            }
-
-            Some(diagnostic)
-        })
-        .collect();
-
-    checker.diagnostics.extend(diagnostics);
+        // We only suggest a fix when all appends in a group are clumped together. If they're
+        // non-consecutive, fixing them is much more difficult.
+        //
+        // Avoid fixing if there are comments in between the appends:
+        //
+        // ```python
+        // a.append(1)
+        // # comment
+        // a.append(2)
+        // ```
+        if group.is_consecutive && !checker.comment_ranges().intersects(group.range()) {
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
+                replacement,
+                group.start(),
+                group.end(),
+            )));
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -179,10 +172,10 @@ fn match_consecutive_appends<'a>(
 
     // In order to match consecutive statements, we need to go to the tree ancestor of the
     // given statement, find its position there, and match all 'appends' from there.
-    let siblings: &[Stmt] = if semantic.at_top_level() {
+    let suite = if semantic.at_top_level() {
         // If the statement is at the top level, we should go to the parent module.
         // Module is available in the definitions list.
-        semantic.definitions.python_ast()?
+        EnclosingSuite::new(semantic.definitions.python_ast()?, stmt)?
     } else {
         // Otherwise, go to the parent, and take its body as a sequence of siblings.
         semantic
@@ -190,11 +183,12 @@ fn match_consecutive_appends<'a>(
             .and_then(|parent| traversal::suite(stmt, parent))?
     };
 
-    let stmt_index = siblings.iter().position(|sibling| sibling == stmt)?;
-
     // We shouldn't repeat the same work for many 'appends' that go in a row. Let's check
     // that this statement is at the beginning of such a group.
-    if stmt_index != 0 && match_append(semantic, &siblings[stmt_index - 1]).is_some() {
+    if suite
+        .previous_sibling()
+        .is_some_and(|previous_stmt| match_append(semantic, previous_stmt).is_some())
+    {
         return None;
     }
 
@@ -202,9 +196,9 @@ fn match_consecutive_appends<'a>(
     Some(
         std::iter::once(append)
             .chain(
-                siblings
+                suite
+                    .next_siblings()
                     .iter()
-                    .skip(stmt_index + 1)
                     .map_while(|sibling| match_append(semantic, sibling)),
             )
             .collect(),
@@ -330,9 +324,11 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
     assert!(!appends.is_empty());
     let first = appends.first().unwrap();
 
-    assert!(appends
-        .iter()
-        .all(|append| append.binding.source == first.binding.source));
+    assert!(
+        appends
+            .iter()
+            .all(|append| append.binding.source == first.binding.source)
+    );
 
     // Here we construct `var.extend((elt1, elt2, ..., eltN))
     //
@@ -346,6 +342,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         elts,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         parenthesized: true,
     };
     // Make `var.extend`.
@@ -355,6 +352,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         attr: ast::Identifier::new("extend".to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // Make the actual call `var.extend((elt1, elt2, ..., eltN))`
     let call = ast::ExprCall {
@@ -363,13 +361,16 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
             args: Box::from([tuple.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     generator.stmt(&stmt.into())
 }

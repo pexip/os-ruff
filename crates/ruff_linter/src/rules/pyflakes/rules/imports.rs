@@ -1,6 +1,10 @@
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_semantic::{BindingKind, Scope, ScopeId};
 use ruff_source_file::SourceRow;
+use ruff_text_size::Ranged;
+
+use crate::Violation;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for import bindings that are shadowed by loop variables.
@@ -29,8 +33,8 @@ use ruff_source_file::SourceRow;
 /// for filename in files:
 ///     print(filename)
 /// ```
-#[violation]
-pub struct ImportShadowedByLoopVar {
+#[derive(ViolationMetadata)]
+pub(crate) struct ImportShadowedByLoopVar {
     pub(crate) name: String,
     pub(crate) row: SourceRow,
 }
@@ -40,6 +44,48 @@ impl Violation for ImportShadowedByLoopVar {
     fn message(&self) -> String {
         let ImportShadowedByLoopVar { name, row } = self;
         format!("Import `{name}` from {row} shadowed by loop variable")
+    }
+}
+
+/// F402
+pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
+    for (name, binding_id) in scope.bindings() {
+        for shadow in checker.semantic().shadowed_bindings(scope_id, binding_id) {
+            // If the shadowing binding isn't a loop variable, abort.
+            let binding = &checker.semantic().bindings[shadow.binding_id()];
+            if !binding.kind.is_loop_var() {
+                continue;
+            }
+
+            // If the shadowed binding isn't an import, abort.
+            let shadowed = &checker.semantic().bindings[shadow.shadowed_id()];
+            if !matches!(
+                shadowed.kind,
+                BindingKind::Import(..)
+                    | BindingKind::FromImport(..)
+                    | BindingKind::SubmoduleImport(..)
+                    | BindingKind::FutureImport
+            ) {
+                continue;
+            }
+
+            // If the bindings are in different forks, abort.
+            if shadowed.source.is_none_or(|left| {
+                binding
+                    .source
+                    .is_none_or(|right| !checker.semantic().same_branch(left, right))
+            }) {
+                continue;
+            }
+
+            checker.report_diagnostic(
+                ImportShadowedByLoopVar {
+                    name: name.to_string(),
+                    row: checker.compute_source_row(shadowed.start()),
+                },
+                binding.range(),
+            );
+        }
     }
 }
 
@@ -70,8 +116,8 @@ impl Violation for ImportShadowedByLoopVar {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
-#[violation]
-pub struct UndefinedLocalWithImportStar {
+#[derive(ViolationMetadata)]
+pub(crate) struct UndefinedLocalWithImportStar {
     pub(crate) name: String,
 }
 
@@ -108,13 +154,13 @@ impl Violation for UndefinedLocalWithImportStar {
 ///
 /// ## References
 /// - [Python documentation: Future statements](https://docs.python.org/3/reference/simple_stmts.html#future)
-#[violation]
-pub struct LateFutureImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct LateFutureImport;
 
 impl Violation for LateFutureImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`from __future__` imports must occur at the beginning of the file")
+        "`from __future__` imports must occur at the beginning of the file".to_string()
     }
 }
 
@@ -152,8 +198,8 @@ impl Violation for LateFutureImport {
 /// def area(radius):
 ///     return pi * radius**2
 /// ```
-#[violation]
-pub struct UndefinedLocalWithImportStarUsage {
+#[derive(ViolationMetadata)]
+pub(crate) struct UndefinedLocalWithImportStarUsage {
     pub(crate) name: String,
 }
 
@@ -193,8 +239,8 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
-#[violation]
-pub struct UndefinedLocalWithNestedImportStarUsage {
+#[derive(ViolationMetadata)]
+pub(crate) struct UndefinedLocalWithNestedImportStarUsage {
     pub(crate) name: String,
 }
 

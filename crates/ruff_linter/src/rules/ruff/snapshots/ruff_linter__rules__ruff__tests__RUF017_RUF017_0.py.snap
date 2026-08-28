@@ -109,7 +109,7 @@ RUF017_0.py:9:1: RUF017 (quadratic-list-summation) [*] Avoid quadratic list summ
  9 | / sum([[1, 2, 3], [4, 5, 6]],
 10 | |     [])
    | |_______^ RUF017 (quadratic-list-summation)
-11 |   
+11 |
 12 |   # OK
    |
    = help: Replace with `functools.reduce`
@@ -134,7 +134,7 @@ RUF017_0.py:9:1: RUF017 (quadratic-list-summation) [*] Avoid quadratic list summ
 RUF017_0.py:21:5: RUF017 (quadratic-list-summation) [*] Avoid quadratic list summation
    |
 19 |     import functools, operator
-20 | 
+20 |
 21 |     sum([x, y], [])
    |     ^^^^^^^^^^^^^^^ RUF017 (quadratic-list-summation)
    |

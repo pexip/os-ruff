@@ -2,28 +2,29 @@ use std::borrow::Cow;
 use std::fmt::{Debug, Display, Formatter};
 
 use anyhow::Result;
+use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, ExprSlice, ExprSubscript, ExprTuple, Parameters, Stmt};
 use ruff_python_semantic::SemanticModel;
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::importer::{ImportRequest, Importer};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for lambda expressions and function definitions that can be replaced
-/// with a function from the `operator` module.
+/// Checks for lambda expressions and function definitions that can be replaced with a function from
+/// the `operator` module.
 ///
 /// ## Why is this bad?
-/// The `operator` module provides functions that implement the same functionality
-/// as the corresponding operators. For example, `operator.add` is equivalent to
-/// `lambda x, y: x + y`. Using the functions from the `operator` module is more
-/// concise and communicates the intent of the code more clearly.
+/// The `operator` module provides functions that implement the same functionality as the
+/// corresponding operators. For example, `operator.add` is often equivalent to `lambda x, y: x + y`.
+/// Using the functions from the `operator` module is more concise and communicates the intent of
+/// the code more clearly.
 ///
 /// ## Example
 /// ```python
@@ -41,8 +42,34 @@ use crate::importer::{ImportRequest, Importer};
 /// nums = [1, 2, 3]
 /// total = functools.reduce(operator.add, nums)
 /// ```
-#[violation]
-pub struct ReimplementedOperator {
+///
+/// ## Fix safety
+/// The fix offered by this rule is always marked as unsafe. While the changes the fix would make
+/// would rarely break your code, there are two ways in which functions from the `operator` module
+/// differ from user-defined functions. It would be non-trivial for Ruff to detect whether or not
+/// these differences would matter in a specific situation where Ruff is emitting a diagnostic for
+/// this rule.
+///
+/// The first difference is that `operator` functions cannot be called with keyword arguments, but
+/// most user-defined functions can. If an `add` function is defined as `add = lambda x, y: x + y`,
+/// replacing this function with `operator.add` will cause the later call to raise `TypeError` if
+/// the function is later called with keyword arguments, e.g. `add(x=1, y=2)`.
+///
+/// The second difference is that user-defined functions are [descriptors], but this is not true of
+/// the functions defined in the `operator` module. Practically speaking, this means that defining
+/// a function in a class body (either by using a `def` statement or assigning a `lambda` function
+/// to a variable) is a valid way of defining an instance method on that class; monkeypatching a
+/// user-defined function onto a class after the class has been created also has the same effect.
+/// The same is not true of an `operator` function: assigning an `operator` function to a variable
+/// in a class body or monkeypatching one onto a class will not create a valid instance method.
+/// Ruff will refrain from emitting diagnostics for this rule on function definitions in class
+/// bodies; however, it does not currently have sophisticated enough type inference to avoid
+/// emitting this diagnostic if a user-defined function is being monkeypatched onto a class after
+/// the class has been constructed.
+///
+/// [descriptors]: https://docs.python.org/3/howto/descriptor.html
+#[derive(ViolationMetadata)]
+pub(crate) struct ReimplementedOperator {
     operator: Operator,
     target: FunctionLikeKind,
 }
@@ -53,14 +80,7 @@ impl Violation for ReimplementedOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ReimplementedOperator { operator, target } = self;
-        match target {
-            FunctionLikeKind::Function => {
-                format!("Use `operator.{operator}` instead of defining a function")
-            }
-            FunctionLikeKind::Lambda => {
-                format!("Use `operator.{operator}` instead of defining a lambda")
-            }
-        }
+        format!("Use `operator.{operator}` instead of defining a {target}")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -70,12 +90,18 @@ impl Violation for ReimplementedOperator {
 }
 
 /// FURB118
-pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
+pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
     // Ignore methods.
-    if target.kind() == FunctionLikeKind::Function {
-        if checker.semantic().current_scope().kind.is_class() {
-            return;
-        }
+    // Methods can be defined via a `def` statement in a class scope,
+    // or via a lambda appearing on the right-hand side of an assignment in a class scope.
+    if checker.semantic().current_scope().kind.is_class()
+        && (target.is_function_def()
+            || checker
+                .semantic()
+                .current_statements()
+                .any(|stmt| matches!(stmt, Stmt::AnnAssign(_) | Stmt::Assign(_))))
+    {
+        return;
     }
 
     let Some(params) = target.parameters() else {
@@ -86,7 +112,7 @@ pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLik
         return;
     };
     let fix = target.try_fix(&operator, checker.importer(), checker.semantic());
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ReimplementedOperator {
             operator,
             target: target.kind(),
@@ -94,7 +120,6 @@ pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLik
         target.range(),
     );
     diagnostic.try_set_optional_fix(|| fix);
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Candidate for lambda expression or function definition consisting of a return statement.
@@ -132,6 +157,10 @@ impl FunctionLike<'_> {
             Self::Lambda(expr) => expr.parameters.as_deref(),
             Self::Function(stmt) => Some(&stmt.parameters),
         }
+    }
+
+    const fn is_function_def(&self) -> bool {
+        matches!(self, Self::Function(_))
     }
 
     /// Return the body of the function-like node.
@@ -176,7 +205,7 @@ impl FunctionLike<'_> {
                 } else {
                     format!("{binding}({})", operator.args.join(", "))
                 };
-                Ok(Some(Fix::safe_edits(
+                Ok(Some(Fix::unsafe_edits(
                     Edit::range_replacement(content, self.range()),
                     [edit],
                 )))
@@ -213,7 +242,18 @@ fn subscript_slice_to_string<'a>(expr: &Expr, locator: &Locator<'a>) -> Cow<'a, 
     if let Expr::Slice(expr_slice) = expr {
         Cow::Owned(slice_expr_to_slice_call(expr_slice, locator))
     } else if let Expr::Tuple(tuple) = expr {
-        if tuple.parenthesized {
+        if locator.slice(tuple).contains(':') {
+            // We cannot perform a trivial replacement if there's a `:` in the expression
+            let inner = tuple
+                .iter()
+                .map(|expr| match expr {
+                    Expr::Slice(expr) => Cow::Owned(slice_expr_to_slice_call(expr, locator)),
+                    _ => Cow::Borrowed(locator.slice(expr)),
+                })
+                .join(", ");
+
+            Cow::Owned(format!("({inner})"))
+        } else if tuple.parenthesized {
             Cow::Borrowed(locator.slice(expr))
         } else {
             Cow::Owned(format!("({})", locator.slice(tuple)))
@@ -232,7 +272,7 @@ fn itemgetter_op(expr: &ExprSubscript, params: &Parameters, locator: &Locator) -
     // The argument to the lambda must match the subscripted value, as in: `lambda x: x[1]`.
     if !is_same_expression(arg, &expr.value) {
         return None;
-    };
+    }
 
     // The subscripted expression can't contain references to the argument, as in: `lambda x: x[x]`.
     if any_over_expr(expr.slice.as_ref(), &|expr| is_same_expression(arg, expr)) {
@@ -309,10 +349,25 @@ fn get_operator(expr: &Expr, params: &Parameters, locator: &Locator) -> Option<O
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum FunctionLikeKind {
     Lambda,
     Function,
+}
+
+impl FunctionLikeKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Lambda => "lambda",
+            Self::Function => "function",
+        }
+    }
+}
+
+impl Display for FunctionLikeKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// Return the name of the `operator` implemented by the given unary expression.
@@ -400,11 +455,11 @@ fn match_arguments(
 /// Returns `true` if the given argument is the "same" as the given expression. For example, if
 /// the argument has a default, it is not considered the same as any expression; if both match the
 /// same name, they are considered the same.
-fn is_same_expression(arg: &ast::ParameterWithDefault, expr: &Expr) -> bool {
-    if arg.default.is_some() {
+fn is_same_expression(param: &ast::ParameterWithDefault, expr: &Expr) -> bool {
+    if param.default.is_some() {
         false
     } else if let Expr::Name(name) = expr {
-        name.id == arg.parameter.name.as_str()
+        name.id == param.name().as_str()
     } else {
         false
     }

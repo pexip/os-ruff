@@ -6,14 +6,15 @@ inline_comments.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or
  1 | / from a.prometheus.metrics import (  # type:ignore[attr-defined]
  2 | |     TERMINAL_CURRENTLY_RUNNING_TOTAL,
  3 | | )
- 4 | | 
+ 4 | |
  5 | | from b.prometheus.metrics import (
  6 | |     TERMINAL_CURRENTLY_RUNNING_TOTAL,  # type:ignore[attr-defined]
  7 | | )
- 8 | | 
+ 8 | |
  9 | | from c.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL  # type:ignore[attr-defined]
-10 | | 
+10 | |
 11 | | from d.prometheus.metrics import TERMINAL_CURRENTLY_RUNNING_TOTAL, OTHER_RUNNING_TOTAL  # type:ignore[attr-defined]
+   | |______________________________________________________________________________________^ I001 (unsorted-imports)
    |
    = help: Organize imports
 

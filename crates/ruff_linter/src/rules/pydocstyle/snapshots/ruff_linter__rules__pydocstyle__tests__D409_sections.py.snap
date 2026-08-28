@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:111:5: D409 (section-underline-matches-section-length) [*] Section underline should match the length of its name ("Returns")
+sections.py:111:5: D409 (mismatched-section-underline-length) [*] Section underline should match the length of its name ("Returns")
     |
 110 |     Returns
 111 |     --
-    |     ^^ D409 (section-underline-matches-section-length)
+    |     ^^ D409 (mismatched-section-underline-length)
 112 |     A value of some sort.
     |
     = help: Adjust underline length to match "Returns"
@@ -20,11 +20,11 @@ sections.py:111:5: D409 (section-underline-matches-section-length) [*] Section u
 113 113 | 
 114 114 |     """
 
-sections.py:225:5: D409 (section-underline-matches-section-length) [*] Section underline should match the length of its name ("Returns")
+sections.py:225:5: D409 (mismatched-section-underline-length) [*] Section underline should match the length of its name ("Returns")
     |
 224 |     Returns
 225 |     ------
-    |     ^^^^^^ D409 (section-underline-matches-section-length)
+    |     ^^^^^^ D409 (mismatched-section-underline-length)
 226 |     Many many wonderful things.
 227 |     Raises:
     |
@@ -40,22 +40,22 @@ sections.py:225:5: D409 (section-underline-matches-section-length) [*] Section u
 227 227 |     Raises:
 228 228 |     My attention.
 
-sections.py:578:5: D409 (section-underline-matches-section-length) [*] Section underline should match the length of its name ("Other Parameters")
+sections.py:589:5: D409 (mismatched-section-underline-length) [*] Section underline should match the length of its name ("Other Parameters")
     |
-577 |     Other Parameters
-578 |     ----------
-    |     ^^^^^^^^^^ D409 (section-underline-matches-section-length)
-579 |     other_parameters:
-580 |         A dictionary of string attributes
+588 |     Other Parameters
+589 |     ----------
+    |     ^^^^^^^^^^ D409 (mismatched-section-underline-length)
+590 |     other_parameters:
+591 |         A dictionary of string attributes
     |
     = help: Adjust underline length to match "Other Parameters"
 
 ℹ Safe fix
-575 575 |         A dictionary of string attributes
-576 576 | 
-577 577 |     Other Parameters
-578     |-    ----------
-    578 |+    ----------------
-579 579 |     other_parameters:
-580 580 |         A dictionary of string attributes
-581 581 |     parameters:
+586 586 |         A dictionary of string attributes
+587 587 | 
+588 588 |     Other Parameters
+589     |-    ----------
+    589 |+    ----------------
+590 590 |     other_parameters:
+591 591 |         A dictionary of string attributes
+592 592 |     parameters:

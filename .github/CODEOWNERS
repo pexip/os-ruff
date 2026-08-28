@@ -9,13 +9,16 @@
 /crates/ruff_formatter/ @MichaReiser
 /crates/ruff_python_formatter/ @MichaReiser
 /crates/ruff_python_parser/ @MichaReiser @dhruvmanila
+/crates/ruff_annotate_snippets/ @BurntSushi
 
 # flake8-pyi
 /crates/ruff_linter/src/rules/flake8_pyi/ @AlexWaygood
 
-# Script for fuzzing the parser
-/scripts/fuzz-parser/ @AlexWaygood
+# Script for fuzzing the parser/ty etc.
+/python/py-fuzzer/ @AlexWaygood
 
-# red-knot
-/crates/red_knot* @carljm @MichaReiser @AlexWaygood
-/crates/ruff_db/ @carljm @MichaReiser @AlexWaygood
+# ty
+/crates/ty* @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
+/crates/ruff_db/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
+/scripts/ty_benchmark/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
+/crates/ty_python_semantic @carljm @AlexWaygood @sharkdp @dcreager

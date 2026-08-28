@@ -7,6 +7,6 @@ ARG.py:28:8: ARG005 (unused-lambda-argument) Unused lambda argument: `x`
 27 | ###
 28 | lambda x: print("Hello, world!")
    |        ^ ARG005 (unused-lambda-argument)
-29 | 
+29 |
 30 | lambda: print("Hello, world!")
    |

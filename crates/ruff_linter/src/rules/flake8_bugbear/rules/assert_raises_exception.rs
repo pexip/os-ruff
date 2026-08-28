@@ -1,10 +1,10 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, WithItem};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -28,35 +28,16 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// self.assertRaises(SomeSpecificException, foo)
 /// ```
-#[violation]
-pub struct AssertRaisesException {
-    assertion: AssertionKind,
+#[derive(ViolationMetadata)]
+pub(crate) struct AssertRaisesException {
     exception: ExceptionKind,
 }
 
 impl Violation for AssertRaisesException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AssertRaisesException {
-            assertion,
-            exception,
-        } = self;
-        format!("`{assertion}({exception})` should be considered evil")
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum AssertionKind {
-    AssertRaises,
-    PytestRaises,
-}
-
-impl fmt::Display for AssertionKind {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AssertionKind::AssertRaises => fmt.write_str("assertRaises"),
-            AssertionKind::PytestRaises => fmt.write_str("pytest.raises"),
-        }
+        let AssertRaisesException { exception } = self;
+        format!("Do not assert blind exception: `{exception}`")
     }
 }
 
@@ -76,56 +57,49 @@ impl fmt::Display for ExceptionKind {
 }
 
 /// B017
-pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem]) {
+pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
     for item in items {
         let Expr::Call(ast::ExprCall {
             func,
             arguments,
             range: _,
+            node_index: _,
         }) = &item.context_expr
         else {
-            return;
+            continue;
         };
 
         if item.optional_vars.is_some() {
-            return;
+            continue;
         }
 
         let [arg] = &*arguments.args else {
-            return;
+            continue;
         };
 
         let semantic = checker.semantic();
 
         let Some(builtin_symbol) = semantic.resolve_builtin_symbol(arg) else {
-            return;
+            continue;
         };
 
         let exception = match builtin_symbol {
             "Exception" => ExceptionKind::Exception,
             "BaseException" => ExceptionKind::BaseException,
-            _ => return,
+            _ => continue,
         };
 
-        let assertion = if matches!(func.as_ref(), Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "assertRaises")
+        if !(matches!(func.as_ref(), Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "assertRaises")
+            || semantic
+                .resolve_qualified_name(func)
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["pytest", "raises"])
+                })
+                && arguments.find_keyword("match").is_none())
         {
-            AssertionKind::AssertRaises
-        } else if semantic
-            .resolve_qualified_name(func)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]))
-            && arguments.find_keyword("match").is_none()
-        {
-            AssertionKind::PytestRaises
-        } else {
-            return;
-        };
+            continue;
+        }
 
-        checker.diagnostics.push(Diagnostic::new(
-            AssertRaisesException {
-                assertion,
-                exception,
-            },
-            item.range(),
-        ));
+        checker.report_diagnostic(AssertRaisesException { exception }, item.range());
     }
 }

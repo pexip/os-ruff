@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 3 |     import os
 4 |     import os
   |            ^^ F811 (redefined-while-unused)
-5 | 
+5 |
 6 |     # Despite this `del`, `import os` should still be flagged as shadowing an unused
   |
   = help: Remove definition: `os`

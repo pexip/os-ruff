@@ -1,11 +1,32 @@
 //! This module takes care of parsing a type annotation.
 
 use ruff_python_ast::relocate::relocate_expr;
-use ruff_python_ast::str::raw_contents;
-use ruff_python_ast::{ExprStringLiteral, ModExpression, StringFlags, StringLiteral};
+use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringLiteral};
 use ruff_text_size::Ranged;
 
-use crate::{parse_expression, parse_expression_range, ParseError, Parsed};
+use crate::{ParseError, Parsed, parse_expression, parse_string_annotation};
+
+type AnnotationParseResult = Result<ParsedAnnotation, ParseError>;
+
+#[derive(Debug)]
+pub struct ParsedAnnotation {
+    parsed: Parsed<ModExpression>,
+    kind: AnnotationKind,
+}
+
+impl ParsedAnnotation {
+    pub fn parsed(&self) -> &Parsed<ModExpression> {
+        &self.parsed
+    }
+
+    pub fn expression(&self) -> &Expr {
+        self.parsed.expr()
+    }
+
+    pub fn kind(&self) -> AnnotationKind {
+        self.kind
+    }
+}
 
 #[derive(Copy, Clone, Debug)]
 pub enum AnnotationKind {
@@ -34,15 +55,11 @@ impl AnnotationKind {
 pub fn parse_type_annotation(
     string_expr: &ExprStringLiteral,
     source: &str,
-) -> Result<(Parsed<ModExpression>, AnnotationKind), ParseError> {
-    let expr_text = &source[string_expr.range()];
-
-    if let [string_literal] = string_expr.value.as_slice() {
+) -> AnnotationParseResult {
+    if let Some(string_literal) = string_expr.as_single_part_string() {
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
-        if raw_contents(expr_text)
-            .is_some_and(|raw_contents| raw_contents == string_literal.as_str())
-        {
+        if &source[string_literal.content_range()] == string_literal.as_str() {
             parse_simple_type_annotation(string_literal, source)
         } else {
             // The raw contents of the string doesn't match the parsed content. This could be the
@@ -58,23 +75,18 @@ pub fn parse_type_annotation(
 fn parse_simple_type_annotation(
     string_literal: &StringLiteral,
     source: &str,
-) -> Result<(Parsed<ModExpression>, AnnotationKind), ParseError> {
-    Ok((
-        parse_expression_range(
-            source,
-            string_literal
-                .range()
-                .add_start(string_literal.flags.opener_len())
-                .sub_end(string_literal.flags.closer_len()),
-        )?,
-        AnnotationKind::Simple,
-    ))
+) -> AnnotationParseResult {
+    Ok(ParsedAnnotation {
+        parsed: parse_string_annotation(source, string_literal)?,
+        kind: AnnotationKind::Simple,
+    })
 }
 
-fn parse_complex_type_annotation(
-    string_expr: &ExprStringLiteral,
-) -> Result<(Parsed<ModExpression>, AnnotationKind), ParseError> {
+fn parse_complex_type_annotation(string_expr: &ExprStringLiteral) -> AnnotationParseResult {
     let mut parsed = parse_expression(string_expr.value.to_str())?;
     relocate_expr(parsed.expr_mut(), string_expr.range());
-    Ok((parsed, AnnotationKind::Complex))
+    Ok(ParsedAnnotation {
+        parsed,
+        kind: AnnotationKind::Complex,
+    })
 }

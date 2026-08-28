@@ -153,7 +153,7 @@ F541.py:19:5: F541 (f-string-missing-placeholders) [*] f-string without any plac
 18 | )
 19 | g = f""
    |     ^^^ F541 (f-string-missing-placeholders)
-20 | 
+20 |
 21 | # OK
    |
    = help: Remove extraneous `f` prefix
@@ -173,7 +173,7 @@ F541.py:25:13: F541 (f-string-missing-placeholders) [*] f-string without any pla
 24 | # Error
 25 | h = "x" "y" f"z"
    |             ^^^^ F541 (f-string-missing-placeholders)
-26 | 
+26 |
 27 | v = 23.234234
    |
    = help: Remove extraneous `f` prefix

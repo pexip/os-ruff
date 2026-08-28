@@ -1,5 +1,5 @@
 ---
-source: crates/ruff_python_ast_integration_tests/tests/preorder.rs
+source: crates/ruff_python_ast_integration_tests/tests/source_order.rs
 expression: trace
 ---
 - ModModule
@@ -7,10 +7,14 @@ expression: trace
     - ExprName
     - TypeParams
       - TypeParamTypeVar
+        - Identifier
         - ExprName
       - TypeParamTypeVar
+        - Identifier
       - TypeParamTypeVarTuple
+        - Identifier
       - TypeParamParamSpec
+        - Identifier
     - ExprSubscript
       - ExprName
       - ExprName

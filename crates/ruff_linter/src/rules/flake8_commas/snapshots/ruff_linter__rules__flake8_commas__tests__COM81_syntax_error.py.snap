@@ -13,7 +13,7 @@ COM81_syntax_error.py:3:5: SyntaxError: Starred expression cannot be used here
 COM81_syntax_error.py:6:9: SyntaxError: Type parameter list cannot be empty
   |
 4 | )
-5 | 
+5 |
 6 | def foo[(param1='test', param2='test',):
   |         ^
 7 |     pass
@@ -22,7 +22,7 @@ COM81_syntax_error.py:6:9: SyntaxError: Type parameter list cannot be empty
 COM81_syntax_error.py:6:38: COM819 (prohibited-trailing-comma) Trailing comma prohibited
   |
 4 | )
-5 | 
+5 |
 6 | def foo[(param1='test', param2='test',):
   |                                      ^ COM819 (prohibited-trailing-comma)
 7 |     pass

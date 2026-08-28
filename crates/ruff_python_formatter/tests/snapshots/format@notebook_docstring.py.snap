@@ -24,7 +24,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = 3.9
 source_type                = Ipynb
 ```
 
@@ -48,7 +48,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = 3.9
 source_type                = Python
 ```
 
@@ -60,6 +60,3 @@ Ruff should leave it as is
 
 "another normal string"
 ```
-
-
-

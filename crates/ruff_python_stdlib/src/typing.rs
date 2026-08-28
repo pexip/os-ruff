@@ -126,6 +126,13 @@ pub fn is_pep_593_generic_type(qualified_name: &[&str]) -> bool {
     )
 }
 
+pub fn is_typed_dict(qualified_name: &[&str]) -> bool {
+    matches!(
+        qualified_name,
+        ["typing" | "typing_extensions", "TypedDict"]
+    )
+}
+
 /// Returns `true` if a call path is `Literal`.
 pub fn is_standard_library_literal(qualified_name: &[&str]) -> bool {
     matches!(qualified_name, ["typing" | "typing_extensions", "Literal"])
@@ -216,6 +223,15 @@ pub fn is_pep_593_generic_member(member: &str) -> bool {
     matches!(member, "Annotated")
 }
 
+/// Returns `true` if a name matches that of `TypedDict`.
+///
+/// See: <https://docs.python.org/3/library/typing.html>
+pub fn is_typed_dict_member(member: &str) -> bool {
+    // Constructed by taking every pattern from `is_pep_593_generic`, removing all but
+    // the last element in each pattern, and de-duplicating the values.
+    matches!(member, "TypedDict")
+}
+
 /// Returns `true` if a name matches that of the `Literal` generic.
 pub fn is_literal_member(member: &str) -> bool {
     matches!(member, "Literal")
@@ -299,8 +315,10 @@ pub fn is_mutable_return_type(qualified_name: &[&str]) -> bool {
 pub fn is_immutable_return_type(qualified_name: &[&str]) -> bool {
     matches!(
         qualified_name,
-        ["datetime", "date" | "datetime" | "timedelta"]
-            | ["decimal", "Decimal"]
+        [
+            "datetime",
+            "date" | "datetime" | "time" | "timedelta" | "timezone" | "tzinfo"
+        ] | ["decimal", "Decimal"]
             | ["fractions", "Fraction"]
             | ["operator", "attrgetter" | "itemgetter" | "methodcaller"]
             | ["pathlib", "Path"]

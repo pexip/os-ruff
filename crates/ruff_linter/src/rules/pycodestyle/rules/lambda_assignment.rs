@@ -1,15 +1,16 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, Expr, Identifier, Parameter, ParameterWithDefault, Parameters, Stmt,
+    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
+    ParameterWithDefault, Parameters, Stmt,
 };
-use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for lambda expressions which are assigned to a variable.
@@ -34,8 +35,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
-#[violation]
-pub struct LambdaAssignment {
+#[derive(ViolationMetadata)]
+pub(crate) struct LambdaAssignment {
     name: String,
 }
 
@@ -44,7 +45,7 @@ impl Violation for LambdaAssignment {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not assign a `lambda` expression, use a `def`")
+        "Do not assign a `lambda` expression, use a `def`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -55,7 +56,7 @@ impl Violation for LambdaAssignment {
 
 /// E731
 pub(crate) fn lambda_assignment(
-    checker: &mut Checker,
+    checker: &Checker,
     target: &Expr,
     value: &Expr,
     annotation: Option<&Expr>,
@@ -65,36 +66,35 @@ pub(crate) fn lambda_assignment(
         return;
     };
 
-    let Expr::Lambda(ast::ExprLambda {
-        parameters, body, ..
-    }) = value
-    else {
+    let Expr::Lambda(lambda) = value else {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    // If the assignment is a class attribute (with an annotation), ignore it.
+    //
+    // This is most common for, e.g., dataclasses and Pydantic models. Those libraries will
+    // treat the lambda as an assignable field, and the use of a lambda is almost certainly
+    // intentional.
+    if annotation.is_some() && checker.semantic().current_scope().kind.is_class() {
+        return;
+    }
+
+    let mut diagnostic = checker.report_diagnostic(
         LambdaAssignment {
             name: id.to_string(),
         },
         stmt.range(),
     );
 
-    if !has_leading_content(stmt.start(), checker.locator())
-        && !has_trailing_content(stmt.end(), checker.locator())
+    if !has_leading_content(stmt.start(), checker.source())
+        && !has_trailing_content(stmt.end(), checker.source())
     {
-        let first_line = checker.locator().line(stmt.start());
+        let first_line = checker.locator().line_str(stmt.start());
         let indentation = leading_indentation(first_line);
         let mut indented = String::new();
-        for (idx, line) in function(
-            id,
-            parameters.as_deref(),
-            body,
-            annotation,
-            checker.semantic(),
-            checker.generator(),
-        )
-        .universal_newlines()
-        .enumerate()
+        for (idx, line) in function(id, lambda, annotation, stmt, checker)
+            .universal_newlines()
+            .enumerate()
         {
             if idx == 0 {
                 indented.push_str(&line);
@@ -103,15 +103,6 @@ pub(crate) fn lambda_assignment(
                 indented.push_str(indentation);
                 indented.push_str(&line);
             }
-        }
-
-        // If the assignment is a class attribute (with an annotation), ignore it.
-        //
-        // This is most common for, e.g., dataclasses and Pydantic models. Those libraries will
-        // treat the lambda as an assignable field, and the use of a lambda is almost certainly
-        // intentional.
-        if annotation.is_some() && checker.semantic().current_scope().kind.is_class() {
-            return;
         }
 
         // Otherwise, if the assignment is in a class body, flag it, but use a display-only fix.
@@ -138,8 +129,6 @@ pub(crate) fn lambda_assignment(
             )));
         }
     }
-
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Extract the argument types and return type from a `Callable` annotation.
@@ -186,19 +175,23 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
 /// Generate a function definition from a `lambda` expression.
 fn function(
     name: &str,
-    parameters: Option<&Parameters>,
-    body: &Expr,
+    lambda: &ExprLambda,
     annotation: Option<&Expr>,
-    semantic: &SemanticModel,
-    generator: Generator,
+    stmt: &Stmt,
+    checker: &Checker,
 ) -> String {
+    // Use a dummy body. It gets replaced at the end with the actual body.
+    // This allows preserving the source formatting for the body.
     let body = Stmt::Return(ast::StmtReturn {
-        value: Some(Box::new(body.clone())),
+        value: Some(Box::new(Expr::EllipsisLiteral(
+            ExprEllipsisLiteral::default(),
+        ))),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     });
-    let parameters = parameters.cloned().unwrap_or_default();
+    let parameters = lambda.parameters.as_deref().cloned().unwrap_or_default();
     if let Some(annotation) = annotation {
-        if let Some((arg_types, return_type)) = extract_types(annotation, semantic) {
+        if let Some((arg_types, return_type)) = extract_types(annotation, checker.semantic()) {
             // A `lambda` expression can only have positional-only and positional-or-keyword
             // arguments. The order is always positional-only first, then positional-or-keyword.
             let new_posonlyargs = parameters
@@ -242,11 +235,14 @@ fn function(
                 returns: Some(Box::new(return_type)),
                 type_params: None,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             });
-            return generator.stmt(&func);
+            let generated = checker.generator().stmt(&func);
+
+            return replace_trailing_ellipsis_with_original_expr(generated, lambda, stmt, checker);
         }
     }
-    let func = Stmt::FunctionDef(ast::StmtFunctionDef {
+    let function = Stmt::FunctionDef(ast::StmtFunctionDef {
         is_async: false,
         name: Identifier::new(name.to_string(), TextRange::default()),
         parameters: Box::new(parameters),
@@ -255,6 +251,49 @@ fn function(
         returns: None,
         type_params: None,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     });
-    generator.stmt(&func)
+    let generated = checker.generator().stmt(&function);
+
+    replace_trailing_ellipsis_with_original_expr(generated, lambda, stmt, checker)
+}
+
+fn replace_trailing_ellipsis_with_original_expr(
+    mut generated: String,
+    lambda: &ExprLambda,
+    stmt: &Stmt,
+    checker: &Checker,
+) -> String {
+    let original_expr_range = parenthesized_range(
+        (&lambda.body).into(),
+        lambda.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or(lambda.body.range());
+
+    // This prevents the autofix of introducing a syntax error if the lambda's body is an
+    // expression spanned across multiple lines. To avoid the syntax error we preserve
+    // the parenthesis around the body.
+    let original_expr_in_source = if parenthesized_range(
+        lambda.into(),
+        stmt.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .is_some()
+    {
+        format!("({})", checker.locator().slice(original_expr_range))
+    } else {
+        checker.locator().slice(original_expr_range).to_string()
+    };
+
+    let placeholder_ellipsis_start = generated.rfind("...").unwrap();
+    let placeholder_ellipsis_end = placeholder_ellipsis_start + "...".len();
+
+    generated.replace_range(
+        placeholder_ellipsis_start..placeholder_ellipsis_end,
+        &original_expr_in_source,
+    );
+    generated
 }

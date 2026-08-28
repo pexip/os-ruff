@@ -5,6 +5,7 @@ reorder_within_section.py:1:1: I001 (unsorted-imports) [*] Import block is un-so
   |
 1 | / import sys
 2 | | import os
+  | |_________^ I001 (unsorted-imports)
   |
   = help: Organize imports
 

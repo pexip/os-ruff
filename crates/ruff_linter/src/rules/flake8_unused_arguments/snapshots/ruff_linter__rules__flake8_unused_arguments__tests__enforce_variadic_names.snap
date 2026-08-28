@@ -62,7 +62,7 @@ ignore_variadic_names.py:10:20: ARG002 (unused-method-argument) Unused method ar
 ignore_variadic_names.py:13:17: ARG002 (unused-method-argument) Unused method argument: `a`
    |
 11 |         print("Hello, world!")
-12 | 
+12 |
 13 |     def f(self, a, b, *args, **kwargs):
    |                 ^ ARG002 (unused-method-argument)
 14 |         print("Hello, world!")
@@ -71,7 +71,7 @@ ignore_variadic_names.py:13:17: ARG002 (unused-method-argument) Unused method ar
 ignore_variadic_names.py:13:20: ARG002 (unused-method-argument) Unused method argument: `b`
    |
 11 |         print("Hello, world!")
-12 | 
+12 |
 13 |     def f(self, a, b, *args, **kwargs):
    |                    ^ ARG002 (unused-method-argument)
 14 |         print("Hello, world!")
@@ -80,7 +80,7 @@ ignore_variadic_names.py:13:20: ARG002 (unused-method-argument) Unused method ar
 ignore_variadic_names.py:13:24: ARG002 (unused-method-argument) Unused method argument: `args`
    |
 11 |         print("Hello, world!")
-12 | 
+12 |
 13 |     def f(self, a, b, *args, **kwargs):
    |                        ^^^^ ARG002 (unused-method-argument)
 14 |         print("Hello, world!")
@@ -89,7 +89,7 @@ ignore_variadic_names.py:13:24: ARG002 (unused-method-argument) Unused method ar
 ignore_variadic_names.py:13:32: ARG002 (unused-method-argument) Unused method argument: `kwargs`
    |
 11 |         print("Hello, world!")
-12 | 
+12 |
 13 |     def f(self, a, b, *args, **kwargs):
    |                                ^^^^^^ ARG002 (unused-method-argument)
 14 |         print("Hello, world!")

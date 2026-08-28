@@ -1,12 +1,19 @@
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 
 /// ## What it does
 /// Checks for the use of the characters 'l', 'O', or 'I' as variable names.
+///
+/// Note: This rule is automatically disabled for all stub files
+/// (files with `.pyi` extensions). The rule has little relevance for authors
+/// of stubs: a well-written stub should aim to faithfully represent the
+/// interface of the equivalent .py file as it exists at runtime, including any
+/// ambiguously named variables in the runtime module.
 ///
 /// ## Why is this bad?
 /// In some fonts, these characters are indistinguishable from the
@@ -25,9 +32,8 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// o = 123
 /// i = 42
 /// ```
-
-#[violation]
-pub struct AmbiguousVariableName(pub String);
+#[derive(ViolationMetadata)]
+pub(crate) struct AmbiguousVariableName(pub String);
 
 impl Violation for AmbiguousVariableName {
     #[derive_message_formats]
@@ -38,13 +44,11 @@ impl Violation for AmbiguousVariableName {
 }
 
 /// E741
-pub(crate) fn ambiguous_variable_name(name: &str, range: TextRange) -> Option<Diagnostic> {
+pub(crate) fn ambiguous_variable_name(checker: &Checker, name: &str, range: TextRange) {
+    if checker.source_type.is_stub() {
+        return;
+    }
     if is_ambiguous_name(name) {
-        Some(Diagnostic::new(
-            AmbiguousVariableName(name.to_string()),
-            range,
-        ))
-    } else {
-        None
+        checker.report_diagnostic(AmbiguousVariableName(name.to_string()), range);
     }
 }

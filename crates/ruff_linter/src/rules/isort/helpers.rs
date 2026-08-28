@@ -1,9 +1,10 @@
 use ruff_python_ast::Stmt;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::PythonWhitespace;
-use ruff_source_file::{Locator, UniversalNewlines};
+use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
 
+use crate::Locator;
 use crate::rules::isort::types::TrailingComma;
 
 /// Return `true` if a `Stmt::ImportFrom` statement ends with a magic

@@ -1,4 +1,4 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
 ---
-__init__.py:1:1: A005 (builtin-module-shadowing) Module `string` is shadowing a Python builtin module
+__init__.py:1:1: A005 (stdlib-module-shadowing) Module `string` shadows a Python standard-library module

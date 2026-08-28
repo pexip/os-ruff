@@ -1,0 +1,294 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR301_names.py:38:1: AIR301 (airflow3-removal) `airflow.PY36` is removed in Airflow 3.0
+   |
+37 | # airflow root
+38 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+   | ^^^^ AIR301 (airflow3-removal)
+39 |
+40 | # airflow.api_connexion.security
+   |
+   = help: Use `sys.version_info` instead
+
+AIR301_names.py:38:7: AIR301 (airflow3-removal) `airflow.PY37` is removed in Airflow 3.0
+   |
+37 | # airflow root
+38 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+   |       ^^^^ AIR301 (airflow3-removal)
+39 |
+40 | # airflow.api_connexion.security
+   |
+   = help: Use `sys.version_info` instead
+
+AIR301_names.py:38:13: AIR301 (airflow3-removal) `airflow.PY38` is removed in Airflow 3.0
+   |
+37 | # airflow root
+38 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+   |             ^^^^ AIR301 (airflow3-removal)
+39 |
+40 | # airflow.api_connexion.security
+   |
+   = help: Use `sys.version_info` instead
+
+AIR301_names.py:38:19: AIR301 (airflow3-removal) `airflow.PY39` is removed in Airflow 3.0
+   |
+37 | # airflow root
+38 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+   |                   ^^^^ AIR301 (airflow3-removal)
+39 |
+40 | # airflow.api_connexion.security
+   |
+   = help: Use `sys.version_info` instead
+
+AIR301_names.py:38:25: AIR301 (airflow3-removal) `airflow.PY310` is removed in Airflow 3.0
+   |
+37 | # airflow root
+38 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+   |                         ^^^^^ AIR301 (airflow3-removal)
+39 |
+40 | # airflow.api_connexion.security
+   |
+   = help: Use `sys.version_info` instead
+
+AIR301_names.py:38:32: AIR301 (airflow3-removal) `airflow.PY311` is removed in Airflow 3.0
+   |
+37 | # airflow root
+38 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+   |                                ^^^^^ AIR301 (airflow3-removal)
+39 |
+40 | # airflow.api_connexion.security
+   |
+   = help: Use `sys.version_info` instead
+
+AIR301_names.py:38:39: AIR301 (airflow3-removal) `airflow.PY312` is removed in Airflow 3.0
+   |
+37 | # airflow root
+38 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+   |                                       ^^^^^ AIR301 (airflow3-removal)
+39 |
+40 | # airflow.api_connexion.security
+   |
+   = help: Use `sys.version_info` instead
+
+AIR301_names.py:41:1: AIR301 (airflow3-removal) `airflow.api_connexion.security.requires_access` is removed in Airflow 3.0
+   |
+40 | # airflow.api_connexion.security
+41 | requires_access
+   | ^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+42 |
+43 | # airflow.contrib.*
+   |
+   = help: Use `airflow.api_fastapi.core_api.security.requires_access_*` instead
+
+AIR301_names.py:44:1: AIR301 (airflow3-removal) `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0
+   |
+43 | # airflow.contrib.*
+44 | AWSAthenaHook()
+   | ^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+   |
+   = help: The whole `airflow.contrib` module has been removed.
+
+AIR301_names.py:48:1: AIR301 (airflow3-removal) `airflow.datasets.DatasetAliasEvent` is removed in Airflow 3.0
+   |
+47 | # airflow.datasets
+48 | DatasetAliasEvent()
+   | ^^^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+   |
+
+AIR301_names.py:52:1: AIR301 (airflow3-removal) `airflow.operators.subdag.SubDagOperator` is removed in Airflow 3.0
+   |
+51 | # airflow.operators.subdag.*
+52 | SubDagOperator()
+   | ^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+   |
+   = help: The whole `airflow.subdag` module has been removed.
+
+AIR301_names.py:61:1: AIR301 (airflow3-removal) `airflow.triggers.external_task.TaskStateTrigger` is removed in Airflow 3.0
+   |
+60 | # airflow.triggers.external_task
+61 | TaskStateTrigger()
+   | ^^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+62 |
+63 | # airflow.utils.date
+   |
+
+AIR301_names.py:64:1: AIR301 (airflow3-removal) `airflow.utils.dates.date_range` is removed in Airflow 3.0
+   |
+63 | # airflow.utils.date
+64 | dates.date_range
+   | ^^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+65 | dates.days_ago
+   |
+
+AIR301_names.py:65:1: AIR301 (airflow3-removal) `airflow.utils.dates.days_ago` is removed in Airflow 3.0
+   |
+63 | # airflow.utils.date
+64 | dates.date_range
+65 | dates.days_ago
+   | ^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+66 |
+67 | date_range
+   |
+   = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
+
+AIR301_names.py:67:1: AIR301 (airflow3-removal) `airflow.utils.dates.date_range` is removed in Airflow 3.0
+   |
+65 | dates.days_ago
+66 |
+67 | date_range
+   | ^^^^^^^^^^ AIR301 (airflow3-removal)
+68 | days_ago
+69 | infer_time_unit
+   |
+
+AIR301_names.py:68:1: AIR301 (airflow3-removal) `airflow.utils.dates.days_ago` is removed in Airflow 3.0
+   |
+67 | date_range
+68 | days_ago
+   | ^^^^^^^^ AIR301 (airflow3-removal)
+69 | infer_time_unit
+70 | parse_execution_date
+   |
+   = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
+
+AIR301_names.py:69:1: AIR301 (airflow3-removal) `airflow.utils.dates.infer_time_unit` is removed in Airflow 3.0
+   |
+67 | date_range
+68 | days_ago
+69 | infer_time_unit
+   | ^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+70 | parse_execution_date
+71 | round_time
+   |
+
+AIR301_names.py:70:1: AIR301 (airflow3-removal) `airflow.utils.dates.parse_execution_date` is removed in Airflow 3.0
+   |
+68 | days_ago
+69 | infer_time_unit
+70 | parse_execution_date
+   | ^^^^^^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+71 | round_time
+72 | scale_time_units
+   |
+
+AIR301_names.py:71:1: AIR301 (airflow3-removal) `airflow.utils.dates.round_time` is removed in Airflow 3.0
+   |
+69 | infer_time_unit
+70 | parse_execution_date
+71 | round_time
+   | ^^^^^^^^^^ AIR301 (airflow3-removal)
+72 | scale_time_units
+   |
+
+AIR301_names.py:72:1: AIR301 (airflow3-removal) `airflow.utils.dates.scale_time_units` is removed in Airflow 3.0
+   |
+70 | parse_execution_date
+71 | round_time
+72 | scale_time_units
+   | ^^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+73 |
+74 | # This one was not deprecated.
+   |
+
+AIR301_names.py:79:1: AIR301 (airflow3-removal) `airflow.utils.dag_cycle_tester.test_cycle` is removed in Airflow 3.0
+   |
+78 | # airflow.utils.dag_cycle_tester
+79 | test_cycle
+   | ^^^^^^^^^^ AIR301 (airflow3-removal)
+   |
+
+AIR301_names.py:83:1: AIR301 (airflow3-removal) `airflow.utils.db.create_session` is removed in Airflow 3.0
+   |
+82 | # airflow.utils.db
+83 | create_session
+   | ^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+84 |
+85 | # airflow.utils.decorators
+   |
+
+AIR301_names.py:86:1: AIR301 (airflow3-removal) `airflow.utils.decorators.apply_defaults` is removed in Airflow 3.0
+   |
+85 | # airflow.utils.decorators
+86 | apply_defaults
+   | ^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+87 |
+88 | # airflow.utils.file
+   |
+   = help: `apply_defaults` is now unconditionally done and can be safely removed.
+
+AIR301_names.py:89:1: AIR301 (airflow3-removal) `airflow.utils.file.mkdirs` is removed in Airflow 3.0
+   |
+88 | # airflow.utils.file
+89 | mkdirs
+   | ^^^^^^ AIR301 (airflow3-removal)
+   |
+   = help: Use `pathlib.Path({path}).mkdir` instead
+
+AIR301_names.py:93:1: AIR301 (airflow3-removal) `airflow.utils.state.SHUTDOWN` is removed in Airflow 3.0
+   |
+92 | # airflow.utils.state
+93 | SHUTDOWN
+   | ^^^^^^^^ AIR301 (airflow3-removal)
+94 | terminating_states
+   |
+
+AIR301_names.py:94:1: AIR301 (airflow3-removal) `airflow.utils.state.terminating_states` is removed in Airflow 3.0
+   |
+92 | # airflow.utils.state
+93 | SHUTDOWN
+94 | terminating_states
+   | ^^^^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+95 |
+96 | #  airflow.utils.trigger_rule
+   |
+
+AIR301_names.py:97:1: AIR301 (airflow3-removal) `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
+   |
+96 | #  airflow.utils.trigger_rule
+97 | TriggerRule.DUMMY
+   | ^^^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+98 | TriggerRule.NONE_FAILED_OR_SKIPPED
+   |
+
+AIR301_names.py:98:1: AIR301 (airflow3-removal) `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+   |
+96 | #  airflow.utils.trigger_rule
+97 | TriggerRule.DUMMY
+98 | TriggerRule.NONE_FAILED_OR_SKIPPED
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+   |
+
+AIR301_names.py:102:1: AIR301 (airflow3-removal) `airflow.www.auth.has_access` is removed in Airflow 3.0
+    |
+101 | # airflow.www.auth
+102 | has_access
+    | ^^^^^^^^^^ AIR301 (airflow3-removal)
+103 | has_access_dataset
+    |
+
+AIR301_names.py:103:1: AIR301 (airflow3-removal) `airflow.www.auth.has_access_dataset` is removed in Airflow 3.0
+    |
+101 | # airflow.www.auth
+102 | has_access
+103 | has_access_dataset
+    | ^^^^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+104 |
+105 | # airflow.www.utils
+    |
+
+AIR301_names.py:106:1: AIR301 (airflow3-removal) `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0
+    |
+105 | # airflow.www.utils
+106 | get_sensitive_variables_fields
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+107 | should_hide_value_for_key
+    |
+
+AIR301_names.py:107:1: AIR301 (airflow3-removal) `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
+    |
+105 | # airflow.www.utils
+106 | get_sensitive_variables_fields
+107 | should_hide_value_for_key
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301 (airflow3-removal)
+    |

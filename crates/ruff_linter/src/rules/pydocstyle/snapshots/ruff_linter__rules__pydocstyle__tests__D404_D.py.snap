@@ -21,14 +21,14 @@ D.py:639:17: D404 (docstring-starts-with-this) First word of the docstring shoul
     |
 639 | class SameLine: """This is a docstring on the same line"""
     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D404 (docstring-starts-with-this)
-640 | 
+640 |
 641 | def same_line(): """This is a docstring on the same line"""
     |
 
 D.py:641:18: D404 (docstring-starts-with-this) First word of the docstring should not be "This"
     |
 639 | class SameLine: """This is a docstring on the same line"""
-640 | 
+640 |
 641 | def same_line(): """This is a docstring on the same line"""
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D404 (docstring-starts-with-this)
     |

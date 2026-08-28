@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -44,19 +44,19 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html#str.strip)
-#[violation]
-pub struct StripWithMultiCharacters;
+#[derive(ViolationMetadata)]
+pub(crate) struct StripWithMultiCharacters;
 
 impl Violation for StripWithMultiCharacters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `.strip()` with multi-character strings is misleading")
+        "Using `.strip()` with multi-character strings is misleading".to_string()
     }
 }
 
 /// B005
 pub(crate) fn strip_with_multi_characters(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -73,8 +73,6 @@ pub(crate) fn strip_with_multi_characters(
     };
 
     if value.chars().count() > 1 && !value.chars().all_unique() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(StripWithMultiCharacters, expr.range()));
+        checker.report_diagnostic(StripWithMultiCharacters, expr.range());
     }
 }

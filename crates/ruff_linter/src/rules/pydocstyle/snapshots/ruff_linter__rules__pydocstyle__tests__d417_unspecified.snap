@@ -71,3 +71,21 @@ D417.py:155:5: D417 (undocumented-param) Missing argument description in the doc
 156 |     query: str,
 157 |     args: tuple,
     |
+
+D417.py:172:5: D417 (undocumented-param) Missing argument description in the docstring for `f`: `**kwargs`
+    |
+170 |     """
+171 |
+172 | def f(x, *args, **kwargs):
+    |     ^ D417 (undocumented-param)
+173 |     """Do something.
+    |
+
+D417.py:199:5: D417 (undocumented-param) Missing argument description in the docstring for `should_fail`: `Args`
+    |
+198 | # undocumented argument with the same name as a section
+199 | def should_fail(payload, Args):
+    |     ^^^^^^^^^^^ D417 (undocumented-param)
+200 |     """
+201 |     Send a message.
+    |

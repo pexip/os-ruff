@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, Path
 
 app = FastAPI()
 
@@ -82,6 +84,11 @@ async def read_thing(
     return {"query": query}
 
 
+@app.get("/books/{name}/{title}")
+async def read_thing(*, author: Annotated[str, Path(alias="author_name")], title: str):
+    return {"author": author, "title": title}
+
+
 # OK
 @app.get("/things/{thing_id}")
 async def read_thing(thing_id: int, query: str):
@@ -118,6 +125,11 @@ async def read_thing(*, author: str, title: str):
     return {"author": author, "title": title}
 
 
+@app.get("/books/{name}/{title}")
+async def read_thing(*, author: Annotated[str, Path(alias="name")], title: str):
+    return {"author": author, "title": title}
+
+
 # Ignored
 @app.get("/things/{thing-id}")
 async def read_thing(query: str):
@@ -132,3 +144,72 @@ async def read_thing(query: str):
 @app.get("/things/{thing_id=}")
 async def read_thing(query: str):
     return {"query": query}
+
+
+# https://github.com/astral-sh/ruff/issues/13657
+def takes_thing_id(thing_id): ...
+def something_else(lorem): ...
+
+from foo import unknown_imported
+unknown_not_function = unknown_imported()
+
+
+### Errors
+@app.get("/things/{thing_id}")
+async def single(other: Annotated[str, Depends(something_else)]): ...
+@app.get("/things/{thing_id}")
+async def default(other: str = Depends(something_else)): ...
+
+
+### No errors
+# A parameter with multiple `Depends()` has undefined behaviour.
+# https://github.com/astral-sh/ruff/pull/15364#discussion_r1912551710
+@app.get("/things/{thing_id}")
+async def single(other: Annotated[str, Depends(takes_thing_id)]): ...
+@app.get("/things/{thing_id}")
+async def double(other: Annotated[str, Depends(something_else), Depends(takes_thing_id)]): ...
+@app.get("/things/{thing_id}")
+async def double(other: Annotated[str, Depends(takes_thing_id), Depends(something_else)]): ...
+@app.get("/things/{thing_id}")
+async def default(other: str = Depends(takes_thing_id)): ...
+@app.get("/things/{thing_id}")
+async def unknown_1(other: str = Depends(unknown_unresolved)): ...
+@app.get("/things/{thing_id}")
+async def unknown_2(other: str = Depends(unknown_not_function)): ...
+@app.get("/things/{thing_id}")
+async def unknown_3(other: str = Depends(unknown_imported)): ...
+
+
+# Class dependencies
+from pydantic import BaseModel
+from dataclasses import dataclass
+
+class PydanticParams(BaseModel):
+    my_id: int
+
+
+class InitParams:
+    def __init__(self, my_id: int):
+        self.my_id = my_id
+
+
+# Errors
+@app.get("/{id}")
+async def get_id_pydantic_full(
+    params: Annotated[PydanticParams, Depends(PydanticParams)],
+): ...
+@app.get("/{id}")
+async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
+@app.get("/{id}")
+async def get_id_init_not_annotated(params = Depends(InitParams)): ...
+
+
+# No errors
+@app.get("/{my_id}")
+async def get_id_pydantic_full(
+    params: Annotated[PydanticParams, Depends(PydanticParams)],
+): ...
+@app.get("/{my_id}")
+async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
+@app.get("/{my_id}")
+async def get_id_init_not_annotated(params = Depends(InitParams)): ...

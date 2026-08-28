@@ -40,12 +40,23 @@
     enabled: true,
   },
   packageRules: [
+    // Pin GitHub Actions to immutable SHAs.
+    {
+      matchDepTypes: ["action"],
+      pinDigests: true,
+    },
+    // Annotate GitHub Actions SHAs with a SemVer version.
+    {
+      extends: ["helpers:pinGitHubActionDigests"],
+      extractVersion: "^(?<version>v?\\d+\\.\\d+\\.\\d+)$",
+      versioning: "regex:^v?(?<major>\\d+)(\\.(?<minor>\\d+)\\.(?<patch>\\d+))?$",
+    },
     {
       // Group upload/download artifact updates, the versions are dependent
       groupName: "Artifact GitHub Actions dependencies",
       matchManagers: ["github-actions"],
       matchDatasources: ["gitea-tags", "github-tags"],
-      matchPackagePatterns: ["actions/.*-artifact"],
+      matchPackageNames: ["actions/.*-artifact"],
       description: "Weekly update of artifact-related GitHub Actions dependencies",
     },
     {
@@ -61,7 +72,7 @@
     {
       // Disable updates of `zip-rs`; intentionally pinned for now due to ownership change
       // See: https://github.com/astral-sh/uv/issues/3642
-      matchPackagePatterns: ["zip"],
+      matchPackageNames: ["zip"],
       matchManagers: ["cargo"],
       enabled: false,
     },
@@ -70,7 +81,7 @@
       // with `mkdocs-material-insider`.
       // See: https://squidfunk.github.io/mkdocs-material/insiders/upgrade/
       matchManagers: ["pip_requirements"],
-      matchPackagePatterns: ["mkdocs-material"],
+      matchPackageNames: ["mkdocs-material"],
       enabled: false,
     },
     {
@@ -87,22 +98,15 @@
     {
       groupName: "Monaco",
       matchManagers: ["npm"],
-      matchPackagePatterns: ["monaco"],
+      matchPackageNames: ["monaco"],
       description: "Weekly update of the Monaco editor",
     },
     {
       groupName: "strum",
       matchManagers: ["cargo"],
-      matchPackagePatterns: ["strum"],
+      matchPackageNames: ["strum"],
       description: "Weekly update of strum dependencies",
-    },
-    {
-      groupName: "ESLint",
-      matchManagers: ["npm"],
-      matchPackageNames: ["eslint"],
-      allowedVersions: "<9",
-      description: "Constraint ESLint to version 8 until TypeScript-eslint supports ESLint 9", // https://github.com/typescript-eslint/typescript-eslint/issues/8211
-    },
+    }
   ],
   vulnerabilityAlerts: {
     commitMessageSuffix: "",

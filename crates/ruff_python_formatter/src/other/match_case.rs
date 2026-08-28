@@ -1,11 +1,11 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::AstNode;
+use ruff_formatter::{FormatRuleWithOptions, format_args, write};
 use ruff_python_ast::MatchCase;
 
-use crate::builders::parenthesize_if_expands;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::Parenthesize;
+use crate::pattern::maybe_parenthesize_pattern;
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
@@ -26,6 +26,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
     fn fmt_fields(&self, item: &MatchCase, f: &mut PyFormatter) -> FormatResult<()> {
         let MatchCase {
             range: _,
+            node_index: _,
             pattern,
             guard,
             body,
@@ -34,46 +35,27 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
         let comments = f.context().comments().clone();
         let dangling_item_comments = comments.dangling(item);
 
+        let format_guard = guard.as_deref().map(|guard| {
+            format_with(|f| {
+                write!(f, [space(), token("if"), space()])?;
+
+                maybe_parenthesize_expression(guard, item, Parenthesize::IfBreaksParenthesized)
+                    .fmt(f)
+            })
+        });
+
         write!(
             f,
             [
                 clause_header(
                     ClauseHeader::MatchCase(item),
                     dangling_item_comments,
-                    &format_with(|f| {
-                        write!(f, [token("case"), space()])?;
-
-                        let has_comments = comments.has_leading(pattern)
-                            || comments.has_trailing_own_line(pattern);
-
-                        if has_comments {
-                            pattern.format().with_options(Parentheses::Always).fmt(f)?;
-                        } else {
-                            match pattern.needs_parentheses(item.as_any_node_ref(), f.context()) {
-                                OptionalParentheses::Multiline => {
-                                    parenthesize_if_expands(
-                                        &pattern.format().with_options(Parentheses::Never),
-                                    )
-                                    .fmt(f)?;
-                                }
-                                OptionalParentheses::Always => {
-                                    pattern.format().with_options(Parentheses::Always).fmt(f)?;
-                                }
-                                OptionalParentheses::Never => {
-                                    pattern.format().with_options(Parentheses::Never).fmt(f)?;
-                                }
-                                OptionalParentheses::BestFit => {
-                                    pattern.format().with_options(Parentheses::Never).fmt(f)?;
-                                }
-                            }
-                        }
-
-                        if let Some(guard) = guard {
-                            write!(f, [space(), token("if"), space(), guard.format()])?;
-                        }
-
-                        Ok(())
-                    }),
+                    &format_args![
+                        token("case"),
+                        space(),
+                        maybe_parenthesize_pattern(pattern, item),
+                        format_guard
+                    ],
                 ),
                 clause_body(
                     body,

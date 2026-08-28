@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::BindingKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary parentheses on raised exceptions.
@@ -36,28 +36,33 @@ use crate::checkers::ast::Checker;
 /// raise TypeError
 /// ```
 ///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if removing the parentheses would also remove comments
+/// or if it’s unclear whether the expression is a class or a function call.
+///
 /// ## References
 /// - [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
-#[violation]
-pub struct UnnecessaryParenOnRaiseException;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryParenOnRaiseException;
 
 impl AlwaysFixableViolation for UnnecessaryParenOnRaiseException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary parentheses on raised exception")
+        "Unnecessary parentheses on raised exception".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove unnecessary parentheses")
+        "Remove unnecessary parentheses".to_string()
     }
 }
 
 /// RSE102
-pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -108,7 +113,8 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
             }
         }
 
-        let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, arguments.range());
+        let mut diagnostic =
+            checker.report_diagnostic(UnnecessaryParenOnRaiseException, arguments.range());
 
         // If the arguments are immediately followed by a `from`, insert whitespace to avoid
         // a syntax error, as in:
@@ -131,17 +137,19 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
                 },
             ));
         } else {
+            let applicability = if exception_type.is_some()
+                && !checker.comment_ranges().intersects(arguments.range())
+            {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            };
+
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(arguments.range()),
-                if exception_type.is_some() {
-                    Applicability::Safe
-                } else {
-                    Applicability::Unsafe
-                },
+                applicability,
             ));
         }
-
-        checker.diagnostics.push(diagnostic);
     }
 }
 

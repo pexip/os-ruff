@@ -1,7 +1,7 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
@@ -39,18 +39,18 @@ use crate::rules::pydocstyle::helpers::normalize_word;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
-#[violation]
-pub struct DocstringStartsWithThis;
+#[derive(ViolationMetadata)]
+pub(crate) struct DocstringStartsWithThis;
 
 impl Violation for DocstringStartsWithThis {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r#"First word of the docstring should not be "This""#)
+        r#"First word of the docstring should not be "This""#.to_string()
     }
 }
 
 /// D404
-pub(crate) fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn starts_with_this(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let trimmed = body.trim();
@@ -64,7 +64,5 @@ pub(crate) fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
     if normalize_word(first_word) != "this" {
         return;
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(DocstringStartsWithThis, docstring.range()));
+    checker.report_diagnostic(DocstringStartsWithThis, docstring.range());
 }

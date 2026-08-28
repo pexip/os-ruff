@@ -6,6 +6,6 @@ S201.py:10:9: S201 (flask-debug-true) Use of `debug=True` in Flask app detected
  9 | # OK
 10 | app.run(debug=True)
    |         ^^^^^^^^^^ S201 (flask-debug-true)
-11 | 
+11 |
 12 | # Errors
    |

@@ -1,22 +1,21 @@
 use std::fmt::{Display, Formatter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 use anyhow::Result;
 use colored::Colorize;
 use fern;
 use log::Level;
-use once_cell::sync::Lazy;
 use ruff_python_parser::{ParseError, ParseErrorType};
 use rustc_hash::FxHashSet;
 
-use ruff_source_file::{LineIndex, OneIndexed, SourceCode, SourceLocation};
+use ruff_source_file::{LineColumn, LineIndex, OneIndexed, SourceCode};
 
 use crate::fs;
 use crate::source_kind::SourceKind;
 use ruff_notebook::Notebook;
 
-pub static IDENTIFIERS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
+pub static IDENTIFIERS: LazyLock<Mutex<Vec<&'static str>>> = LazyLock::new(Mutex::default);
 
 /// Warn a user once, with uniqueness determined by the given ID.
 #[macro_export]
@@ -35,7 +34,7 @@ macro_rules! warn_user_once_by_id {
     };
 }
 
-pub static MESSAGES: Lazy<Mutex<FxHashSet<String>>> = Lazy::new(Mutex::default);
+pub static MESSAGES: LazyLock<Mutex<FxHashSet<String>>> = LazyLock::new(Mutex::default);
 
 /// Warn a user once, if warnings are enabled, with uniqueness determined by the content of the
 /// message.
@@ -86,8 +85,8 @@ macro_rules! notify_user {
     ($($arg:tt)*) => {
         println!(
             "[{}] {}",
-            chrono::Local::now()
-                .format("%H:%M:%S %p")
+            jiff::Zoned::now()
+                .strftime("%H:%M:%S %p")
                 .to_string()
                 .dimmed(),
             format_args!($($arg)*)
@@ -110,7 +109,7 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
-    #[allow(clippy::trivially_copy_pass_by_ref)]
+    #[expect(clippy::trivially_copy_pass_by_ref)]
     const fn level_filter(&self) -> log::LevelFilter {
         match self {
             LogLevel::Default => log::LevelFilter::Info,
@@ -143,7 +142,7 @@ pub fn set_up_logging(level: LogLevel) -> Result<()> {
             Level::Info | Level::Debug | Level::Trace => {
                 out.finish(format_args!(
                     "{}[{}][{}] {}",
-                    chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                    jiff::Zoned::now().strftime("[%Y-%m-%d][%H:%M:%S]"),
                     record.target(),
                     record.level(),
                     message
@@ -152,6 +151,8 @@ pub fn set_up_logging(level: LogLevel) -> Result<()> {
         })
         .level(level.level_filter())
         .level_for("globset", log::LevelFilter::Warn)
+        .level_for("ty_python_semantic", log::LevelFilter::Warn)
+        .level_for("salsa", log::LevelFilter::Warn)
         .chain(std::io::stderr())
         .apply()?;
     Ok(())
@@ -194,21 +195,21 @@ impl DisplayParseError {
         // Translate the byte offset to a location in the originating source.
         let location =
             if let Some(jupyter_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-                let source_location = source_code.source_location(error.location.start());
+                let source_location = source_code.line_column(error.location.start());
 
                 ErrorLocation::Cell(
                     jupyter_index
-                        .cell(source_location.row)
+                        .cell(source_location.line)
                         .unwrap_or(OneIndexed::MIN),
-                    SourceLocation {
-                        row: jupyter_index
-                            .cell_row(source_location.row)
+                    LineColumn {
+                        line: jupyter_index
+                            .cell_row(source_location.line)
                             .unwrap_or(OneIndexed::MIN),
                         column: source_location.column,
                     },
                 )
             } else {
-                ErrorLocation::File(source_code.source_location(error.location.start()))
+                ErrorLocation::File(source_code.line_column(error.location.start()))
             };
 
         Self {
@@ -244,7 +245,7 @@ impl Display for DisplayParseError {
                 write!(
                     f,
                     "{row}{colon}{column}{colon} {inner}",
-                    row = location.row,
+                    row = location.line,
                     column = location.column,
                     colon = ":".cyan(),
                     inner = &DisplayParseErrorType(&self.error.error)
@@ -255,7 +256,7 @@ impl Display for DisplayParseError {
                     f,
                     "{cell}{colon}{row}{colon}{column}{colon} {inner}",
                     cell = cell,
-                    row = location.row,
+                    row = location.line,
                     column = location.column,
                     colon = ":".cyan(),
                     inner = &DisplayParseErrorType(&self.error.error)
@@ -282,9 +283,9 @@ impl Display for DisplayParseErrorType<'_> {
 #[derive(Debug)]
 enum ErrorLocation {
     /// The error occurred in a Python file.
-    File(SourceLocation),
+    File(LineColumn),
     /// The error occurred in a Jupyter cell.
-    Cell(OneIndexed, SourceLocation),
+    Cell(OneIndexed, LineColumn),
 }
 
 /// Truncates the display text before the first newline character to avoid line breaks.

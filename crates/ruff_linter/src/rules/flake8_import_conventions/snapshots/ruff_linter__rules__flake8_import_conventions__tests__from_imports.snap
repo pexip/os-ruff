@@ -83,7 +83,7 @@ from_imports.py:10:57: ICN001 (unconventional-import-alias) `xml.dom.minidom.par
  9 | from xml.dom.minidom import parse, parseString
 10 | from xml.dom.minidom import parse as ps, parseString as wrong
    |                                                         ^^^^^ ICN001 (unconventional-import-alias)
-11 | 
+11 |
 12 | # No ICN001 violations
    |
    = help: Alias `xml.dom.minidom.parseString` to `pstr`

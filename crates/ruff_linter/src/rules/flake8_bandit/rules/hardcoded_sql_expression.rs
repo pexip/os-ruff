@@ -1,18 +1,28 @@
-use once_cell::sync::Lazy;
-use regex::Regex;
-use ruff_python_ast::{self as ast, Expr, Operator};
+use std::sync::LazyLock;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use regex::Regex;
+
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::raw_contents;
-use ruff_source_file::Locator;
+use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_text_size::Ranged;
 
+use crate::Locator;
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b(select\s.+\sfrom\s|delete\s+from\s|(insert|replace)\s.+\svalues\s|update\s.+\sset\s)")
-        .unwrap()
+static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?isx)
+        \b
+        (select\s+.*\s+from\s
+        |delete\s+from\s
+        |(insert|replace)\s+.*\s+values\s
+        |update\s+.*\s+set\s
+        )
+    ",
+    )
+    .unwrap()
 });
 
 /// ## What it does
@@ -34,28 +44,28 @@ static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
 /// ## References
 /// - [B608: Test for SQL injection](https://bandit.readthedocs.io/en/latest/plugins/b608_hardcoded_sql_expressions.html)
 /// - [psycopg3: Server-side binding](https://www.psycopg.org/psycopg3/docs/basic/from_pg2.html#server-side-binding)
-#[violation]
-pub struct HardcodedSQLExpression;
+#[derive(ViolationMetadata)]
+pub(crate) struct HardcodedSQLExpression;
 
 impl Violation for HardcodedSQLExpression {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Possible SQL injection vector through string-based query construction")
+        "Possible SQL injection vector through string-based query construction".to_string()
     }
 }
 
 /// S608
-pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
     let content = match expr {
         // "select * from table where val = " + "str" + ...
         Expr::BinOp(ast::ExprBinOp {
             op: Operator::Add, ..
         }) => {
             // Only evaluate the full BinOp, not the nested components.
-            if !checker
+            if checker
                 .semantic()
                 .current_expression_parent()
-                .map_or(true, |parent| !parent.is_bin_op_expr())
+                .is_some_and(ruff_python_ast::Expr::is_bin_op_expr)
             {
                 return;
             }
@@ -88,15 +98,23 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
             };
             string.value.to_str().escape_default().to_string()
         }
+
         // f"select * from table where val = {val}"
-        Expr::FString(f_string) => concatenated_f_string(f_string, checker.locator()),
+        Expr::FString(f_string)
+            if f_string.value.f_strings().any(|fs| {
+                fs.elements
+                    .iter()
+                    .any(ast::InterpolatedStringElement::is_interpolation)
+            }) =>
+        {
+            concatenated_f_string(f_string, checker.locator())
+        }
+
         _ => return,
     };
 
     if SQL_REGEX.is_match(&content) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(HardcodedSQLExpression, expr.range()));
+        checker.report_diagnostic(HardcodedSQLExpression, expr.range());
     }
 }
 
@@ -113,9 +131,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
 fn concatenated_f_string(expr: &ast::ExprFString, locator: &Locator) -> String {
     expr.value
         .iter()
-        .filter_map(|part| {
-            raw_contents(locator.slice(part)).map(|s| s.escape_default().to_string())
-        })
+        .filter_map(|part| raw_contents(locator.slice(part)))
         .collect()
 }
 
@@ -160,6 +176,8 @@ fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
         Expr::DictComp(_) => Some(false),
         Expr::Compare(_) => Some(false),
         Expr::FString(_) => Some(true),
+        // TODO(dylan): decide whether to trigger here
+        Expr::TString(_) => Some(false),
         Expr::StringLiteral(_) => Some(true),
         Expr::BytesLiteral(_) => Some(false),
         Expr::NoneLiteral(_) => Some(false),
@@ -183,7 +201,7 @@ fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
                 .iter()
                 .map(is_explicit_concatenation)
                 .collect::<Vec<_>>();
-            if values.iter().any(|v| *v == Some(true)) {
+            if values.contains(&Some(true)) {
                 Some(true)
             } else if values.iter().all(|v| *v == Some(false)) {
                 Some(false)

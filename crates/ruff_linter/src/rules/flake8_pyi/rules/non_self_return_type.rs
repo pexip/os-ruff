@@ -1,14 +1,15 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, Parameters, Stmt};
-
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use crate::checkers::ast::{Checker, TypingImporter};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast as ast;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze;
+use ruff_python_semantic::analyze::class::might_be_generic;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
-
-use crate::checkers::ast::Checker;
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for methods that are annotated with a fixed return type which
@@ -51,68 +52,80 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// class Foo:
 ///     def __new__(cls, *args: Any, **kwargs: Any) -> Foo: ...
-///
 ///     def __enter__(self) -> Foo: ...
-///
 ///     async def __aenter__(self) -> Foo: ...
-///
 ///     def __iadd__(self, other: Foo) -> Foo: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// from typing_extensions import Self
-///
 ///
 /// class Foo:
 ///     def __new__(cls, *args: Any, **kwargs: Any) -> Self: ...
-///
 ///     def __enter__(self) -> Self: ...
-///
 ///     async def __aenter__(self) -> Self: ...
-///
 ///     def __iadd__(self, other: Foo) -> Self: ...
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe as it changes the meaning of your type annotations.
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.11, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
+///
 /// ## References
-/// - [`typing.Self` documentation](https://docs.python.org/3/library/typing.html#typing.Self)
-#[violation]
-pub struct NonSelfReturnType {
+/// - [Python documentation: `typing.Self`](https://docs.python.org/3/library/typing.html#typing.Self)
+#[derive(ViolationMetadata)]
+pub(crate) struct NonSelfReturnType {
     class_name: String,
     method_name: String,
 }
 
 impl Violation for NonSelfReturnType {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let NonSelfReturnType {
             class_name,
             method_name,
         } = self;
+
         if matches!(class_name.as_str(), "__new__") {
-            format!("`__new__` methods usually return `self` at runtime")
+            "`__new__` methods usually return `self` at runtime".to_string()
         } else {
-            format!("`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime")
+            format!(
+                "`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime"
+            )
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Consider using `typing_extensions.Self` as return type".to_string())
+        Some("Use `Self` as return type".to_string())
     }
 }
 
 /// PYI034
 pub(crate) fn non_self_return_type(
-    checker: &mut Checker,
-    stmt: &Stmt,
+    checker: &Checker,
+    stmt: &ast::Stmt,
     is_async: bool,
     name: &str,
-    decorator_list: &[Decorator],
-    returns: Option<&Expr>,
-    parameters: &Parameters,
+    decorator_list: &[ast::Decorator],
+    returns: Option<&ast::Expr>,
+    parameters: &ast::Parameters,
 ) {
     let semantic = checker.semantic();
 
@@ -129,7 +142,7 @@ pub(crate) fn non_self_return_type(
     };
 
     // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
-    if analyze::class::is_metaclass(class_def, semantic) {
+    if analyze::class::is_metaclass(class_def, semantic).is_yes() {
         return;
     }
 
@@ -143,27 +156,15 @@ pub(crate) fn non_self_return_type(
             && is_name(returns, &class_def.name)
             && !is_final(&class_def.decorator_list, semantic)
         {
-            checker.diagnostics.push(Diagnostic::new(
-                NonSelfReturnType {
-                    class_name: class_def.name.to_string(),
-                    method_name: name.to_string(),
-                },
-                stmt.identifier(),
-            ));
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
         return;
     }
 
     // In-place methods that are expected to return `Self`.
     if is_inplace_bin_op(name) {
-        if !is_self(returns, semantic) {
-            checker.diagnostics.push(Diagnostic::new(
-                NonSelfReturnType {
-                    class_name: class_def.name.to_string(),
-                    method_name: name.to_string(),
-                },
-                stmt.identifier(),
-            ));
+        if !is_self(returns, checker) {
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
         return;
     }
@@ -171,13 +172,7 @@ pub(crate) fn non_self_return_type(
     if is_name(returns, &class_def.name) {
         if matches!(name, "__enter__" | "__new__") && !is_final(&class_def.decorator_list, semantic)
         {
-            checker.diagnostics.push(Diagnostic::new(
-                NonSelfReturnType {
-                    class_name: class_def.name.to_string(),
-                    method_name: name.to_string(),
-                },
-                stmt.identifier(),
-            ));
+            add_diagnostic(checker, stmt, returns, class_def, name);
         }
         return;
     }
@@ -187,30 +182,92 @@ pub(crate) fn non_self_return_type(
             if is_iterable_or_iterator(returns, semantic)
                 && subclasses_iterator(class_def, semantic)
             {
-                checker.diagnostics.push(Diagnostic::new(
-                    NonSelfReturnType {
-                        class_name: class_def.name.to_string(),
-                        method_name: name.to_string(),
-                    },
-                    stmt.identifier(),
-                ));
+                add_diagnostic(checker, stmt, returns, class_def, name);
             }
         }
         "__aiter__" => {
             if is_async_iterable_or_iterator(returns, semantic)
                 && subclasses_async_iterator(class_def, semantic)
             {
-                checker.diagnostics.push(Diagnostic::new(
-                    NonSelfReturnType {
-                        class_name: class_def.name.to_string(),
-                        method_name: name.to_string(),
-                    },
-                    stmt.identifier(),
-                ));
+                add_diagnostic(checker, stmt, returns, class_def, name);
             }
         }
         _ => {}
     }
+}
+
+/// Add a diagnostic for the given method.
+fn add_diagnostic(
+    checker: &Checker,
+    stmt: &ast::Stmt,
+    returns: &ast::Expr,
+    class_def: &ast::StmtClassDef,
+    method_name: &str,
+) {
+    let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
+        return;
+    };
+
+    let mut diagnostic = checker.report_diagnostic(
+        NonSelfReturnType {
+            class_name: class_def.name.to_string(),
+            method_name: method_name.to_string(),
+        },
+        stmt.identifier(),
+    );
+
+    diagnostic.try_set_fix(|| {
+        replace_with_self_fix(checker.semantic(), &importer, stmt, returns, class_def)
+    });
+}
+
+fn replace_with_self_fix(
+    semantic: &SemanticModel,
+    importer: &TypingImporter,
+    stmt: &ast::Stmt,
+    returns: &ast::Expr,
+    class_def: &ast::StmtClassDef,
+) -> anyhow::Result<Fix> {
+    let (self_import, self_binding) = importer.import(returns.start())?;
+
+    let mut others = Vec::with_capacity(2);
+
+    let remove_first_argument_type_hint = || -> Option<Edit> {
+        let ast::StmtFunctionDef { parameters, .. } = stmt.as_function_def_stmt()?;
+        let first = parameters.iter().next()?;
+        let annotation = first.annotation()?;
+
+        is_class_reference(semantic, annotation, &class_def.name)
+            .then(|| Edit::deletion(first.name().end(), annotation.end()))
+    };
+
+    others.extend(remove_first_argument_type_hint());
+    others.push(Edit::range_replacement(self_binding, returns.range()));
+
+    let applicability = if might_be_generic(class_def, semantic) {
+        Applicability::DisplayOnly
+    } else {
+        Applicability::Unsafe
+    };
+
+    Ok(Fix::applicable_edits(self_import, others, applicability))
+}
+
+/// Return true if `annotation` is either `ClassName` or `type[ClassName]`
+fn is_class_reference(semantic: &SemanticModel, annotation: &ast::Expr, expected: &str) -> bool {
+    if is_name(annotation, expected) {
+        return true;
+    }
+
+    let ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = annotation else {
+        return false;
+    };
+
+    if !semantic.match_builtin_expr(value, "type") && !semantic.match_typing_expr(value, "Type") {
+        return false;
+    }
+
+    is_name(slice, expected)
 }
 
 /// Returns `true` if the method is an in-place binary operator.
@@ -234,16 +291,18 @@ fn is_inplace_bin_op(name: &str) -> bool {
 }
 
 /// Return `true` if the given expression resolves to the given name.
-fn is_name(expr: &Expr, name: &str) -> bool {
-    let Expr::Name(ast::ExprName { id, .. }) = expr else {
+fn is_name(expr: &ast::Expr, name: &str) -> bool {
+    let ast::Expr::Name(ast::ExprName { id, .. }) = expr else {
         return false;
     };
     id.as_str() == name
 }
 
 /// Return `true` if the given expression resolves to `typing.Self`.
-fn is_self(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.match_typing_expr(expr, "Self")
+fn is_self(expr: &ast::Expr, checker: &Checker) -> bool {
+    checker.match_maybe_stringized_annotation(expr, |expr| {
+        checker.semantic().match_typing_expr(expr, "Self")
+    })
 }
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.
@@ -257,7 +316,7 @@ fn subclasses_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) 
 }
 
 /// Return `true` if the given expression resolves to `collections.abc.Iterable` or `collections.abc.Iterator`.
-fn is_iterable_or_iterator(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_iterable_or_iterator(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(expr))
         .is_some_and(|qualified_name| {
@@ -280,7 +339,7 @@ fn subclasses_async_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticM
 }
 
 /// Return `true` if the given expression resolves to `collections.abc.AsyncIterable` or `collections.abc.AsyncIterator`.
-fn is_async_iterable_or_iterator(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_async_iterable_or_iterator(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(expr))
         .is_some_and(|qualified_name| {

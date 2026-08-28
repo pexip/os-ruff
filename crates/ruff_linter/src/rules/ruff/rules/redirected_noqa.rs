@@ -1,9 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
-use crate::noqa::{Directive, NoqaDirectives, NoqaIdentifier};
+use crate::checkers::ast::LintContext;
+use crate::noqa::{Codes, Directive, FileNoqaDirectives, NoqaDirectives, NoqaIdentifier};
 use crate::rule_redirects::get_redirect_target;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `noqa` directives that use redirected rule codes.
@@ -23,8 +24,8 @@ use crate::rule_redirects::get_redirect_target;
 /// ```python
 /// x = eval(command)  # noqa: S307
 /// ```
-#[violation]
-pub struct RedirectedNOQA {
+#[derive(ViolationMetadata)]
+pub(crate) struct RedirectedNOQA {
     original: String,
     target: String,
 }
@@ -42,32 +43,47 @@ impl AlwaysFixableViolation for RedirectedNOQA {
     }
 }
 
-/// RUF101
-pub(crate) fn redirected_noqa(diagnostics: &mut Vec<Diagnostic>, noqa_directives: &NoqaDirectives) {
+/// RUF101 for in-line noqa directives
+pub(crate) fn redirected_noqa(context: &LintContext, noqa_directives: &NoqaDirectives) {
     for line in noqa_directives.lines() {
         let Directive::Codes(directive) = &line.directive else {
             continue;
         };
 
-        for rule_ident in directive.iter() {
-            let NoqaIdentifier::Code(code) = rule_ident.identifier() else {
-                continue;
-            };
+        build_diagnostics(context, directive);
+    }
+}
 
-            if let Some(redirected) = get_redirect_target(code) {
-                let mut diagnostic = Diagnostic::new(
-                    RedirectedNOQA {
-                        original: code.to_string(),
-                        target: redirected.to_string(),
-                    },
-                    rule_ident.range(),
-                );
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    redirected.to_string(),
-                    rule_ident.range(),
-                )));
-                diagnostics.push(diagnostic);
-            }
+/// RUF101 for file noqa directives
+pub(crate) fn redirected_file_noqa(context: &LintContext, noqa_directives: &FileNoqaDirectives) {
+    for line in noqa_directives.lines() {
+        let Directive::Codes(codes) = &line.parsed_file_exemption else {
+            continue;
+        };
+
+        build_diagnostics(context, codes);
+    }
+}
+
+/// Convert a sequence of [Codes] into [Diagnostic]s and append them to `diagnostics`.
+pub(crate) fn build_diagnostics(context: &LintContext, codes: &Codes<'_>) {
+    for rule_ident in codes.iter() {
+        let NoqaIdentifier::Code(code) = rule_ident.identifier() else {
+            continue;
+        };
+
+        if let Some(redirected) = get_redirect_target(code) {
+            let mut diagnostic = context.report_diagnostic(
+                RedirectedNOQA {
+                    original: code.to_string(),
+                    target: redirected.to_string(),
+                },
+                rule_ident.range(),
+            );
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                redirected.to_string(),
+                rule_ident.range(),
+            )));
         }
     }
 }

@@ -95,6 +95,6 @@ B034.py:14:1: B034 (re-sub-positional-args) `re.sub` should pass `count` and `fl
 13 | re.split(" ", "a a a a", 2, re.I)
 14 | sub("a", "b", "aaa", re.IGNORECASE)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B034 (re-sub-positional-args)
-15 | 
+15 |
 16 | # OK
    |

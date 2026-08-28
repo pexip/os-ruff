@@ -75,12 +75,11 @@ pub(crate) fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
                     }
                 }
 
-                let field_attr = match &field.ident {
-                    Some(ident) => quote!(self.#ident),
-                    None => {
-                        let index = syn::Index::from(i);
-                        quote!(self.#index)
-                    }
+                let field_attr = if let Some(ident) = &field.ident {
+                    quote!(self.#ident)
+                } else {
+                    let index = syn::Index::from(i);
+                    quote!(self.#index)
                 };
 
                 fields.push(quote!(#field_attr.cache_key(key);));
@@ -93,7 +92,7 @@ pub(crate) fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
             return Err(Error::new(
                 item.span(),
                 "CacheKey does not support unions. Only structs and enums are supported",
-            ))
+            ));
         }
     };
 
@@ -144,7 +143,7 @@ impl Parse for CacheKeyFieldAttributes {
                     return Err(Error::new(
                         arg.span(),
                         format!("Unknown `cache_field` argument {name}"),
-                    ))
+                    ));
                 }
             }
         }

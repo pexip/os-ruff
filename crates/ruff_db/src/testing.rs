@@ -1,7 +1,7 @@
 //! Test helpers for working with Salsa databases
 
-use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::layer::SubscriberExt;
 
 pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
     db: &Db,
@@ -13,12 +13,12 @@ pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
     Q: Fn(QDb, I) -> R,
     I: salsa::plumbing::AsId + std::fmt::Debug + Copy,
 {
-    let id = input.as_id().as_u32();
+    let id = input.as_id();
     let (query_name, will_execute_event) = find_will_execute_event(db, query, input, events);
 
     db.attach(|_| {
         if let Some(will_execute_event) = will_execute_event {
-            panic!("Expected query {query_name}({id}) not to have run but it did: {will_execute_event:?}");
+            panic!("Expected query {query_name}({id:?}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}");
         }
     });
 }
@@ -31,12 +31,22 @@ pub fn assert_const_function_query_was_not_run<Db, Q, QDb, R>(
     Db: salsa::Database,
     Q: Fn(QDb) -> R,
 {
-    let (query_name, will_execute_event) = find_will_execute_event(db, query, (), events);
+    // Salsa now interns singleton ingredients. But we know that it is a singleton, so we can just search for
+    // any event of that ingredient.
+    let query_name = query_name(&query);
+
+    let event = events.iter().find(|event| {
+        if let salsa::EventKind::WillExecute { database_key } = event.kind {
+            db.ingredient_debug_name(database_key.ingredient_index()) == query_name
+        } else {
+            false
+        }
+    });
 
     db.attach(|_| {
-        if let Some(will_execute_event) = will_execute_event {
+        if let Some(will_execute_event) = event {
             panic!(
-                "Expected query {query_name}() not to have run but it did: {will_execute_event:?}"
+                "Expected query {query_name}() not to have run but it did: {will_execute_event:?}\n\n{events:#?}"
             );
         }
     });
@@ -55,7 +65,7 @@ pub fn assert_function_query_was_run<Db, Q, QDb, I, R>(
     Q: Fn(QDb, I) -> R,
     I: salsa::plumbing::AsId + std::fmt::Debug + Copy,
 {
-    let id = input.as_id().as_u32();
+    let id = input.as_id();
     let (query_name, will_execute_event) = find_will_execute_event(db, query, input, events);
 
     db.attach(|_| {
@@ -97,7 +107,7 @@ fn query_name<Q>(_query: &Q) -> &'static str {
         .unwrap_or(full_qualified_query_name)
 }
 
-/// Sets up logging for the current thread. It captures all `red_knot` and `ruff` events.
+/// Sets up logging for the current thread. It captures all `ty` and `ruff` events.
 ///
 /// Useful for capturing the tracing output in a failing test.
 ///
@@ -118,7 +128,7 @@ pub fn setup_logging() -> LoggingGuard {
 /// # Examples
 /// ```
 /// use ruff_db::testing::setup_logging_with_filter;
-/// let _logging = setup_logging_with_filter("red_knot_module_resolver::resolver");
+/// let _logging = setup_logging_with_filter("ty_module_resolver::resolver");
 /// ```
 ///
 /// # Filter
@@ -131,67 +141,38 @@ pub fn setup_logging_with_filter(filter: &str) -> Option<LoggingGuard> {
 #[derive(Debug)]
 pub struct LoggingBuilder {
     filter: EnvFilter,
-    hierarchical: bool,
 }
 
 impl LoggingBuilder {
     pub fn new() -> Self {
         Self {
             filter: EnvFilter::default()
-                .add_directive(
-                    "red_knot=trace"
-                        .parse()
-                        .expect("Hardcoded directive to be valid"),
-                )
+                .add_directive("ty=trace".parse().expect("Hardcoded directive to be valid"))
                 .add_directive(
                     "ruff=trace"
                         .parse()
                         .expect("Hardcoded directive to be valid"),
                 ),
-            hierarchical: true,
         }
     }
 
     pub fn with_filter(filter: &str) -> Option<Self> {
         let filter = EnvFilter::builder().parse(filter).ok()?;
 
-        Some(Self {
-            filter,
-            hierarchical: true,
-        })
-    }
-
-    pub fn with_hierarchical(mut self, hierarchical: bool) -> Self {
-        self.hierarchical = hierarchical;
-        self
+        Some(Self { filter })
     }
 
     pub fn build(self) -> LoggingGuard {
         let registry = tracing_subscriber::registry().with(self.filter);
 
-        let guard = if self.hierarchical {
-            let subscriber = registry.with(
-                tracing_tree::HierarchicalLayer::default()
-                    .with_indent_lines(true)
-                    .with_indent_amount(2)
-                    .with_bracketed_fields(true)
-                    .with_thread_ids(true)
-                    .with_targets(true)
-                    .with_writer(std::io::stderr)
-                    .with_timer(tracing_tree::time::Uptime::default()),
-            );
+        let subscriber = registry.with(
+            tracing_subscriber::fmt::layer()
+                .compact()
+                .with_writer(std::io::stderr)
+                .with_timer(tracing_subscriber::fmt::time()),
+        );
 
-            tracing::subscriber::set_default(subscriber)
-        } else {
-            let subscriber = registry.with(
-                tracing_subscriber::fmt::layer()
-                    .compact()
-                    .with_writer(std::io::stderr)
-                    .with_timer(tracing_subscriber::fmt::time()),
-            );
-
-            tracing::subscriber::set_default(subscriber)
-        };
+        let guard = tracing::subscriber::set_default(subscriber);
 
         LoggingGuard { _guard: guard }
     }
@@ -203,6 +184,7 @@ impl Default for LoggingBuilder {
     }
 }
 
+#[must_use = "Dropping the guard unregisters the tracing subscriber."]
 pub struct LoggingGuard {
     _guard: tracing::subscriber::DefaultGuard,
 }
@@ -212,7 +194,7 @@ fn query_was_not_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }
@@ -242,12 +224,12 @@ fn query_was_not_run() {
 }
 
 #[test]
-#[should_panic(expected = "Expected query len(0) not to have run but it did:")]
+#[should_panic(expected = "Expected query len(Id(0)) not to have run but it did:")]
 fn query_was_not_run_fails_if_query_was_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }
@@ -305,12 +287,12 @@ fn const_query_was_not_run_fails_if_query_was_run() {
 }
 
 #[test]
-#[should_panic(expected = "Expected query len(0) to have run but it did not:")]
+#[should_panic(expected = "Expected query len(Id(0)) to have run but it did not:")]
 fn query_was_run_fails_if_query_was_not_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }

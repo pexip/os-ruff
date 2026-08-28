@@ -167,3 +167,23 @@ E22.py:19:14: E221 (multiple-spaces-before-operator) [*] Multiple spaces before 
 20 20 | #: Okay
 21 21 | x = 1
 22 22 | y = 2
+
+E22.py:184:5: E221 (multiple-spaces-before-operator) [*] Multiple spaces before operator
+    |
+182 | #:
+183 |
+184 | if a  ==  1:
+    |     ^^ E221 (multiple-spaces-before-operator)
+185 |     print(a)
+    |
+    = help: Replace with single space
+
+ℹ Safe fix
+181 181 |     pass
+182 182 | #:
+183 183 | 
+184     |-if a  ==  1:
+    184 |+if a ==  1:
+185 185 |     print(a)
+186 186 | 
+187 187 |

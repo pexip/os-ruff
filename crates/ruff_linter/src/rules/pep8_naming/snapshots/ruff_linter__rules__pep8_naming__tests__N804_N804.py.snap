@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 N804.py:30:27: N804 (invalid-first-argument-name-for-class-method) [*] First argument of a class method should be named `cls`
    |
 28 |         ...
-29 | 
+29 |
 30 |     def __init_subclass__(self, default_name, **kwargs):
    |                           ^^^^ N804 (invalid-first-argument-name-for-class-method)
 31 |         ...
@@ -71,7 +71,7 @@ N804.py:54:25: N804 (invalid-first-argument-name-for-class-method) First argumen
 N804.py:57:34: N804 (invalid-first-argument-name-for-class-method) First argument of a class method should be named `cls`
    |
 55 |         pass
-56 | 
+56 |
 57 |     def cls_as_pos_only_argument(this, cls, /):
    |                                  ^^^^ N804 (invalid-first-argument-name-for-class-method)
 58 |         pass
@@ -81,7 +81,7 @@ N804.py:57:34: N804 (invalid-first-argument-name-for-class-method) First argumen
 N804.py:60:33: N804 (invalid-first-argument-name-for-class-method) First argument of a class method should be named `cls`
    |
 58 |         pass
-59 | 
+59 |
 60 |     def cls_as_kw_only_argument(this, *, cls):
    |                                 ^^^^ N804 (invalid-first-argument-name-for-class-method)
 61 |         pass
@@ -91,7 +91,7 @@ N804.py:60:33: N804 (invalid-first-argument-name-for-class-method) First argumen
 N804.py:63:23: N804 (invalid-first-argument-name-for-class-method) First argument of a class method should be named `cls`
    |
 61 |         pass
-62 | 
+62 |
 63 |     def cls_as_varags(this, *cls):
    |                       ^^^^ N804 (invalid-first-argument-name-for-class-method)
 64 |         pass
@@ -101,7 +101,7 @@ N804.py:63:23: N804 (invalid-first-argument-name-for-class-method) First argumen
 N804.py:66:23: N804 (invalid-first-argument-name-for-class-method) First argument of a class method should be named `cls`
    |
 64 |         pass
-65 | 
+65 |
 66 |     def cls_as_kwargs(this, **cls):
    |                       ^^^^ N804 (invalid-first-argument-name-for-class-method)
 67 |         pass
@@ -135,7 +135,7 @@ N804.py:70:20: N804 (invalid-first-argument-name-for-class-method) [*] First arg
 N804.py:74:20: N804 (invalid-first-argument-name-for-class-method) [*] First argument of a class method should be named `cls`
    |
 72 |         this
-73 | 
+73 |
 74 |     def bad_method(this):
    |                    ^^^^ N804 (invalid-first-argument-name-for-class-method)
 75 |         self = this
@@ -153,3 +153,13 @@ N804.py:74:20: N804 (invalid-first-argument-name-for-class-method) [*] First arg
 76 76 | 
 77 77 | def func(x):
 78 78 |     return x
+
+N804.py:88:18: N804 (invalid-first-argument-name-for-class-method) First argument of a class method should be named `cls`
+   |
+86 | class Example:
+87 |     @classmethod
+88 |     def function(this):
+   |                  ^^^^ N804 (invalid-first-argument-name-for-class-method)
+89 |         cls = 1234
+   |
+   = help: Rename `this` to `cls`

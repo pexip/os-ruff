@@ -75,7 +75,7 @@ PYI013.py:13:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class bo
 PYI013.py:21:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class body must not contain `...`
    |
 19 |     """
-20 | 
+20 |
 21 |     ...
    |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
    |
@@ -132,7 +132,7 @@ PYI013.py:36:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class bo
 35 |     value: int
 36 |     ...
    |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
-37 | 
+37 |
 38 |     def __init__():
    |
    = help: Remove unnecessary `...`

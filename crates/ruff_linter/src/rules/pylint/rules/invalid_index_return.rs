@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// type may cause unexpected behavior.
 ///
 /// Note: `bool` is a subclass of `int`, so it's technically valid for `__index__` to
-/// return `True` or `False`. However, a DeprecationWarning (`DeprecationWarning:
+/// return `True` or `False`. However, a `DeprecationWarning` (`DeprecationWarning:
 /// __index__ returned non-int (type bool)`) for such cases was already introduced,
 /// thus this is a conscious difference between the original pylint rule and the
 /// current ruff implementation.
@@ -40,18 +40,18 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `__index__` method](https://docs.python.org/3/reference/datamodel.html#object.__index__)
-#[violation]
-pub struct InvalidIndexReturnType;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidIndexReturnType;
 
 impl Violation for InvalidIndexReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__index__` does not return an integer")
+        "`__index__` does not return an integer".to_string()
     }
 }
 
-/// E0305
-pub(crate) fn invalid_index_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+/// PLE0305
+pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__index__" {
         return;
     }
@@ -74,10 +74,7 @@ pub(crate) fn invalid_index_return(checker: &mut Checker, function_def: &ast::St
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.diagnostics.push(Diagnostic::new(
-            InvalidIndexReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidIndexReturnType, function_def.identifier());
         return;
     }
 
@@ -94,15 +91,11 @@ pub(crate) fn invalid_index_return(checker: &mut Checker, function_def: &ast::St
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
             ) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(InvalidIndexReturnType, value.range()));
+                checker.report_diagnostic(InvalidIndexReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker
-                .diagnostics
-                .push(Diagnostic::new(InvalidIndexReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidIndexReturnType, stmt.range());
         }
     }
 }

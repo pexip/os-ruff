@@ -15,7 +15,7 @@ impl fmt::Display for Settings {
             formatter = f,
             namespace = "linter.ruff",
             fields = [
-                self.parenthesize_tuple_in_subscript
+                self.parenthesize_tuple_in_subscript,
             ]
         }
         Ok(())

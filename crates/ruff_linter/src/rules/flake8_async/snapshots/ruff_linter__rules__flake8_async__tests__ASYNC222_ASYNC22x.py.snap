@@ -59,6 +59,6 @@ ASYNC22x.py:95:5: ASYNC222 (wait-for-process-in-async-function) Async functions 
 94 |     os.waitid()  # ASYNC222
 95 |     os.waitpid()  # ASYNC222
    |     ^^^^^^^^^^ ASYNC222 (wait-for-process-in-async-function)
-96 | 
+96 |
 97 |     os.waitpi()
    |

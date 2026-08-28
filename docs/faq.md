@@ -28,7 +28,7 @@ to see a few differences on the margins, but the vast majority of your code shou
 When run over _non_-Black-formatted code, the formatter makes some different decisions than Black,
 and so more deviations should be expected, especially around the treatment of end-of-line comments.
 
-See [_Black compatibility_](formatter.md#black-compatibility) for more.
+See [_Style Guide_](formatter.md#style-guide) for more.
 
 ## How does Ruff's linter compare to Flake8?
 
@@ -103,13 +103,7 @@ conflicts with the isort rules, like `I001`).
 
 Beyond the rule set, Ruff's primary limitation vis-à-vis Flake8 is that it does not support custom
 lint rules. (Instead, popular Flake8 plugins are re-implemented in Rust as part of Ruff itself.)
-
-There are a few other minor incompatibilities between Ruff and the originating Flake8 plugins:
-
-- Ruff doesn't implement all the "opinionated" lint rules from flake8-bugbear.
-- Depending on your project structure, Ruff and isort can differ in their detection of first-party
-    code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
-    code is nested in a `src` directory.)
+One minor difference is that Ruff doesn't include all the 'opinionated' rules from flake8-bugbear.
 
 ## How does Ruff's linter compare to Pylint?
 
@@ -226,14 +220,39 @@ Ruff is installable under any Python version from 3.7 onwards.
 
 ## Do I need to install Rust to use Ruff?
 
-Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
+Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI. We recommend installing Ruff with [uv](https://docs.astral.sh/uv/),
+though it's also installable with `pip`, `pipx`, and a [variety of other package managers](installation.md):
 
 ```console
+$ # Install Ruff globally.
+$ uv tool install ruff@latest
+
+$ # Or add Ruff to your project.
+$ uv add --dev ruff
+
+$ # With pip.
 $ pip install ruff
+
+$ # With pipx.
+$ pipx install ruff
 ```
 
-Ruff ships with wheels for all major platforms, which enables `pip` to install Ruff without relying
-on Rust at all.
+Starting with version `0.5.0`, Ruff can also be installed with our standalone installers:
+
+```console
+$ # On macOS and Linux.
+$ curl -LsSf https://astral.sh/ruff/install.sh | sh
+
+$ # On Windows.
+$ powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
+
+$ # For a specific version.
+$ curl -LsSf https://astral.sh/ruff/0.5.0/install.sh | sh
+$ powershell -c "irm https://astral.sh/ruff/0.5.0/install.ps1 | iex"
+```
+
+Ruff ships with wheels for all major platforms, which enables `uv`, `pip`, and other tools to install Ruff without
+relying on a Rust toolchain at all.
 
 ## Can I write my own linter plugins for Ruff?
 
@@ -290,7 +309,31 @@ my_project
 
 When Ruff sees an import like `import foo`, it will then iterate over the `src` directories,
 looking for a corresponding Python module (in reality, a directory named `foo` or a file named
-`foo.py`).
+`foo.py`). For module paths with multiple components like `import foo.bar`,
+the default behavior is to search only for a directory named `foo` or a file
+named `foo.py`. However, if `preview` is enabled, Ruff will require that the full relative path `foo/bar` exists as a directory, or that `foo/bar.py` or `foo/bar.pyi` exist as files. Finally, imports of the form `from foo import bar`, Ruff will only use `foo` when determining whether a module is first-party or third-party. 
+
+If there is a directory
+whose name matches a third-party package, but does not contain Python code,
+it could happen that the above algorithm incorrectly infers an import to be first-party.
+To prevent this, you can modify the [`known-third-party`](settings.md#lint_isort_known-third-party) setting. For example, if you import
+the package `wandb` but also have a subdirectory of your `src` with
+the same name, you can add the following:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint.isort]
+    known-third-party = ["wandb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint.isort]
+    known-third-party = ["wandb"]
+    ```
+
 
 If the `src` field is omitted, Ruff will default to using the "project root", along with a `"src"`
 subdirectory, as the first-party sources, to support both flat and nested project layouts.
@@ -504,47 +547,47 @@ then selectively enable or disable any additional rules on top of it:
     ```
 
 The PEP 257 convention includes all `D` errors apart from:
-[`D203`](rules/one-blank-line-before-class.md),
+[`D203`](rules/incorrect-blank-line-before-class.md),
 [`D212`](rules/multi-line-summary-first-line.md),
 [`D213`](rules/multi-line-summary-second-line.md),
-[`D214`](rules/section-not-over-indented.md),
-[`D215`](rules/section-underline-not-over-indented.md),
+[`D214`](rules/overindented-section.md),
+[`D215`](rules/overindented-section-underline.md),
 [`D404`](rules/docstring-starts-with-this.md),
-[`D405`](rules/capitalize-section-name.md),
-[`D406`](rules/new-line-after-section-name.md),
-[`D407`](rules/dashed-underline-after-section.md),
-[`D408`](rules/section-underline-after-name.md),
-[`D409`](rules/section-underline-matches-section-length.md),
+[`D405`](rules/non-capitalized-section-name.md),
+[`D406`](rules/missing-new-line-after-section-name.md),
+[`D407`](rules/missing-dashed-underline-after-section.md),
+[`D408`](rules/missing-section-underline-after-name.md),
+[`D409`](rules/mismatched-section-underline-length.md),
 [`D410`](rules/no-blank-line-after-section.md),
 [`D411`](rules/no-blank-line-before-section.md),
 [`D413`](rules/no-blank-line-after-section.md),
-[`D415`](rules/ends-in-punctuation.md),
-[`D416`](rules/section-name-ends-in-colon.md), and
+[`D415`](rules/missing-terminal-punctuation.md),
+[`D416`](rules/missing-section-name-colon.md), and
 [`D417`](rules/undocumented-param.md).
 
 The NumPy convention includes all `D` errors apart from:
 [`D107`](rules/undocumented-public-init.md),
-[`D203`](rules/one-blank-line-before-class.md),
+[`D203`](rules/incorrect-blank-line-before-class.md),
 [`D212`](rules/multi-line-summary-first-line.md),
 [`D213`](rules/multi-line-summary-second-line.md),
-[`D402`](rules/no-signature.md),
+[`D402`](rules/signature-in-docstring.md),
 [`D413`](rules/no-blank-line-after-section.md),
-[`D415`](rules/ends-in-punctuation.md),
-[`D416`](rules/section-name-ends-in-colon.md), and
+[`D415`](rules/missing-terminal-punctuation.md),
+[`D416`](rules/missing-section-name-colon.md), and
 [`D417`](rules/undocumented-param.md).
 
 The Google convention includes all `D` errors apart from:
-[`D203`](rules/one-blank-line-before-class.md),
-[`D204`](rules/one-blank-line-after-class.md),
+[`D203`](rules/incorrect-blank-line-before-class.md),
+[`D204`](rules/incorrect-blank-line-after-class.md),
 [`D213`](rules/multi-line-summary-second-line.md),
-[`D215`](rules/section-underline-not-over-indented.md),
-[`D400`](rules/ends-in-period.md),
+[`D215`](rules/overindented-section-underline.md),
+[`D400`](rules/missing-trailing-period.md),
 [`D401`](rules/non-imperative-mood.md),
 [`D404`](rules/docstring-starts-with-this.md),
-[`D406`](rules/new-line-after-section-name.md),
-[`D407`](rules/dashed-underline-after-section.md),
-[`D408`](rules/section-underline-after-name.md),
-[`D409`](rules/section-underline-matches-section-length.md), and
+[`D406`](rules/missing-new-line-after-section-name.md),
+[`D407`](rules/missing-dashed-underline-after-section.md),
+[`D408`](rules/missing-section-underline-after-name.md),
+[`D409`](rules/mismatched-section-underline-length.md), and
 [`D413`](rules/no-blank-line-after-section.md).
 
 By default, no [`convention`](settings.md#lint_pydocstyle_convention) is set, and so the enabled rules
@@ -620,7 +663,28 @@ making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks
 Ruff's color output is powered by the [`colored`](https://crates.io/crates/colored) crate, which
 attempts to automatically detect whether the output stream supports color. However, you can force
 colors off by setting the `NO_COLOR` environment variable to any value (e.g., `NO_COLOR=1`), or
-force colors on by setting `FORCE_COLOR` to any non-empty value (e.g. `FORCE_COLOR=1`).
+force colors on by setting `FORCE_COLOR` to any non-empty value (e.g., `FORCE_COLOR=1`).
 
 [`colored`](https://crates.io/crates/colored) also supports the `CLICOLOR` and `CLICOLOR_FORCE`
 environment variables (see the [spec](https://bixense.com/clicolors/)).
+
+## Ruff behaves unexpectedly when using `source.*` code actions in Notebooks. What's going on? {: #source-code-actions-in-notebooks }
+
+Ruff does not support `source.organizeImports` and `source.fixAll` code actions in Jupyter Notebooks
+(`notebook.codeActionsOnSave` in VS Code). It's recommended to use the `notebook` prefixed code
+actions for the same such as `notebook.source.organizeImports` and `notebook.source.fixAll`
+respectively.
+
+Ruff requires to have a full view of the notebook to provide accurate diagnostics and fixes. For
+example, if you have a cell that imports a module and another cell that uses that module, Ruff
+needs to see both cells to mark the import as used. If Ruff were to only see one cell at a time,
+it would incorrectly mark the import as unused.
+
+When using the `source.*` code actions for a Notebook, Ruff will be asked to fix any issues for each
+cell in parallel, which can lead to unexpected behavior. For example, if a user has configured to
+run `source.organizeImports` code action on save for a Notebook, Ruff will attempt to fix the
+imports for the entire notebook corresponding to each cell. This leads to the client making the same
+changes to the notebook multiple times, which can lead to unexpected behavior
+([astral-sh/ruff-vscode#680](https://github.com/astral-sh/ruff-vscode/issues/680),
+[astral-sh/ruff-vscode#640](https://github.com/astral-sh/ruff-vscode/issues/640),
+[astral-sh/ruff-vscode#391](https://github.com/astral-sh/ruff-vscode/issues/391)).

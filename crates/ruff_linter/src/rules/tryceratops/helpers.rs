@@ -1,8 +1,8 @@
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
-use ruff_python_semantic::analyze::logging;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 
 /// Collect `logging`-like calls from an AST.
@@ -22,7 +22,7 @@ impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
+impl<'b> Visitor<'b> for LoggerCandidateVisitor<'_, 'b> {
     fn visit_expr(&mut self, expr: &'b Expr) {
         if let Expr::Call(call) = expr {
             match call.func.as_ref() {
@@ -31,7 +31,7 @@ impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
                     {
                         if let Some(logging_level) = LoggingLevel::from_attribute(attr) {
                             self.calls.push((call, logging_level));
-                        };
+                        }
                     }
                 }
                 Expr::Name(_) => {

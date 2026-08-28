@@ -112,8 +112,7 @@ SIM117.py:53:5: SIM117 (multiple-with-statements) [*] Use a single `with` statem
    |
 51 |   while True:
 52 |       # SIM117
-53 |       with A() as a:
-   |  _____^
+53 | /     with A() as a:
 54 | |         with B() as b:
    | |______________________^ SIM117 (multiple-with-statements)
 55 |               """this
@@ -276,8 +275,7 @@ SIM117.py:106:5: SIM117 (multiple-with-statements) Use a single `with` statement
     |
 104 |   # From issue #3025.
 105 |   async def main():
-106 |       async with A() as a: # SIM117.
-    |  _____^
+106 | /     async with A() as a: # SIM117.
 107 | |         async with B() as b:
     | |____________________________^ SIM117 (multiple-with-statements)
 108 |               print("async-inside!")

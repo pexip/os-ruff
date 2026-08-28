@@ -3,8 +3,8 @@ use std::path::Path;
 
 use rustc_hash::FxHashMap;
 
-use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::Locator;
+use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer, indentation_at_offset};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::name::{Name, QualifiedName, QualifiedNameBuilder};
@@ -12,8 +12,8 @@ use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
 use crate::{
-    self as ast, Arguments, CmpOp, ExceptHandler, Expr, FStringElement, MatchCase, Operator,
-    Pattern, Stmt, TypeParam,
+    self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr,
+    InterpolatedStringElement, MatchCase, Operator, Pattern, Stmt, TypeParam,
 };
 use crate::{AnyNodeRef, ExprContext};
 
@@ -53,6 +53,7 @@ where
             func,
             arguments,
             range: _,
+            node_index: _,
         }) = expr
         {
             // Ex) `list()`
@@ -138,11 +139,15 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         }
         Expr::FString(ast::ExprFString { value, .. }) => value
             .elements()
-            .any(|expr| any_over_f_string_element(expr, func)),
+            .any(|expr| any_over_interpolated_string_element(expr, func)),
+        Expr::TString(ast::ExprTString { value, .. }) => value
+            .elements()
+            .any(|expr| any_over_interpolated_string_element(expr, func)),
         Expr::Named(ast::ExprNamed {
             target,
             value,
             range: _,
+            node_index: _,
         }) => any_over_expr(target, func) || any_over_expr(value, func),
         Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
             any_over_expr(left, func) || any_over_expr(right, func)
@@ -154,32 +159,49 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             body,
             orelse,
             range: _,
+            node_index: _,
         }) => any_over_expr(test, func) || any_over_expr(body, func) || any_over_expr(orelse, func),
-        Expr::Dict(ast::ExprDict { items, range: _ }) => {
-            items.iter().any(|ast::DictItem { key, value }| {
-                any_over_expr(value, func)
-                    || key.as_ref().is_some_and(|key| any_over_expr(key, func))
-            })
-        }
-        Expr::Set(ast::ExprSet { elts, range: _ })
-        | Expr::List(ast::ExprList { elts, range: _, .. })
-        | Expr::Tuple(ast::ExprTuple { elts, range: _, .. }) => {
-            elts.iter().any(|expr| any_over_expr(expr, func))
-        }
+        Expr::Dict(ast::ExprDict {
+            items,
+            range: _,
+            node_index: _,
+        }) => items.iter().any(|ast::DictItem { key, value }| {
+            any_over_expr(value, func) || key.as_ref().is_some_and(|key| any_over_expr(key, func))
+        }),
+        Expr::Set(ast::ExprSet {
+            elts,
+            range: _,
+            node_index: _,
+        })
+        | Expr::List(ast::ExprList {
+            elts,
+            range: _,
+            node_index: _,
+            ..
+        })
+        | Expr::Tuple(ast::ExprTuple {
+            elts,
+            range: _,
+            node_index: _,
+            ..
+        }) => elts.iter().any(|expr| any_over_expr(expr, func)),
         Expr::ListComp(ast::ExprListComp {
             elt,
             generators,
             range: _,
+            node_index: _,
         })
         | Expr::SetComp(ast::ExprSetComp {
             elt,
             generators,
             range: _,
+            node_index: _,
         })
         | Expr::Generator(ast::ExprGenerator {
             elt,
             generators,
             range: _,
+            node_index: _,
             parenthesized: _,
         }) => {
             any_over_expr(elt, func)
@@ -194,6 +216,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             value,
             generators,
             range: _,
+            node_index: _,
         }) => {
             any_over_expr(key, func)
                 || any_over_expr(value, func)
@@ -203,15 +226,33 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
                         || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
                 })
         }
-        Expr::Await(ast::ExprAwait { value, range: _ })
-        | Expr::YieldFrom(ast::ExprYieldFrom { value, range: _ })
+        Expr::Await(ast::ExprAwait {
+            value,
+            range: _,
+            node_index: _,
+        })
+        | Expr::YieldFrom(ast::ExprYieldFrom {
+            value,
+            range: _,
+            node_index: _,
+        })
         | Expr::Attribute(ast::ExprAttribute {
-            value, range: _, ..
+            value,
+            range: _,
+            node_index: _,
+            ..
         })
         | Expr::Starred(ast::ExprStarred {
-            value, range: _, ..
+            value,
+            range: _,
+            node_index: _,
+            ..
         }) => any_over_expr(value, func),
-        Expr::Yield(ast::ExprYield { value, range: _ }) => value
+        Expr::Yield(ast::ExprYield {
+            value,
+            range: _,
+            node_index: _,
+        }) => value
             .as_ref()
             .is_some_and(|value| any_over_expr(value, func)),
         Expr::Compare(ast::ExprCompare {
@@ -221,6 +262,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             func: call_func,
             arguments,
             range: _,
+            node_index: _,
         }) => {
             any_over_expr(call_func, func)
                 // Note that this is the evaluation order but not necessarily the declaration order
@@ -238,6 +280,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             upper,
             step,
             range: _,
+            node_index: _,
         }) => {
             lower
                 .as_ref()
@@ -281,11 +324,17 @@ pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool)
 
 pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool {
     match pattern {
-        Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
-            any_over_expr(value, func)
-        }
+        Pattern::MatchValue(ast::PatternMatchValue {
+            value,
+            range: _,
+            node_index: _,
+        }) => any_over_expr(value, func),
         Pattern::MatchSingleton(_) => false,
-        Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => patterns
+        Pattern::MatchSequence(ast::PatternMatchSequence {
+            patterns,
+            range: _,
+            node_index: _,
+        }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
         Pattern::MatchMapping(ast::PatternMatchMapping { keys, patterns, .. }) => {
@@ -309,28 +358,32 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
         Pattern::MatchAs(ast::PatternMatchAs { pattern, .. }) => pattern
             .as_ref()
             .is_some_and(|pattern| any_over_pattern(pattern, func)),
-        Pattern::MatchOr(ast::PatternMatchOr { patterns, range: _ }) => patterns
+        Pattern::MatchOr(ast::PatternMatchOr {
+            patterns,
+            range: _,
+            node_index: _,
+        }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
     }
 }
 
-pub fn any_over_f_string_element(
-    element: &ast::FStringElement,
+pub fn any_over_interpolated_string_element(
+    element: &ast::InterpolatedStringElement,
     func: &dyn Fn(&Expr) -> bool,
 ) -> bool {
     match element {
-        ast::FStringElement::Literal(_) => false,
-        ast::FStringElement::Expression(ast::FStringExpressionElement {
+        ast::InterpolatedStringElement::Literal(_) => false,
+        ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
             expression,
             format_spec,
             ..
         }) => {
             any_over_expr(expression, func)
                 || format_spec.as_ref().is_some_and(|spec| {
-                    spec.elements
-                        .iter()
-                        .any(|spec_element| any_over_f_string_element(spec_element, func))
+                    spec.elements.iter().any(|spec_element| {
+                        any_over_interpolated_string_element(spec_element, func)
+                    })
                 })
         }
     }
@@ -392,12 +445,18 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
                     .iter()
                     .any(|decorator| any_over_expr(&decorator.expression, func))
         }
-        Stmt::Return(ast::StmtReturn { value, range: _ }) => value
+        Stmt::Return(ast::StmtReturn {
+            value,
+            range: _,
+            node_index: _,
+        }) => value
             .as_ref()
             .is_some_and(|value| any_over_expr(value, func)),
-        Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
-            targets.iter().any(|expr| any_over_expr(expr, func))
-        }
+        Stmt::Delete(ast::StmtDelete {
+            targets,
+            range: _,
+            node_index: _,
+        }) => targets.iter().any(|expr| any_over_expr(expr, func)),
         Stmt::TypeAlias(ast::StmtTypeAlias {
             name,
             type_params,
@@ -447,12 +506,14 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             body,
             orelse,
             range: _,
+            node_index: _,
         }) => any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func),
         Stmt::If(ast::StmtIf {
             test,
             body,
             elif_else_clauses,
             range: _,
+            node_index: _,
         }) => {
             any_over_expr(test, func)
                 || any_over_body(body, func)
@@ -477,6 +538,7 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             exc,
             cause,
             range: _,
+            node_index: _,
         }) => {
             exc.as_ref().is_some_and(|value| any_over_expr(value, func))
                 || cause
@@ -490,6 +552,7 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             finalbody,
             is_star: _,
             range: _,
+            node_index: _,
         }) => {
             any_over_body(body, func)
                 || handlers.iter().any(|handler| {
@@ -508,6 +571,7 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             test,
             msg,
             range: _,
+            node_index: _,
         }) => {
             any_over_expr(test, func)
                 || msg.as_ref().is_some_and(|value| any_over_expr(value, func))
@@ -516,6 +580,7 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             subject,
             cases,
             range: _,
+            node_index: _,
         }) => {
             any_over_expr(subject, func)
                 || cases.iter().any(|case| {
@@ -524,6 +589,7 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
                         guard,
                         body,
                         range: _,
+                        node_index: _,
                     } = case;
                     any_over_pattern(pattern, func)
                         || guard.as_ref().is_some_and(|expr| any_over_expr(expr, func))
@@ -534,7 +600,11 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
         Stmt::ImportFrom(_) => false,
         Stmt::Global(_) => false,
         Stmt::Nonlocal(_) => false,
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => any_over_expr(value, func),
+        Stmt::Expr(ast::StmtExpr {
+            value,
+            range: _,
+            node_index: _,
+        }) => any_over_expr(value, func),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
         Stmt::IpyEscapeCommand(_) => false,
     }
@@ -546,6 +616,13 @@ pub fn any_over_body(body: &[Stmt], func: &dyn Fn(&Expr) -> bool) -> bool {
 
 pub fn is_dunder(id: &str) -> bool {
     id.starts_with("__") && id.ends_with("__")
+}
+
+/// Whether a name starts and ends with a single underscore.
+///
+/// `_a__` is considered neither a dunder nor a sunder name.
+pub fn is_sunder(id: &str) -> bool {
+    id.starts_with('_') && id.ends_with('_') && !id.starts_with("__") && !id.ends_with("__")
 }
 
 /// Return `true` if the [`Stmt`] is an assignment to a dunder (like `__all__`).
@@ -947,6 +1024,7 @@ impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
                 exc,
                 cause,
                 range: _,
+                node_index: _,
             }) => {
                 self.raises
                     .push((stmt.range(), exc.as_deref(), cause.as_deref()));
@@ -1004,11 +1082,24 @@ impl Visitor<'_> for AwaitVisitor {
             crate::visitor::walk_expr(self, expr);
         }
     }
+
+    fn visit_comprehension(&mut self, comprehension: &'_ crate::Comprehension) {
+        if comprehension.is_async {
+            self.seen_await = true;
+        } else {
+            crate::visitor::walk_comprehension(self, comprehension);
+        }
+    }
 }
 
 /// Return `true` if a `Stmt` is a docstring.
 pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
-    if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
+    if let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    {
         value.is_string_literal_expr()
     } else {
         false
@@ -1021,7 +1112,12 @@ pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -
         if matches!(parent, Stmt::If(_) | Stmt::While(_) | Stmt::Match(_)) {
             return true;
         }
-        if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = parent {
+        if let Stmt::Expr(ast::StmtExpr {
+            value,
+            range: _,
+            node_index: _,
+        }) = parent
+        {
             if value.is_if_expr() {
                 return true;
             }
@@ -1110,6 +1206,8 @@ pub enum Truthiness {
     Falsey,
     /// The expression evaluates to a `True`-like value (e.g., `1`, `"foo"`).
     Truthy,
+    /// The expression evaluates to `None`.
+    None,
     /// The expression evaluates to an unknown value (e.g., a variable `x` of unknown type).
     Unknown,
 }
@@ -1165,7 +1263,7 @@ impl Truthiness {
                     Self::False
                 }
             }
-            Expr::NoneLiteral(_) => Self::Falsey,
+            Expr::NoneLiteral(_) => Self::None,
             Expr::EllipsisLiteral(_) => Self::Truthy,
             Expr::FString(f_string) => {
                 if is_empty_f_string(f_string) {
@@ -1180,14 +1278,32 @@ impl Truthiness {
             | Expr::Set(ast::ExprSet { elts, .. })
             | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 if elts.is_empty() {
-                    Self::Falsey
+                    return Self::Falsey;
+                }
+
+                if elts.iter().all(Expr::is_starred_expr) {
+                    // [*foo] / [*foo, *bar]
+                    Self::Unknown
                 } else {
                     Self::Truthy
                 }
             }
             Expr::Dict(dict) => {
                 if dict.is_empty() {
-                    Self::Falsey
+                    return Self::Falsey;
+                }
+
+                if dict.items.iter().all(|item| {
+                    matches!(
+                        item,
+                        DictItem {
+                            key: None,
+                            value: Expr::Name(..)
+                        }
+                    )
+                }) {
+                    // {**foo} / {**foo, **bar}
+                    Self::Unknown
                 } else {
                     Self::Truthy
                 }
@@ -1221,6 +1337,7 @@ impl Truthiness {
         match self {
             Self::True | Self::Truthy => Some(true),
             Self::False | Self::Falsey => Some(false),
+            Self::None => Some(false),
             Self::Unknown => None,
         }
     }
@@ -1268,6 +1385,8 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
 
             // These literals may or may not be empty.
             Expr::FString(f_string) => is_non_empty_f_string(f_string),
+            // These literals may or may not be empty.
+            Expr::TString(f_string) => is_non_empty_t_string(f_string),
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
             Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
         }
@@ -1277,8 +1396,78 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
         ast::FStringPart::Literal(string_literal) => !string_literal.is_empty(),
         ast::FStringPart::FString(f_string) => {
             f_string.elements.iter().all(|element| match element {
-                FStringElement::Literal(string_literal) => !string_literal.is_empty(),
-                FStringElement::Expression(f_string) => inner(&f_string.expression),
+                InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
+                InterpolatedStringElement::Interpolation(f_string) => inner(&f_string.expression),
+            })
+        }
+    })
+}
+
+/// Returns `true` if the expression definitely resolves to a non-empty string, when used as an
+/// f-string expression, or `false` if the expression may resolve to an empty string.
+fn is_non_empty_t_string(expr: &ast::ExprTString) -> bool {
+    fn inner(expr: &Expr) -> bool {
+        match expr {
+            // When stringified, these expressions are always non-empty.
+            Expr::Lambda(_) => true,
+            Expr::Dict(_) => true,
+            Expr::Set(_) => true,
+            Expr::ListComp(_) => true,
+            Expr::SetComp(_) => true,
+            Expr::DictComp(_) => true,
+            Expr::Compare(_) => true,
+            Expr::NumberLiteral(_) => true,
+            Expr::BooleanLiteral(_) => true,
+            Expr::NoneLiteral(_) => true,
+            Expr::EllipsisLiteral(_) => true,
+            Expr::List(_) => true,
+            Expr::Tuple(_) => true,
+
+            // These expressions must resolve to the inner expression.
+            Expr::If(ast::ExprIf { body, orelse, .. }) => inner(body) && inner(orelse),
+            Expr::Named(ast::ExprNamed { value, .. }) => inner(value),
+
+            // These expressions are complex. We can't determine whether they're empty or not.
+            Expr::BoolOp(ast::ExprBoolOp { .. }) => false,
+            Expr::BinOp(ast::ExprBinOp { .. }) => false,
+            Expr::UnaryOp(ast::ExprUnaryOp { .. }) => false,
+            Expr::Generator(_) => false,
+            Expr::Await(_) => false,
+            Expr::Yield(_) => false,
+            Expr::YieldFrom(_) => false,
+            Expr::Call(_) => false,
+            Expr::Attribute(_) => false,
+            Expr::Subscript(_) => false,
+            Expr::Starred(_) => false,
+            Expr::Name(_) => false,
+            Expr::Slice(_) => false,
+            Expr::IpyEscapeCommand(_) => false,
+
+            // These literals may or may not be empty.
+            Expr::FString(f_string) => is_non_empty_f_string(f_string),
+            // These literals may or may not be empty.
+            Expr::TString(t_string) => is_non_empty_t_string(t_string),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
+        }
+    }
+
+    expr.value.iter().any(|part| match part {
+        ast::TStringPart::Literal(string_literal) => !string_literal.is_empty(),
+        ast::TStringPart::TString(t_string) => {
+            t_string.elements.iter().all(|element| match element {
+                ast::InterpolatedStringElement::Literal(string_literal) => {
+                    !string_literal.is_empty()
+                }
+                ast::InterpolatedStringElement::Interpolation(t_string) => {
+                    inner(&t_string.expression)
+                }
+            })
+        }
+        ast::TStringPart::FString(f_string) => {
+            f_string.elements.iter().all(|element| match element {
+                InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
+                InterpolatedStringElement::Interpolation(f_string) => inner(&f_string.expression),
             })
         }
     })
@@ -1295,10 +1484,10 @@ fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
                 value
                     .elements()
                     .all(|f_string_element| match f_string_element {
-                        FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
-                            value.is_empty()
-                        }
-                        FStringElement::Expression(ast::FStringExpressionElement {
+                        InterpolatedStringElement::Literal(
+                            ast::InterpolatedStringLiteralElement { value, .. },
+                        ) => value.is_empty(),
+                        InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
                             expression,
                             ..
                         }) => inner(expression),
@@ -1312,8 +1501,8 @@ fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
         ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
         ast::FStringPart::FString(f_string) => {
             f_string.elements.iter().all(|element| match element {
-                FStringElement::Literal(string_literal) => string_literal.is_empty(),
-                FStringElement::Expression(f_string) => inner(&f_string.expression),
+                InterpolatedStringElement::Literal(string_literal) => string_literal.is_empty(),
+                InterpolatedStringElement::Interpolation(f_string) => inner(&f_string.expression),
             })
         }
     })
@@ -1325,7 +1514,7 @@ pub fn generate_comparison(
     comparators: &[Expr],
     parent: AnyNodeRef,
     comment_ranges: &CommentRanges,
-    locator: &Locator,
+    source: &str,
 ) -> String {
     let start = left.start();
     let end = comparators.last().map_or_else(|| left.end(), Ranged::end);
@@ -1333,10 +1522,8 @@ pub fn generate_comparison(
 
     // Add the left side of the comparison.
     contents.push_str(
-        locator.slice(
-            parenthesized_range(left.into(), parent, comment_ranges, locator.contents())
-                .unwrap_or(left.range()),
-        ),
+        &source[parenthesized_range(left.into(), parent, comment_ranges, source)
+            .unwrap_or(left.range())],
     );
 
     for (op, comparator) in ops.iter().zip(comparators) {
@@ -1356,15 +1543,8 @@ pub fn generate_comparison(
 
         // Add the right side of the comparison.
         contents.push_str(
-            locator.slice(
-                parenthesized_range(
-                    comparator.into(),
-                    parent,
-                    comment_ranges,
-                    locator.contents(),
-                )
-                .unwrap_or(comparator.range()),
-            ),
+            &source[parenthesized_range(comparator.into(), parent, comment_ranges, source)
+                .unwrap_or(comparator.range())],
         );
     }
 
@@ -1378,6 +1558,7 @@ pub fn pep_604_optional(expr: &Expr) -> Expr {
         op: Operator::BitOr,
         right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
         range: TextRange::default(),
+        node_index: AtomicNodeIndex::dummy(),
     }
     .into()
 }
@@ -1389,6 +1570,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
             elts: vec![],
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             parenthesized: true,
         }),
         [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
@@ -1398,6 +1580,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
             op: Operator::BitOr,
             right: Box::new(pep_604_union(&[elt.clone()])),
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
         }),
     }
 }
@@ -1408,44 +1591,38 @@ pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
         value: Box::new(Expr::Name(ast::ExprName {
             id: binding,
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             ctx: ExprContext::Load,
         })),
         slice: Box::new(elt),
         ctx: ExprContext::Load,
         range: TextRange::default(),
+        node_index: AtomicNodeIndex::dummy(),
     })
 }
 
 /// Format the expressions as a `typing.Union`-style union.
+///
+/// Note: It is a syntax error to have `Union[]` so the caller
+/// should ensure that the `elts` argument is nonempty.
 pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
-    fn tuple(elts: &[Expr], binding: Name) -> Expr {
-        match elts {
-            [] => Expr::Tuple(ast::ExprTuple {
-                elts: vec![],
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-                parenthesized: true,
-            }),
-            [Expr::Tuple(ast::ExprTuple { elts, .. })] => typing_union(elts, binding),
-            [elt] => elt.clone(),
-            [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
-                left: Box::new(tuple(rest, binding)),
-                op: Operator::BitOr,
-                right: Box::new(elt.clone()),
-                range: TextRange::default(),
-            }),
-        }
-    }
-
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
-            id: binding.clone(),
+            id: binding,
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             ctx: ExprContext::Load,
         })),
-        slice: Box::new(tuple(elts, binding)),
+        slice: Box::new(Expr::Tuple(ast::ExprTuple {
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
+            elts: elts.to_vec(),
+            ctx: ExprContext::Load,
+            parenthesized: false,
+        })),
         ctx: ExprContext::Load,
         range: TextRange::default(),
+        node_index: AtomicNodeIndex::dummy(),
     })
 }
 
@@ -1504,17 +1681,17 @@ pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
 pub fn comment_indentation_after(
     preceding: AnyNodeRef,
     comment_range: TextRange,
-    locator: &Locator,
+    source: &str,
 ) -> TextSize {
     let tokenizer = SimpleTokenizer::new(
-        locator.contents(),
-        TextRange::new(locator.full_line_end(preceding.end()), comment_range.end()),
+        source,
+        TextRange::new(source.full_line_end(preceding.end()), comment_range.end()),
     );
 
     tokenizer
         .filter_map(|token| {
             if token.kind() == SimpleTokenKind::Comment {
-                indentation_at_offset(token.start(), locator).map(TextLen::text_len)
+                indentation_at_offset(token.start(), source).map(TextLen::text_len)
             } else {
                 None
             }
@@ -1533,9 +1710,9 @@ mod tests {
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
     use crate::{
-        Expr, ExprContext, ExprName, ExprNumberLiteral, Identifier, Int, Number, Stmt,
-        StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-        TypeParams,
+        AtomicNodeIndex, Expr, ExprContext, ExprName, ExprNumberLiteral, Identifier, Int, Number,
+        Stmt, StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
+        TypeParamTypeVarTuple, TypeParams,
     };
 
     #[test]
@@ -1578,40 +1755,48 @@ mod tests {
         let name = Expr::Name(ExprName {
             id: "x".into(),
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             ctx: ExprContext::Load,
         });
         let constant_one = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::from(1u8)),
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
         });
         let constant_two = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::from(2u8)),
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
         });
         let constant_three = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::from(3u8)),
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             bound: Some(Box::new(constant_one.clone())),
             default: None,
             name: Identifier::new("x", TextRange::default()),
         });
         let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             bound: None,
             default: Some(Box::new(constant_two.clone())),
             name: Identifier::new("x", TextRange::default()),
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
             name: Box::new(name.clone()),
-            type_params: Some(TypeParams {
+            type_params: Some(Box::new(TypeParams {
                 type_params: vec![type_var_one, type_var_two],
                 range: TextRange::default(),
-            }),
+                node_index: AtomicNodeIndex::dummy(),
+            })),
             value: Box::new(constant_three.clone()),
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
         });
         assert!(!any_over_stmt(&type_alias, &|expr| {
             seen.borrow_mut().push(expr.clone());
@@ -1627,6 +1812,7 @@ mod tests {
     fn any_over_type_param_type_var() {
         let type_var_no_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             bound: None,
             default: None,
             name: Identifier::new("x", TextRange::default()),
@@ -1636,10 +1822,12 @@ mod tests {
         let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
         });
 
         let type_var_with_bound = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             bound: Some(Box::new(constant.clone())),
             default: None,
             name: Identifier::new("x", TextRange::default()),
@@ -1657,6 +1845,7 @@ mod tests {
 
         let type_var_with_default = TypeParam::TypeVar(TypeParamTypeVar {
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             default: Some(Box::new(constant.clone())),
             bound: None,
             name: Identifier::new("x", TextRange::default()),
@@ -1677,6 +1866,7 @@ mod tests {
     fn any_over_type_param_type_var_tuple() {
         let type_var_tuple = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             name: Identifier::new("x", TextRange::default()),
             default: None,
         });
@@ -1688,10 +1878,12 @@ mod tests {
         let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
         });
 
         let type_var_tuple_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             default: Some(Box::new(constant.clone())),
             name: Identifier::new("x", TextRange::default()),
         });
@@ -1711,6 +1903,7 @@ mod tests {
     fn any_over_type_param_param_spec() {
         let type_param_spec = TypeParam::ParamSpec(TypeParamParamSpec {
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             name: Identifier::new("x", TextRange::default()),
             default: None,
         });
@@ -1722,10 +1915,12 @@ mod tests {
         let constant = Expr::NumberLiteral(ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
         });
 
         let param_spec_with_default = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
             range: TextRange::default(),
+            node_index: AtomicNodeIndex::dummy(),
             default: Some(Box::new(constant.clone())),
             name: Identifier::new("x", TextRange::default()),
         });

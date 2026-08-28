@@ -1,19 +1,20 @@
 use std::borrow::Cow;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use itertools::izip;
+
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Binding;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sequence_sorting::{
-    sort_single_line_elements_sequence, MultilineStringSequenceValue, SequenceKind,
-    SortClassification, SortingStyle,
+    CommentComplexity, MultilineStringSequenceValue, SequenceKind, SortClassification,
+    SortingStyle, sort_single_line_elements_sequence,
 };
-
-use itertools::izip;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `__slots__` definitions that are not ordered according to a
@@ -36,11 +37,44 @@ use itertools::izip;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe whenever Ruff can detect that code
-/// elsewhere in the same file reads the `__slots__` variable in some way.
-/// This is because the order of the items in `__slots__` may have semantic
-/// significance if the `__slots__` of a class is being iterated over, or
-/// being assigned to another value.
+/// This rule's fix is marked as unsafe in three situations.
+///
+/// Firstly, the fix is unsafe if there are any comments that take up
+/// a whole line by themselves inside the `__slots__` definition, for example:
+/// ```py
+/// class Foo:
+///     __slots__ = [
+///         # eggy things
+///         "duck_eggs",
+///         "chicken_eggs",
+///         # hammy things
+///         "country_ham",
+///         "parma_ham",
+///     ]
+/// ```
+///
+/// This is a common pattern used to delimit categories within a class's slots,
+/// but it would be out of the scope of this rule to attempt to maintain these
+/// categories when applying a natural sort to the items of `__slots__`.
+///
+/// Secondly, the fix is also marked as unsafe if there are more than two
+/// `__slots__` items on a single line and that line also has a trailing
+/// comment, since here it is impossible to accurately gauge which item the
+/// comment should be moved with when sorting `__slots__`:
+/// ```py
+/// class Bar:
+///     __slots__ = [
+///         "a", "c", "e",  # a comment
+///         "b", "d", "f",  # a second  comment
+///     ]
+/// ```
+///
+/// Lastly, this rule's fix is marked as unsafe whenever Ruff can detect that
+/// code elsewhere in the same file reads the `__slots__` variable in some way
+/// and the `__slots__` variable is not assigned to a set. This is because the
+/// order of the items in `__slots__` may have semantic significance if the
+/// `__slots__` of a class is being iterated over, or being assigned to another
+/// value.
 ///
 /// In the vast majority of other cases, this rule's fix is unlikely to
 /// cause breakage; as such, Ruff will otherwise mark this rule's fix as
@@ -48,14 +82,8 @@ use itertools::izip;
 /// could still be read by code outside of the module in which the
 /// `__slots__` definition occurs, in which case this rule's fix could
 /// theoretically cause breakage.
-///
-/// Additionally, note that for multiline `__slots__` definitions that
-/// include comments on their own line, it can be hard to tell where the
-/// comments should be moved to when sorting the contents of `__slots__`.
-/// While this rule's fix will never delete a comment, it might *sometimes*
-/// move a comment to an unexpected location.
-#[violation]
-pub struct UnsortedDunderSlots {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnsortedDunderSlots {
     class_name: ast::name::Name,
 }
 
@@ -77,43 +105,56 @@ impl Violation for UnsortedDunderSlots {
 
 const SORTING_STYLE: SortingStyle = SortingStyle::Natural;
 
+/// RUF023
 /// Sort a tuple, list, dict or set that defines `__slots__` in a class scope.
 ///
 /// This routine checks whether the display is sorted, and emits a
 /// violation if it is not sorted. If the tuple/list/set was not sorted,
 /// it attempts to set a `Fix` on the violation.
-pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) {
     let semantic = checker.semantic();
 
-    let (target, value) = match binding.statement(semantic)? {
-        ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => match targets.as_slice() {
-            [target] => (target, &**value),
-            _ => return None,
-        },
-        ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-            (&**target, value.as_deref()?)
-        }
-        _ => return None,
+    let Some(stmt) = binding.statement(semantic) else {
+        return;
     };
 
-    let ast::ExprName { id, .. } = target.as_name_expr()?;
+    let (target, value) = match stmt {
+        ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => match targets.as_slice() {
+            [target] => (target, &**value),
+            _ => return,
+        },
+        ast::Stmt::AnnAssign(ast::StmtAnnAssign {
+            target,
+            value: Some(value),
+            ..
+        }) => (&**target, &**value),
+        _ => return,
+    };
+
+    let Some(ast::ExprName { id, .. }) = target.as_name_expr() else {
+        return;
+    };
 
     if id != "__slots__" {
-        return None;
+        return;
     }
 
     // We're only interested in `__slots__` in the class scope
-    let enclosing_class = semantic.scopes[binding.scope].kind.as_class()?;
+    let Some(enclosing_class) = semantic.scopes[binding.scope].kind.as_class() else {
+        return;
+    };
 
     // and it has to be an assignment to a "display literal" (a literal dict/set/tuple/list)
-    let display = StringLiteralDisplay::new(value)?;
+    let Some(display) = StringLiteralDisplay::new(value) else {
+        return;
+    };
 
     let sort_classification = SortClassification::of_elements(&display.elts, SORTING_STYLE);
     if sort_classification.is_not_a_list_of_string_literals() || sort_classification.is_sorted() {
-        return None;
+        return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnsortedDunderSlots {
             class_name: enclosing_class.name.id.clone(),
         },
@@ -121,20 +162,20 @@ pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) -> Option<
     );
 
     if let SortClassification::UnsortedAndMaybeFixable { items } = sort_classification {
-        if let Some(sorted_source_code) = display.generate_sorted_source_code(&items, checker) {
+        if let Some((sorted_source_code, comment_complexity)) =
+            display.generate_sorted_source_code(&items, checker)
+        {
             let edit = Edit::range_replacement(sorted_source_code, display.range());
-
-            let applicability = if display.kind.is_set_literal() || binding.is_unused() {
-                Applicability::Safe
-            } else {
+            let applicability = if comment_complexity.is_complex()
+                || (binding.is_used() && !display.kind.is_set_literal())
+            {
                 Applicability::Unsafe
+            } else {
+                Applicability::Safe
             };
-
             diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
         }
     }
-
-    Some(diagnostic)
 }
 
 /// Struct representing a [display](https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries)
@@ -144,7 +185,7 @@ struct StringLiteralDisplay<'a> {
     /// The elts from the original AST node representing the display.
     /// Each elt is the AST representation of a single string literal
     /// element in the display
-    elts: Cow<'a, Vec<ast::Expr>>,
+    elts: Cow<'a, [ast::Expr]>,
     /// The source-code range of the display as a whole
     range: TextRange,
     /// What kind of a display is it? A dict, set, list or tuple?
@@ -183,7 +224,11 @@ impl<'a> StringLiteralDisplay<'a> {
                     kind,
                 }
             }
-            ast::Expr::Set(ast::ExprSet { elts, range }) => {
+            ast::Expr::Set(ast::ExprSet {
+                elts,
+                range,
+                node_index: _,
+            }) => {
                 let kind = DisplayKind::Sequence(SequenceKind::Set);
                 Self {
                     elts: Cow::Borrowed(elts),
@@ -218,7 +263,11 @@ impl<'a> StringLiteralDisplay<'a> {
         Some(result)
     }
 
-    fn generate_sorted_source_code(&self, elements: &[&str], checker: &Checker) -> Option<String> {
+    fn generate_sorted_source_code(
+        &self,
+        elements: &[&str],
+        checker: &Checker,
+    ) -> Option<(String, CommentComplexity)> {
         let locator = checker.locator();
 
         let multiline_classification = if locator.contains_line_break(self.range()) {
@@ -237,26 +286,31 @@ impl<'a> StringLiteralDisplay<'a> {
                     elements,
                 )?;
                 assert_eq!(analyzed_sequence.len(), self.elts.len());
-                Some(analyzed_sequence.into_sorted_source_code(
+                let comment_complexity = analyzed_sequence.comment_complexity();
+                let sorted_code = analyzed_sequence.into_sorted_source_code(
                     SORTING_STYLE,
                     locator,
                     checker.stylist(),
-                ))
+                );
+                Some((sorted_code, comment_complexity))
             }
             // Sorting multiline dicts is unsupported
             (DisplayKind::Dict { .. }, MultilineClassification::Multiline) => None,
             (DisplayKind::Sequence(sequence_kind), MultilineClassification::SingleLine) => {
-                Some(sort_single_line_elements_sequence(
+                let sorted_code = sort_single_line_elements_sequence(
                     *sequence_kind,
                     &self.elts,
                     elements,
                     locator,
                     SORTING_STYLE,
-                ))
+                );
+                Some((sorted_code, CommentComplexity::Simple))
             }
-            (DisplayKind::Dict { items }, MultilineClassification::SingleLine) => Some(
-                sort_single_line_elements_dict(&self.elts, elements, items, locator),
-            ),
+            (DisplayKind::Dict { items }, MultilineClassification::SingleLine) => {
+                let sorted_code =
+                    sort_single_line_elements_dict(&self.elts, elements, items, locator);
+                Some((sorted_code, CommentComplexity::Simple))
+            }
         }
     }
 }
@@ -276,7 +330,7 @@ enum DisplayKind<'a> {
     Dict { items: &'a [ast::DictItem] },
 }
 
-impl<'a> DisplayKind<'a> {
+impl DisplayKind<'_> {
     const fn is_set_literal(self) -> bool {
         matches!(self, Self::Sequence(SequenceKind::Set))
     }

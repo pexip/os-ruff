@@ -92,9 +92,9 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
     with (rules_dir / f"{rule_name_snake}.rs").open("w") as fp:
         fp.write(
             f"""\
-use ruff_diagnostics::Violation;
-use ruff_macros::{{derive_message_formats, violation}};
+use ruff_macros::{{ViolationMetadata, derive_message_formats}};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -108,8 +108,8 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// ```
-#[violation]
-pub struct {name};
+#[derive(ViolationMetadata)]
+pub(crate) struct {name};
 
 impl Violation for {name} {{
     #[derive_message_formats]

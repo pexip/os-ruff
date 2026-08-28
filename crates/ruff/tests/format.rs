@@ -30,7 +30,7 @@ if condition:
 
     print('Hy "Micha"') # Should not change quotes
 
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -45,7 +45,7 @@ if condition:
         print('Hy "Micha"')  # Should not change quotes
 
     ----- stderr -----
-    "###);
+    "#);
 }
 
 #[test]
@@ -65,7 +65,7 @@ bar =     "needs formatting"
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--no-cache", "--check"]).current_dir(tempdir.path()), @r###"
+        .args(["format", "--isolated", "--no-cache", "--check"]).current_dir(tempdir.path()), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -74,7 +74,7 @@ bar =     "needs formatting"
     2 files would be reformatted
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -84,7 +84,7 @@ fn format_warn_stdin_filename_with_files() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--isolated", "--stdin-filename", "foo.py"])
         .arg("foo.py")
-        .pass_stdin("foo =     1"), @r###"
+        .pass_stdin("foo =     1"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -92,13 +92,13 @@ fn format_warn_stdin_filename_with_files() {
 
     ----- stderr -----
     warning: Ignoring file foo.py in favor of standard input.
-    "###);
+    ");
 }
 
 #[test]
 fn nonexistent_config_file() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--config", "foo.toml", "."]), @r###"
+        .args(["format", "--config", "foo.toml", "."]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -114,13 +114,13 @@ fn nonexistent_config_file() {
     The path `foo.toml` does not point to a configuration file
 
     For more information, try '--help'.
-    "###);
+    ");
 }
 
 #[test]
 fn config_override_rejected_if_invalid_toml() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--config", "foo = bar", "."]), @r###"
+        .args(["format", "--config", "foo = bar", "."]), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -142,7 +142,7 @@ fn config_override_rejected_if_invalid_toml() {
     expected `"`, `'`
 
     For more information, try '--help'.
-    "###);
+    "#);
 }
 
 #[test]
@@ -161,19 +161,18 @@ fn too_many_config_files() -> Result<()> {
         .arg(&ruff_dot_toml)
         .arg("--config")
         .arg(&ruff2_dot_toml)
-        .arg("."), @r###"
-            success: false
-            exit_code: 2
-            ----- stdout -----
+        .arg("."), @r"
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-            ----- stderr -----
-            ruff failed
-              Cause: You cannot specify more than one configuration file on the command line.
+        ----- stderr -----
+        ruff failed
+          Cause: You cannot specify more than one configuration file on the command line.
 
-              tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
-                   For more information, try `--help`.
-
-            "###);
+          tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
+               For more information, try `--help`.
+        ");
     });
     Ok(())
 }
@@ -191,7 +190,7 @@ fn config_file_and_isolated() -> Result<()> {
         .arg("--config")
         .arg(&ruff_dot_toml)
         .arg("--isolated")
-        .arg("."), @r###"
+        .arg("."), @r"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -203,8 +202,7 @@ fn config_file_and_isolated() -> Result<()> {
           tip: You cannot specify a configuration file and also specify `--isolated`,
                as `--isolated` causes ruff to ignore all configuration files.
                For more information, try `--help`.
-
-        "###);
+        ");
     });
     Ok(())
 }
@@ -226,7 +224,7 @@ def foo():
         // This overrides the long line length set in the config file
         .args(["--config", "line-length=80"])
         .arg("-")
-        .pass_stdin(fixture), @r###"
+        .pass_stdin(fixture), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -236,7 +234,7 @@ def foo():
         )
 
     ----- stderr -----
-    "###);
+    "#);
     Ok(())
 }
 
@@ -259,7 +257,7 @@ def foo():
         // ...but this overrides them both:
         .args(["--line-length", "100"])
         .arg("-")
-        .pass_stdin(fixture), @r###"
+        .pass_stdin(fixture), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -267,7 +265,7 @@ def foo():
         print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
 
     ----- stderr -----
-    "###);
+    "#);
     Ok(())
 }
 
@@ -302,7 +300,7 @@ if condition:
 
     print("Should change quotes")
 
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -316,7 +314,7 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    "###);
+    "#);
     Ok(())
 }
 
@@ -326,18 +324,18 @@ fn docstring_options() -> Result<()> {
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
-        r#"
+        r"
 [format]
 docstring-code-format = true
 docstring-code-line-length = 20
-"#,
+",
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--config"])
         .arg(&ruff_toml)
         .arg("-")
-        .pass_stdin(r#"
+        .pass_stdin(r"
 def f(x):
     '''
     Something about `f`. And an example:
@@ -357,7 +355,7 @@ def f(x):
     >>> foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
     '''
     pass
-"#), @r###"
+"), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -403,7 +401,7 @@ def f(x):
         pass
 
     ----- stderr -----
-    "###);
+    "#);
     Ok(())
 }
 
@@ -424,14 +422,14 @@ fn mixed_line_endings() -> Result<()> {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
         .args(["format", "--no-cache", "--diff", "--isolated"])
-        .arg("."), @r###"
+        .arg("."), @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
     2 files already formatted
-    "###);
+    ");
     Ok(())
 }
 
@@ -490,7 +488,7 @@ OTHER = "OTHER"
         // Explicitly pass test.py, should be formatted regardless of it being excluded by format.exclude
         .arg(test_path.file_name().unwrap())
         // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
-        .arg("."), @r###"
+        .arg("."), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -499,7 +497,7 @@ OTHER = "OTHER"
     2 files would be reformatted
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -509,22 +507,22 @@ fn syntax_error() -> Result<()> {
 
     fs::write(
         tempdir.path().join("main.py"),
-        r#"
+        r"
 from module import =
-"#,
+",
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
         .args(["format", "--no-cache", "--isolated", "--check"])
-        .arg("main.py"), @r###"
+        .arg("main.py"), @r"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: Failed to parse main.py:2:20: Expected an import name
-    "###);
+    ");
 
     Ok(())
 }
@@ -546,7 +544,7 @@ if __name__ == "__main__":
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
         .args(["format", "--no-cache", "--isolated", "--check"])
-        .arg("main.py"), @r###"
+        .arg("main.py"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -554,31 +552,110 @@ if __name__ == "__main__":
     1 file would be reformatted
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
         .args(["format", "--no-cache", "--isolated"])
-        .arg("main.py"), @r###"
+        .arg("main.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
     1 file reformatted
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
         .args(["format", "--no-cache", "--isolated"])
-        .arg("main.py"), @r###"
+        .arg("main.py"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
     1 file left unchanged
 
     ----- stderr -----
-    "###);
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn exit_non_zero_on_format() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    let contents = r#"
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#;
+
+    fs::write(tempdir.path().join("main.py"), contents)?;
+
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    cmd.current_dir(tempdir.path())
+        .args([
+            "format",
+            "--no-cache",
+            "--isolated",
+            "--exit-non-zero-on-format",
+        ])
+        .arg("main.py");
+
+    // First format should exit with code 1 since the file needed formatting
+    assert_cmd_snapshot!(cmd, @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    ");
+
+    // Second format should exit with code 0 since no files needed formatting
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file left unchanged
+
+    ----- stderr -----
+    ");
+
+    // Repeat the tests above with the --exit-non-zero-on-fix alias
+    fs::write(tempdir.path().join("main.py"), contents)?;
+
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    cmd.current_dir(tempdir.path())
+        .args([
+            "format",
+            "--no-cache",
+            "--isolated",
+            "--exit-non-zero-on-fix",
+        ])
+        .arg("main.py");
+
+    // First format should exit with code 1 since the file needed formatting
+    assert_cmd_snapshot!(cmd, @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    ");
+
+    // Second format should exit with code 0 since no files needed formatting
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file left unchanged
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -638,7 +715,7 @@ OTHER = "OTHER"
         // Explicitly pass test.py, should be respect the `format.exclude` when `--force-exclude` is present
         .arg(test_path.file_name().unwrap())
         // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
-        .arg("."), @r###"
+        .arg("."), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -646,7 +723,7 @@ OTHER = "OTHER"
     1 file would be reformatted
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -673,7 +750,7 @@ from test import say_hy
 
 if __name__ == '__main__':
     say_hy("dear Ruff contributor")
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -686,7 +763,7 @@ if __name__ == '__main__':
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
       - 'ignore' -> 'lint.ignore'
-    "###);
+    "#);
     Ok(())
 }
 
@@ -713,7 +790,7 @@ from test import say_hy
 
 if __name__ == '__main__':
     say_hy("dear Ruff contributor")
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -727,7 +804,7 @@ if __name__ == '__main__':
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
       - 'ignore' -> 'lint.ignore'
-    "###);
+    "#);
     Ok(())
 }
 
@@ -770,7 +847,7 @@ if condition:
 
     print("Should change quotes")
 
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -785,8 +862,8 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.
-    "###);
+    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    "#);
     Ok(())
 }
 
@@ -811,15 +888,21 @@ tab-size = 2
             .pass_stdin(r"
 if True:
     pass
-    "), @r###"
+    "), @r"
         success: false
         exit_code: 2
         ----- stdout -----
 
         ----- stderr -----
         ruff failed
-          Cause: The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update `[RUFF-TOML-PATH]` to use `indent-width = <value>` instead.
-        "###);
+          Cause: Failed to load configuration `[RUFF-TOML-PATH]`
+          Cause: Failed to parse [RUFF-TOML-PATH]
+          Cause: TOML parse error at line 1, column 1
+          |
+        1 | 
+          | ^
+        unknown field `tab-size`
+        ");
     });
     Ok(())
 }
@@ -845,21 +928,21 @@ format = "json"
             .arg("-")
             .pass_stdin(r"
     import os
-    "), @r###"
+    "), @r#"
         success: false
         exit_code: 2
         ----- stdout -----
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load configuration `[RUFF-TOML-PATH]`
           Cause: Failed to parse [RUFF-TOML-PATH]
           Cause: TOML parse error at line 2, column 10
           |
         2 | format = "json"
           |          ^^^^^^
         invalid type: string "json", expected struct FormatOptions
-
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -875,7 +958,7 @@ indent-width = 2
 
 [lint]
 select = ["ALL"]
-ignore = ["D203", "D212"]
+ignore = ["D203", "D212", "ISC001"]
 
 [lint.isort]
 lines-after-imports = 3
@@ -888,6 +971,9 @@ split-on-trailing-comma = true
 inline-quotes = "single"
 docstring-quotes = "single"
 multiline-quotes = "single"
+
+[lint.flake8-implicit-str-concat]
+allow-multiline = false
 
 [format]
 skip-magic-trailing-comma = true
@@ -906,24 +992,25 @@ def say_hy(name: str):
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--no-cache", "--config"])
         .arg(&ruff_toml)
-        .arg(test_path), @r###"
+        .arg(test_path), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
     1 file reformatted
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: `COM812`, `ISC001`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.
+    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
     warning: The `format.indent-style="tab"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
+    warning: The `lint.flake8-implicit-str-concat.allow-multiline = false` option is incompatible with the formatter unless `ISC001` is enabled. We recommend enabling `ISC001` or setting `allow-multiline=true`.
     warning: The `format.indent-style="tab"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
     warning: The `flake8-quotes.inline-quotes="single"` option is incompatible with the formatter's `format.quote-style="double"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `"single"` or `"double"`.
     warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `"double"`.`
-    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
+    warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
     warning: The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
     warning: The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
     warning: The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.
     warning: The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.
-    "###);
+    "#);
     Ok(())
 }
 
@@ -964,7 +1051,7 @@ indent-style = "tab"
         .arg("-")
         .pass_stdin(r#"
 def say_hy(name: str):
-        print(f"Hy {name}")"#), @r###"
+        print(f"Hy {name}")"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -972,17 +1059,17 @@ def say_hy(name: str):
     	print(f"Hy {name}")
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: `COM812`, `ISC001`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.
+    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
     warning: The `format.indent-style="tab"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
     warning: The `format.indent-style="tab"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `"space"`.
     warning: The `flake8-quotes.inline-quotes="single"` option is incompatible with the formatter's `format.quote-style="double"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `"single"` or `"double"`.
     warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `"double"`.`
-    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
+    warning: The `flake8-quotes.docstring-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
     warning: The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
     warning: The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
     warning: The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.
     warning: The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.
-    "###);
+    "#);
     Ok(())
 }
 
@@ -1026,14 +1113,14 @@ def say_hy(name: str):
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--no-cache", "--config"])
         .arg(&ruff_toml)
-        .arg(test_path), @r###"
+        .arg(test_path), @r"
     success: true
     exit_code: 0
     ----- stdout -----
     1 file reformatted
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -1068,14 +1155,14 @@ def say_hy(name: str):
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--no-cache", "--config"])
         .arg(&ruff_toml)
-        .arg(test_path), @r###"
+        .arg(test_path), @r"
     success: true
     exit_code: 0
     ----- stdout -----
     1 file reformatted
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -1103,17 +1190,17 @@ def say_hy(name: str):
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--no-cache", "--config"])
         .arg(&ruff_toml)
-        .arg(test_path), @r###"
+        .arg(test_path), @r"
     success: true
     exit_code: 0
     ----- stdout -----
     1 file reformatted
 
     ----- stderr -----
-    warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
+    warning: `incorrect-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class`.
     warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
-    warning: The following rules may cause conflicts when used with the formatter: `COM812`, `ISC001`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.
-    "###);
+    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    ");
     Ok(())
 }
 
@@ -1132,7 +1219,7 @@ fn test_diff() {
     ]}, {
         assert_cmd_snapshot!(
             Command::new(get_cargo_bin(BIN_NAME)).args(args).args(paths),
-            @r###"
+            @r"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -1180,7 +1267,7 @@ fn test_diff() {
 
         ----- stderr -----
         2 files would be reformatted, 1 file already formatted
-        "###);
+        ");
     });
 }
 
@@ -1195,7 +1282,7 @@ fn test_diff_no_change() {
     ]}, {
         assert_cmd_snapshot!(
             Command::new(get_cargo_bin(BIN_NAME)).args(args).args(paths),
-            @r###"
+            @r"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -1210,7 +1297,7 @@ fn test_diff_no_change() {
 
         ----- stderr -----
         1 file would be reformatted
-        "###
+        "
         );
     });
 }
@@ -1229,7 +1316,7 @@ fn test_diff_stdin_unformatted() {
     let unformatted = fs::read(fixtures.join("unformatted.py")).unwrap();
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME)).args(args).pass_stdin(unformatted),
-        @r###"
+        @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1243,7 +1330,7 @@ fn test_diff_stdin_unformatted() {
 
 
     ----- stderr -----
-    "###);
+    ");
 }
 
 #[test]
@@ -1253,13 +1340,13 @@ fn test_diff_stdin_formatted() {
     let unformatted = fs::read(fixtures.join("formatted.py")).unwrap();
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME)).args(args).pass_stdin(unformatted),
-        @r###"
+        @r"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    "###);
+    ");
 }
 
 #[test]
@@ -1269,7 +1356,7 @@ fn test_notebook_trailing_semicolon() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--isolated", "--stdin-filename", "test.ipynb"])
         .arg("-")
-        .pass_stdin(unformatted), @r###"
+        .pass_stdin(unformatted), @r##"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1688,7 +1775,88 @@ fn test_notebook_trailing_semicolon() {
     }
 
     ----- stderr -----
-    "###);
+    "##);
+}
+
+#[test]
+fn syntax_error_in_notebooks() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+include = ["*.ipy"]
+"#,
+    )?;
+
+    fs::write(
+        tempdir.path().join("main.ipy"),
+        r#"
+{
+    "cells": [
+     {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+       "id": "S6nTuMqGGqp2"
+      },
+      "outputs": [],
+      "source": [
+       "np.random.seed(RANDOM_STATE)\n",
+       "X = pd.DataFrame(data=X, columns=np.arange(0, X.shape[1]))\n",
+       "X[10] = X[6] + X[7] + np.random.random() * 0.01"
+      ]
+     },
+     {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+       "id": "fTZWxz1zpb9R"
+      },
+      "outputs": [],
+      "source": [
+       "for i in range(iterations):\n",
+       "    # выберите случайный индекс в диапазон от 0 до len(X)-1 включительно при помощи функции random.randint\n",
+       "    j = # ваш код здесь\n"
+      ]
+     }
+    ],
+    "metadata": {
+     "colab": {
+      "provenance": []
+     },
+     "kernelspec": {
+      "display_name": "ml",
+      "language": "python",
+      "name": "python3"
+     },
+     "language_info": {
+      "name": "python",
+      "version": "3.12.9"
+     }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 0
+   }
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .arg("format")
+        .arg("--no-cache")
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--extension", "ipy:ipynb"])
+        .arg("."), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to parse main.ipy:2:3:24: Expected an expression
+    ");
+    Ok(())
 }
 
 #[test]
@@ -1750,14 +1918,14 @@ include = ["*.ipy"]
         .arg("--no-cache")
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         .args(["--extension", "ipy:ipynb"])
-        .arg("."), @r###"
+        .arg("."), @r"
     success: true
     exit_code: 0
     ----- stdout -----
     1 file reformatted
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -1770,7 +1938,7 @@ fn range_formatting() {
 def foo(arg1, arg2,):
     print("Shouldn't format this" )
 
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1783,7 +1951,7 @@ def foo(arg1, arg2,):
 
 
     ----- stderr -----
-    "###);
+    "#);
 }
 
 #[test]
@@ -1793,7 +1961,7 @@ fn range_formatting_unicode() {
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1="👋🏽" ): print("Format this" )
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1802,7 +1970,7 @@ def foo(arg1="👋🏽" ): print("Format this" )
         print("Format this")
 
     ----- stderr -----
-    "###);
+    "#);
 }
 
 #[test]
@@ -1833,7 +2001,7 @@ def file2(arg1, arg2,):
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--isolated", "--range=1:8-1:15"])
         .arg(file1)
-        .arg(file2),  @r###"
+        .arg(file2),  @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1841,7 +2009,7 @@ def file2(arg1, arg2,):
     ----- stderr -----
     ruff failed
       Cause: The `--range` option is only supported when formatting a single file but the specified paths resolve to 2 files.
-    "###);
+    ");
 
     Ok(())
 }
@@ -1855,7 +2023,7 @@ fn range_formatting_out_of_bounds() {
 def foo(arg1, arg2,):
     print("Shouldn't format this" )
 
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1865,7 +2033,7 @@ def foo(arg1, arg2,):
 
 
     ----- stderr -----
-    "###);
+    "#);
 }
 
 #[test]
@@ -1877,7 +2045,7 @@ fn range_start_larger_than_end() {
 def foo(arg1, arg2,):
     print("Shouldn't format this" )
 
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1887,7 +2055,7 @@ def foo(arg1, arg2,):
         tip: Try switching start and end: '50:1-90:1'
 
     For more information, try '--help'.
-    "###);
+    ");
 }
 
 #[test]
@@ -1899,7 +2067,7 @@ fn range_line_numbers_only() {
 def foo(arg1, arg2,):
     print("Shouldn't format this" )
 
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1912,7 +2080,7 @@ def foo(arg1, arg2,):
 
 
     ----- stderr -----
-    "###);
+    "#);
 }
 
 #[test]
@@ -1924,7 +2092,7 @@ fn range_start_only() {
 def foo(arg1, arg2,):
     print("Should format this" )
 
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1933,7 +2101,7 @@ def foo(arg1, arg2,):
         print("Should format this")
 
     ----- stderr -----
-    "###);
+    "#);
 }
 
 #[test]
@@ -1945,11 +2113,10 @@ fn range_end_only() {
 def foo(arg1, arg2,):
     print("Should format this" )
 
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
-
     def foo(
         arg1,
         arg2,
@@ -1958,7 +2125,7 @@ def foo(arg1, arg2,):
 
 
     ----- stderr -----
-    "###);
+    "#);
 }
 
 #[test]
@@ -1970,7 +2137,7 @@ fn range_missing_line() {
 def foo(arg1, arg2,):
     print("Should format this" )
 
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1980,7 +2147,7 @@ def foo(arg1, arg2,):
       tip: The format is 'line:column'.
 
     For more information, try '--help'.
-    "###);
+    ");
 }
 
 #[test]
@@ -1992,7 +2159,7 @@ fn zero_line_number() {
 def foo(arg1, arg2,):
     print("Should format this" )
 
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2003,7 +2170,7 @@ def foo(arg1, arg2,):
       tip: Try 1:2 instead.
 
     For more information, try '--help'.
-    "###);
+    ");
 }
 
 #[test]
@@ -2015,7 +2182,7 @@ fn column_and_line_zero() {
 def foo(arg1, arg2,):
     print("Should format this" )
 
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2026,7 +2193,7 @@ def foo(arg1, arg2,):
       tip: Try 1:1 instead.
 
     For more information, try '--help'.
-    "###);
+    ");
 }
 
 #[test]
@@ -2070,12 +2237,93 @@ fn range_formatting_notebook() {
  "nbformat": 4,
  "nbformat_minor": 5
 }
-"#), @r###"
+"#), @r"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
     error: Failed to format main.ipynb: Range formatting isn't supported for notebooks.
-    "###);
+    ");
+}
+
+/// Test that the formatter respects `per-file-target-version`. Context managers can't be
+/// parenthesized like this before Python 3.10.
+///
+/// Adapted from <https://github.com/python/cpython/issues/56991#issuecomment-1093555135>
+#[test]
+fn per_file_target_version_formatter() {
+    // without `per-file-target-version` this should not be reformatted in the same way
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--target-version=py38"])
+        .arg("-")
+        .pass_stdin(r#"
+with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a_really_long_baz") as baz:
+    pass
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open(
+        "a_really_long_baz"
+    ) as baz:
+        pass
+
+    ----- stderr -----
+    "#);
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--target-version=py38"])
+        .args(["--config", r#"per-file-target-version = {"test.py" = "py311"}"#])
+        .arg("-")
+        .pass_stdin(r#"
+with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a_really_long_baz") as baz:
+    pass
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    with (
+        open("a_really_long_foo") as foo,
+        open("a_really_long_bar") as bar,
+        open("a_really_long_baz") as baz,
+    ):
+        pass
+
+    ----- stderr -----
+    "#);
+}
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/9381> with very helpful
+/// reproduction repo here: <https://github.com/lucasfijen/example_ruff_glob_bug>
+#[test]
+fn cookiecutter_globbing() -> Result<()> {
+    // This is a simplified directory structure from the repo linked above. The essence of the
+    // problem is this `{{cookiecutter.repo_name}}` directory containing a config file with a glob.
+    // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
+    // user's glob does not.
+    let tempdir = TempDir::new()?;
+    let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
+    let cookiecutter_toml = cookiecutter.join("pyproject.toml");
+    let tests = cookiecutter.join("tests");
+    fs::create_dir_all(&tests)?;
+    fs::write(
+        cookiecutter_toml,
+        r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
+    )?;
+    let maintest = tests.join("maintest.py");
+    fs::write(maintest, "import foo\nimport bar\nimport foo\n")?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(["format", "--no-cache", "--diff"])
+            .current_dir(tempdir.path()), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    1 file already formatted
+    ");
+
+    Ok(())
 }

@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StringLiteral;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of the Unicode kind prefix (`u`) in strings.
@@ -24,13 +24,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Unicode HOWTO](https://docs.python.org/3/howto/unicode.html)
-#[violation]
-pub struct UnicodeKindPrefix;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnicodeKindPrefix;
 
 impl AlwaysFixableViolation for UnicodeKindPrefix {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Remove unicode literals from strings")
+        "Remove unicode literals from strings".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -39,13 +39,12 @@ impl AlwaysFixableViolation for UnicodeKindPrefix {
 }
 
 /// UP025
-pub(crate) fn unicode_kind_prefix(checker: &mut Checker, string: &StringLiteral) {
+pub(crate) fn unicode_kind_prefix(checker: &Checker, string: &StringLiteral) {
     if string.flags.prefix().is_unicode() {
-        let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, string.range);
+        let mut diagnostic = checker.report_diagnostic(UnicodeKindPrefix, string.range);
         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::at(
             string.start(),
             TextSize::from(1),
         ))));
-        checker.diagnostics.push(diagnostic);
     }
 }

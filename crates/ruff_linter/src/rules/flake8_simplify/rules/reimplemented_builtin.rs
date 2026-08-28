@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
@@ -7,11 +6,13 @@ use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Comprehension, Expr, ExprContext, Stmt, UnaryOp,
 };
 use ruff_python_codegen::Generator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
 use crate::line_width::LineWidthBuilder;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced with a builtin function, like
@@ -33,11 +34,15 @@ use crate::line_width::LineWidthBuilder;
 /// return any(predicate(item) for item in iterable)
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because it might remove comments.
+///
 /// ## References
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
 /// - [Python documentation: `all`](https://docs.python.org/3/library/functions.html#all)
-#[violation]
-pub struct ReimplementedBuiltin {
+#[derive(ViolationMetadata)]
+pub(crate) struct ReimplementedBuiltin {
     replacement: String,
 }
 
@@ -57,7 +62,7 @@ impl Violation for ReimplementedBuiltin {
 }
 
 /// SIM110, SIM111
-pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
     if !checker.semantic().current_scope().kind.is_function() {
         return;
     }
@@ -72,8 +77,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
     // - `for` loop followed by `return True` or `return False`.
     let Some(terminal) = match_else_return(stmt).or_else(|| {
         let parent = checker.semantic().current_statement_parent()?;
-        let suite = traversal::suite(stmt, parent)?;
-        let sibling = traversal::next_sibling(stmt, suite)?;
+        let sibling = traversal::suite(stmt, parent)?.next_sibling()?;
         match_sibling_return(stmt, sibling)
     }) else {
         return;
@@ -101,13 +105,13 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 &contents,
                 stmt.into(),
                 checker.locator(),
-                checker.settings.pycodestyle.max_line_length,
-                checker.settings.tab_size,
+                checker.settings().pycodestyle.max_line_length,
+                checker.settings().tab_size,
             ) {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
                     replacement: contents.to_string(),
                 },
@@ -120,7 +124,6 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     terminal.stmt.end(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
         }
         // Replace with `all`.
         (false, true) => {
@@ -130,6 +133,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     op: UnaryOp::Not,
                     operand,
                     range: _,
+                    node_index: _,
                 }) = &loop_.test
                 {
                     *operand.clone()
@@ -138,6 +142,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     ops,
                     comparators,
                     range: _,
+                    node_index: _,
                 }) = &loop_.test
                 {
                     if let ([op], [comparator]) = (&**ops, &**comparators) {
@@ -158,6 +163,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                             ops: Box::from([op]),
                             comparators: Box::from([comparator.clone()]),
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                         };
                         node.into()
                     } else {
@@ -165,6 +171,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                             op: UnaryOp::Not,
                             operand: Box::new(loop_.test.clone()),
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                         };
                         node.into()
                     }
@@ -173,6 +180,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                         op: UnaryOp::Not,
                         operand: Box::new(loop_.test.clone()),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     };
                     node.into()
                 }
@@ -187,19 +195,19 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
 
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
-            if LineWidthBuilder::new(checker.settings.tab_size)
+            if LineWidthBuilder::new(checker.settings().tab_size)
                 .add_str(
                     checker
                         .locator()
                         .slice(TextRange::new(line_start, stmt.start())),
                 )
                 .add_str(&contents)
-                > checker.settings.pycodestyle.max_line_length
+                > checker.settings().pycodestyle.max_line_length
             {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
                     replacement: contents.to_string(),
                 },
@@ -212,7 +220,6 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     terminal.stmt.end(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
         }
         _ => {}
     }
@@ -268,22 +275,28 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
 
     // The loop itself should contain a single `if` statement, with a single `return` statement in
     // the body.
-    let [Stmt::If(ast::StmtIf {
-        body: nested_body,
-        test: nested_test,
-        elif_else_clauses: nested_elif_else_clauses,
-        range: _,
-    })] = body.as_slice()
+    let [
+        Stmt::If(ast::StmtIf {
+            body: nested_body,
+            test: nested_test,
+            elif_else_clauses: nested_elif_else_clauses,
+            range: _,
+            node_index: _,
+        }),
+    ] = body.as_slice()
     else {
         return None;
     };
     if !nested_elif_else_clauses.is_empty() {
         return None;
     }
-    let [Stmt::Return(ast::StmtReturn {
-        value: Some(value),
-        range: _,
-    })] = nested_body.as_slice()
+    let [
+        Stmt::Return(ast::StmtReturn {
+            value: Some(value),
+            range: _,
+            node_index: _,
+        }),
+    ] = nested_body.as_slice()
     else {
         return None;
     };
@@ -315,10 +328,13 @@ fn match_else_return(stmt: &Stmt) -> Option<Terminal> {
     };
 
     // The `else` block has to contain a single `return True` or `return False`.
-    let [Stmt::Return(ast::StmtReturn {
-        value: Some(next_value),
-        range: _,
-    })] = orelse.as_slice()
+    let [
+        Stmt::Return(ast::StmtReturn {
+            value: Some(next_value),
+            range: _,
+            node_index: _,
+        }),
+    ] = orelse.as_slice()
     else {
         return None;
     };
@@ -360,6 +376,7 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
     let Stmt::Return(ast::StmtReturn {
         value: Some(next_value),
         range: _,
+        node_index: _,
     }) = &sibling
     else {
         return None;
@@ -387,14 +404,17 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
             ifs: vec![],
             is_async: false,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         }],
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         parenthesized: false,
     };
     let node1 = ast::ExprName {
         id,
         ctx: ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
@@ -402,12 +422,15 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
             args: Box::from([node.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let node3 = ast::StmtReturn {
         value: Some(Box::new(node2.into())),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     generator.stmt(&node3.into())
 }

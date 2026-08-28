@@ -7,7 +7,7 @@ N806.py:3:5: N806 (non-lowercase-variable-in-function) Variable `stillBad` in fu
 2 |     badAllowed = 0
 3 |     stillBad = 0
   |     ^^^^^^^^ N806 (non-lowercase-variable-in-function)
-4 | 
+4 |
 5 |     BAD_ALLOWED = 0
   |
 

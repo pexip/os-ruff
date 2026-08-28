@@ -7,7 +7,7 @@ PYI013.pyi:5:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class bo
 4 |     value: int
 5 |     ...  # Error
   |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
-6 | 
+6 |
 7 | class OneAttributeClass2:
   |
   = help: Remove unnecessary `...`
@@ -81,7 +81,7 @@ PYI013.pyi:17:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class b
 16 |     ...
 17 |     ...  # Error
    |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
-18 | 
+18 |
 19 | class DocstringClass:
    |
    = help: Remove unnecessary `...`
@@ -98,10 +98,10 @@ PYI013.pyi:17:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class b
 PYI013.pyi:24:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class body must not contain `...`
    |
 22 |     """
-23 | 
+23 |
 24 |     ...  # Error
    |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
-25 | 
+25 |
 26 | class NonEmptyChild(Exception):
    |
    = help: Remove unnecessary `...`
@@ -121,7 +121,7 @@ PYI013.pyi:28:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class b
 27 |     value: int
 28 |     ...  # Error
    |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
-29 | 
+29 |
 30 | class NonEmptyChild2(Exception):
    |
    = help: Remove unnecessary `...`
@@ -159,7 +159,7 @@ PYI013.pyi:36:5: PYI013 (ellipsis-in-non-empty-class-body) [*] Non-empty class b
 35 |     value: int
 36 |     ...  # Error
    |     ^^^ PYI013 (ellipsis-in-non-empty-class-body)
-37 | 
+37 |
 38 |     def __init__():
    |
    = help: Remove unnecessary `...`

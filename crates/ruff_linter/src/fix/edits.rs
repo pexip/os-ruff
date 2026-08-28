@@ -2,37 +2,38 @@
 
 use anyhow::{Context, Result};
 
-use ruff_diagnostics::Edit;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
-use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::textwrap::dedent_to;
 use ruff_python_trivia::{
-    has_leading_content, is_python_whitespace, CommentRanges, PythonWhitespace, SimpleTokenKind,
-    SimpleTokenizer,
+    CommentRanges, PythonWhitespace, SimpleTokenKind, SimpleTokenizer, has_leading_content,
+    is_python_whitespace,
 };
-use ruff_source_file::{Locator, NewlineWithTrailingNewline, UniversalNewlines};
+use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Edit;
+use crate::Locator;
 use crate::cst::matchers::{match_function_def, match_indented_block, match_statement};
 use crate::fix::codemods;
 use crate::fix::codemods::CodegenStylist;
 use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder};
 
-/// Return the `Fix` to use when deleting a `Stmt`.
+/// Return the [`Edit`] to use when deleting a [`Stmt`].
 ///
-/// In some cases, this is as simple as deleting the `Range` of the `Stmt`
+/// In some cases, this is as simple as deleting the [`TextRange`] of the [`Stmt`]
 /// itself. However, there are a few exceptions:
-/// - If the `Stmt` is _not_ the terminal statement in a multi-statement line,
+/// - If the [`Stmt`] is _not_ the terminal statement in a multi-statement line,
 ///   we need to delete up to the start of the next statement (and avoid
 ///   deleting any content that precedes the statement).
-/// - If the `Stmt` is the terminal statement in a multi-statement line, we need
+/// - If the [`Stmt`] is the terminal statement in a multi-statement line, we need
 ///   to avoid deleting any content that precedes the statement.
-/// - If the `Stmt` has no trailing and leading content, then it's convenient to
+/// - If the [`Stmt`] has no trailing and leading content, then it's convenient to
 ///   remove the entire start and end lines.
-/// - If the `Stmt` is the last statement in its parent body, replace it with a
+/// - If the [`Stmt`] is the last statement in its parent body, replace it with a
 ///   `pass` instead.
 pub(crate) fn delete_stmt(
     stmt: &Stmt,
@@ -48,9 +49,11 @@ pub(crate) fn delete_stmt(
         if let Some(semicolon) = trailing_semicolon(stmt.end(), locator) {
             let next = next_stmt_break(semicolon, locator);
             Edit::deletion(stmt.start(), next)
-        } else if has_leading_content(stmt.start(), locator) {
+        } else if has_leading_content(stmt.start(), locator.contents()) {
             Edit::range_deletion(stmt.range())
-        } else if let Some(start) = indexer.preceded_by_continuations(stmt.start(), locator) {
+        } else if let Some(start) =
+            indexer.preceded_by_continuations(stmt.start(), locator.contents())
+        {
             Edit::deletion(start, stmt.end())
         } else {
             let range = locator.full_lines_range(stmt.range());
@@ -99,11 +102,8 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
     }
     // Ex) `x = 1  # noqa here`
     else {
-        // Replace `# noqa here` with `# here`.
-        Edit::range_replacement(
-            "# ".to_string(),
-            TextRange::new(range.start(), range.end() + trailing_space_len),
-        )
+        // Remove `# noqa here` and whitespace
+        Edit::deletion(range.start() - leading_space_len, line_range.end())
     }
 }
 
@@ -209,6 +209,7 @@ pub(crate) fn remove_argument<T: Ranged>(
     arguments: &Arguments,
     parentheses: Parentheses,
     source: &str,
+    comment_ranges: &CommentRanges,
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
     let (before, after): (Vec<_>, Vec<_>) = arguments
@@ -216,6 +217,15 @@ pub(crate) fn remove_argument<T: Ranged>(
         .map(|arg| arg.range())
         .filter(|range| argument.range() != *range)
         .partition(|range| range.start() < argument.start());
+
+    let arg = arguments
+        .arguments_source_order()
+        .find(|arg| arg.range() == argument.range())
+        .context("Unable to find argument")?;
+
+    let parenthesized_range =
+        parenthesized_range(arg.value().into(), arguments.into(), comment_ranges, source)
+            .unwrap_or(arg.range());
 
     if !after.is_empty() {
         // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
@@ -234,7 +244,7 @@ pub(crate) fn remove_argument<T: Ranged>(
             })
             .context("Unable to find next token")?;
 
-        Ok(Edit::deletion(argument.start(), next.start()))
+        Ok(Edit::deletion(parenthesized_range.start(), next.start()))
     } else if let Some(previous) = before.iter().map(Ranged::end).max() {
         // Case 2: argument or keyword is the last node, so delete from the start of the
         // previous comma to the end of the argument.
@@ -245,7 +255,7 @@ pub(crate) fn remove_argument<T: Ranged>(
             .find(|token| token.kind == SimpleTokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
-        Ok(Edit::deletion(comma.start(), argument.end()))
+        Ok(Edit::deletion(comma.start(), parenthesized_range.end()))
     } else {
         // Case 3: argument or keyword is the only node, so delete the arguments (but preserve
         // parentheses, if needed).
@@ -257,19 +267,23 @@ pub(crate) fn remove_argument<T: Ranged>(
 }
 
 /// Generic function to add arguments or keyword arguments to function calls.
+///
+/// The new argument will be inserted before the first existing keyword argument in `arguments`, if
+/// there are any present. Otherwise, the new argument is added to the end of the argument list.
 pub(crate) fn add_argument(
     argument: &str,
     arguments: &Arguments,
     comment_ranges: &CommentRanges,
     source: &str,
 ) -> Edit {
-    if let Some(last) = arguments.arguments_source_order().last() {
+    if let Some(ast::Keyword { range, value, .. }) = arguments.keywords.first() {
+        let keyword = parenthesized_range(value.into(), arguments.into(), comment_ranges, source)
+            .unwrap_or(*range);
+        Edit::insertion(format!("{argument}, "), keyword.start())
+    } else if let Some(last) = arguments.arguments_source_order().last() {
         // Case 1: existing arguments, so append after the last argument.
         let last = parenthesized_range(
-            match last {
-                ArgOrKeyword::Arg(arg) => arg.into(),
-                ArgOrKeyword::Keyword(keyword) => (&keyword.value).into(),
-            },
+            last.value().into(),
             arguments.into(),
             comment_ranges,
             source,
@@ -288,11 +302,11 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &s
         .args
         .iter()
         .filter(|arg| arg.default.is_none())
-        .last()
+        .next_back()
     {
         // Case 1: at least one regular parameter, so append after the last one.
         Edit::insertion(format!(", {parameter}"), last.end())
-    } else if parameters.args.first().is_some() {
+    } else if !parameters.args.is_empty() {
         // Case 2: no regular parameters, but at least one keyword parameter, so add before the
         // first.
         let pos = parameters.start();
@@ -316,7 +330,7 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &s
         } else {
             Edit::insertion(format!(", {parameter}"), slash.start())
         }
-    } else if parameters.kwonlyargs.first().is_some() {
+    } else if !parameters.kwonlyargs.is_empty() {
         // Case 3: no regular parameter, but a keyword-only parameter exist, so add parameter before that.
         // We need to backtrack to before the `*` separator.
         // We know there is no non-keyword-only params, so we can safely assume that the `*` separator is the first
@@ -591,20 +605,20 @@ fn all_lines_fit(
 
 #[cfg(test)]
 mod tests {
-    use anyhow::{anyhow, Result};
+    use anyhow::{Result, anyhow};
+    use ruff_source_file::SourceFileBuilder;
     use test_case::test_case;
 
-    use ruff_diagnostics::{Diagnostic, Edit, Fix};
     use ruff_python_ast::Stmt;
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::{parse_expression, parse_module};
-    use ruff_source_file::Locator;
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
     use crate::fix::apply_fixes;
     use crate::fix::edits::{
         add_to_dunder_all, make_redundant_alias, next_stmt_break, trailing_semicolon,
     };
+    use crate::{Edit, Fix, Locator, OldDiagnostic};
 
     /// Parse the given source using [`Mode::Module`] and return the first statement.
     fn parse_first_stmt(source: &str) -> Result<Stmt> {
@@ -729,20 +743,22 @@ x = 1 \
         let locator = Locator::new(raw);
         let edits = {
             let parsed = parse_expression(raw)?;
-            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+            let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             add_to_dunder_all(names.iter().copied(), parsed.expr(), &stylist)
         };
         let diag = {
             use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
             let mut iter = edits.into_iter();
-            Diagnostic::new(
+            let mut diagnostic = OldDiagnostic::new(
                 MissingNewlineAtEndOfFile, // The choice of rule here is arbitrary.
                 TextRange::default(),
-            )
-            .with_fix(Fix::safe_edits(
+                &SourceFileBuilder::new("<filename>", "<code>").finish(),
+            );
+            diagnostic.fix = Some(Fix::safe_edits(
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,
                 iter,
-            ))
+            ));
+            diagnostic
         };
         assert_eq!(apply_fixes([diag].iter(), &locator).code, expect);
         Ok(())

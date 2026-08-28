@@ -1,12 +1,8 @@
-// TODO support untitled files for the LSP use case. Wrap a `str` and `String`
-//    The main question is how `as_std_path` would work for untitled files, that can only exist in the LSP case
-//    but there's no compile time guarantee that a [`OsSystem`] never gets an untitled file path.
-
 use camino::{Utf8Path, Utf8PathBuf};
 use std::borrow::Borrow;
 use std::fmt::Formatter;
 use std::ops::Deref;
-use std::path::{Path, StripPrefixError};
+use std::path::{Path, PathBuf, StripPrefixError};
 
 /// A slice of a path on [`System`](super::System) (akin to [`str`]).
 ///
@@ -21,6 +17,56 @@ impl SystemPath {
         // SAFETY: FsPath is marked as #[repr(transparent)] so the conversion from a
         // *const Utf8Path to a *const FsPath is valid.
         unsafe { &*(path as *const Utf8Path as *const SystemPath) }
+    }
+
+    /// Takes any path, and when possible, converts Windows UNC paths to regular paths.
+    /// If the path can't be converted, it's returned unmodified.
+    ///
+    /// On non-Windows this is no-op.
+    ///
+    /// `\\?\C:\Windows` will be converted to `C:\Windows`,
+    /// but `\\?\C:\COM` will be left as-is (due to a reserved filename).
+    ///
+    /// Use this to pass arbitrary paths to programs that may not be UNC-aware.
+    ///
+    /// It's generally safe to pass UNC paths to legacy programs, because
+    /// these paths contain a reserved prefix, so will gracefully fail
+    /// if used with legacy APIs that don't support UNC.
+    ///
+    /// This function does not perform any I/O.
+    ///
+    /// Currently paths with unpaired surrogates aren't converted even if they
+    /// could be, due to limitations of Rust's `OsStr` API.
+    ///
+    /// To check if a path remained as UNC, use `path.as_os_str().as_encoded_bytes().starts_with(b"\\\\")`.
+    #[inline]
+    pub fn simplified(&self) -> &SystemPath {
+        // SAFETY: simplified only trims the path, that means the returned path must be a valid UTF-8 path.
+        SystemPath::from_std_path(dunce::simplified(self.as_std_path())).unwrap()
+    }
+
+    /// Returns `true` if the `SystemPath` is absolute, i.e., if it is independent of
+    /// the current directory.
+    ///
+    /// * On Unix, a path is absolute if it starts with the root, so
+    ///   `is_absolute` and [`has_root`] are equivalent.
+    ///
+    /// * On Windows, a path is absolute if it has a prefix and starts with the
+    ///   root: `c:\windows` is absolute, while `c:temp` and `\temp` are not.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// assert!(!SystemPath::new("foo.txt").is_absolute());
+    /// ```
+    ///
+    /// [`has_root`]: Utf8Path::has_root
+    #[inline]
+    #[must_use]
+    pub fn is_absolute(&self) -> bool {
+        self.0.is_absolute()
     }
 
     /// Extracts the file extension, if possible.
@@ -121,6 +167,39 @@ impl SystemPath {
     #[must_use]
     pub fn parent(&self) -> Option<&SystemPath> {
         self.0.parent().map(SystemPath::new)
+    }
+
+    /// Produces an iterator over `SystemPath` and its ancestors.
+    ///
+    /// The iterator will yield the `SystemPath` that is returned if the [`parent`] method is used zero
+    /// or more times. That means, the iterator will yield `&self`, `&self.parent().unwrap()`,
+    /// `&self.parent().unwrap().parent().unwrap()` and so on. If the [`parent`] method returns
+    /// [`None`], the iterator will do likewise. The iterator will always yield at least one value,
+    /// namely `&self`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// let mut ancestors = SystemPath::new("/foo/bar").ancestors();
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("/foo/bar")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("/foo")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("/")));
+    /// assert_eq!(ancestors.next(), None);
+    ///
+    /// let mut ancestors = SystemPath::new("../foo/bar").ancestors();
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("../foo/bar")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("../foo")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("..")));
+    /// assert_eq!(ancestors.next(), Some(SystemPath::new("")));
+    /// assert_eq!(ancestors.next(), None);
+    /// ```
+    ///
+    /// [`parent`]: SystemPath::parent
+    #[inline]
+    pub fn ancestors(&self) -> impl Iterator<Item = &SystemPath> {
+        self.0.ancestors().map(SystemPath::new)
     }
 
     /// Produces an iterator over the [`camino::Utf8Component`]s of the path.
@@ -416,7 +495,13 @@ impl ToOwned for SystemPath {
 /// The path is guaranteed to be valid UTF-8.
 #[repr(transparent)]
 #[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
-pub struct SystemPathBuf(Utf8PathBuf);
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(transparent)
+)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct SystemPathBuf(#[cfg_attr(feature = "schemars", schemars(with = "String"))] Utf8PathBuf);
 
 impl SystemPathBuf {
     pub fn new() -> Self {
@@ -473,6 +558,14 @@ impl SystemPathBuf {
         self.0
     }
 
+    pub fn into_std_path_buf(self) -> PathBuf {
+        self.0.into_std_path_buf()
+    }
+
+    pub fn into_string(self) -> String {
+        self.0.into_string()
+    }
+
     #[inline]
     pub fn as_path(&self) -> &SystemPath {
         SystemPath::new(&self.0)
@@ -487,6 +580,12 @@ impl Borrow<SystemPath> for SystemPathBuf {
 
 impl From<&str> for SystemPathBuf {
     fn from(value: &str) -> Self {
+        SystemPathBuf::from_utf8_path_buf(Utf8PathBuf::from(value))
+    }
+}
+
+impl From<String> for SystemPathBuf {
+    fn from(value: String) -> Self {
         SystemPathBuf::from_utf8_path_buf(Utf8PathBuf::from(value))
     }
 }
@@ -525,6 +624,13 @@ impl AsRef<SystemPath> for Utf8PathBuf {
     }
 }
 
+impl AsRef<SystemPath> for camino::Utf8Component<'_> {
+    #[inline]
+    fn as_ref(&self) -> &SystemPath {
+        SystemPath::new(self.as_str())
+    }
+}
+
 impl AsRef<SystemPath> for str {
     #[inline]
     fn as_ref(&self) -> &SystemPath {
@@ -552,6 +658,22 @@ impl Deref for SystemPathBuf {
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.as_path()
+    }
+}
+
+impl<P: AsRef<SystemPath>> FromIterator<P> for SystemPathBuf {
+    fn from_iter<I: IntoIterator<Item = P>>(iter: I) -> Self {
+        let mut buf = SystemPathBuf::new();
+        buf.extend(iter);
+        buf
+    }
+}
+
+impl<P: AsRef<SystemPath>> Extend<P> for SystemPathBuf {
+    fn extend<I: IntoIterator<Item = P>>(&mut self, iter: I) {
+        for path in iter {
+            self.push(path);
+        }
     }
 }
 

@@ -23,7 +23,7 @@ PYI057.py:5:29: PYI057 (byte-string-usage) Do not use `collections.abc.ByteStrin
 PYI057.py:8:4: PYI057 (byte-string-usage) Do not use `typing.ByteString`, which has unclear semantics and is deprecated
    |
  6 | from foo import ByteString
- 7 | 
+ 7 |
  8 | a: typing.ByteString
    |    ^^^^^^^^^^^^^^^^^ PYI057 (byte-string-usage)
  9 | b: collections.abc.ByteString

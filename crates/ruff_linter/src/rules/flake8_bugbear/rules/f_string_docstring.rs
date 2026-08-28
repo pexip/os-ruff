@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -28,32 +28,33 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [PEP 257](https://peps.python.org/pep-0257/)
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: Formatted string literals](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
-#[violation]
-pub struct FStringDocstring;
+#[derive(ViolationMetadata)]
+pub(crate) struct FStringDocstring;
 
 impl Violation for FStringDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "f-string used as docstring. Python will interpret this as a joined string, rather than a docstring."
-        )
+        "f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.".to_string()
     }
 }
 
 /// B021
-pub(crate) fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn f_string_docstring(checker: &Checker, body: &[Stmt]) {
     let Some(stmt) = body.first() else {
         return;
     };
-    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt else {
+    let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    else {
         return;
     };
     if !value.is_f_string_expr() {
         return;
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(FStringDocstring, stmt.identifier()));
+    checker.report_diagnostic(FStringDocstring, stmt.identifier());
 }

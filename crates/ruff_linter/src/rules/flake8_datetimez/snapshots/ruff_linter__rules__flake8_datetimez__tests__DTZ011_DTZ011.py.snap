@@ -6,7 +6,7 @@ DTZ011.py:4:1: DTZ011 (call-date-today) `datetime.date.today()` used
 3 | # qualified
 4 | datetime.date.today()
   | ^^^^^^^^^^^^^^^^^^^^^ DTZ011 (call-date-today)
-5 | 
+5 |
 6 | from datetime import date
   |
   = help: Use `datetime.datetime.now(tz=...).date()` instead

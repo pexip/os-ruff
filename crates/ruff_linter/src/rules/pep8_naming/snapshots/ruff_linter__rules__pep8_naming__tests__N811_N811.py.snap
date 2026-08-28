@@ -15,6 +15,7 @@ N811.py:2:17: N811 (constant-imported-as-non-constant) Constant `CONSTANT` impor
 2 | from mod import CONSTANT as constant
   |                 ^^^^^^^^^^^^^^^^^^^^ N811 (constant-imported-as-non-constant)
 3 | from mod import ANOTHER_CONSTANT as another_constant
+4 | import mod.CON as c
   |
 
 N811.py:3:17: N811 (constant-imported-as-non-constant) Constant `ANOTHER_CONSTANT` imported as non-constant `another_constant`
@@ -23,4 +24,25 @@ N811.py:3:17: N811 (constant-imported-as-non-constant) Constant `ANOTHER_CONSTAN
 2 | from mod import CONSTANT as constant
 3 | from mod import ANOTHER_CONSTANT as another_constant
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N811 (constant-imported-as-non-constant)
+4 | import mod.CON as c
+5 | from mod import C as c
+  |
+
+N811.py:4:8: N811 (constant-imported-as-non-constant) Constant `CON` imported as non-constant `c`
+  |
+2 | from mod import CONSTANT as constant
+3 | from mod import ANOTHER_CONSTANT as another_constant
+4 | import mod.CON as c
+  |        ^^^^^^^^^^^^ N811 (constant-imported-as-non-constant)
+5 | from mod import C as c
+  |
+
+N811.py:5:17: N811 (constant-imported-as-non-constant) Constant `C` imported as non-constant `c`
+  |
+3 | from mod import ANOTHER_CONSTANT as another_constant
+4 | import mod.CON as c
+5 | from mod import C as c
+  |                 ^^^^^^ N811 (constant-imported-as-non-constant)
+6 |
+7 | # These are all OK:
   |

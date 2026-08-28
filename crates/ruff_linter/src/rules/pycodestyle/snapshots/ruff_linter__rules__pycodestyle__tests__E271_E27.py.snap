@@ -195,7 +195,7 @@ E27.py:71:5: E271 (multiple-spaces-after-keyword) [*] Multiple spaces after keyw
 70 | #: E271
 71 | type  Number = int
    |     ^^ E271 (multiple-spaces-after-keyword)
-72 | 
+72 |
 73 | #: E273
    |
    = help: Replace with single space

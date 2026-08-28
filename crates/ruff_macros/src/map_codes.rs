@@ -2,10 +2,10 @@ use std::collections::{BTreeMap, HashMap};
 
 use itertools::Itertools;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::{
-    parenthesized, parse::Parse, spanned::Spanned, Attribute, Error, Expr, ExprCall, ExprMatch,
-    Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
+    Attribute, Error, Expr, ExprCall, ExprMatch, Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
+    parenthesized, parse::Parse, spanned::Spanned,
 };
 
 use crate::rule_code_prefix::{get_prefix_ident, intersection_all};
@@ -143,9 +143,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         for (prefix, rules) in &rules_by_prefix {
             let prefix_ident = get_prefix_ident(prefix);
             let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
-            let attrs = match attrs.as_slice() {
-                [] => quote!(),
-                [..] => quote!(#(#attrs)*),
+            let attrs = if attrs.is_empty() {
+                quote!()
+            } else {
+                quote!(#(#attrs)*)
             };
             all_codes.push(quote! {
                 #attrs Self::#linter(#linter::#prefix_ident)
@@ -161,9 +162,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             });
             let prefix_ident = get_prefix_ident(&prefix);
             let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
-            let attrs = match attrs.as_slice() {
-                [] => quote!(),
-                [..] => quote!(#(#attrs)*),
+            let attrs = if attrs.is_empty() {
+                quote!()
+            } else {
+                quote!(#(#attrs)*)
             };
             prefix_into_iter_match_arms.extend(quote! {
                 #attrs #linter::#prefix_ident => vec![#(#rule_paths,)*].into_iter(),
@@ -172,7 +174,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
 
         output.extend(quote! {
             impl #linter {
-                pub fn rules(&self) -> ::std::vec::IntoIter<Rule> {
+                pub(crate) fn rules(&self) -> ::std::vec::IntoIter<Rule> {
                     match self { #prefix_into_iter_match_arms }
                 }
             }
@@ -180,7 +182,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     }
     output.extend(quote! {
         impl RuleCodePrefix {
-            pub fn parse(linter: &Linter, code: &str) -> Result<Self, crate::registry::FromCodeOrNameError> {
+            pub(crate) fn parse(linter: &Linter, code: &str) -> Result<Self, crate::registry::FromCodeOrNameError> {
                 use std::str::FromStr;
 
                 Ok(match linter {
@@ -188,7 +190,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 })
             }
 
-            pub fn rules(&self) -> ::std::vec::IntoIter<Rule> {
+            pub(crate) fn rules(&self) -> ::std::vec::IntoIter<Rule> {
                 match self {
                     #(RuleCodePrefix::#linter_idents(prefix) => prefix.clone().rules(),)*
                 }
@@ -317,7 +319,7 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 matches!(self.group(), RuleGroup::Preview)
             }
 
-            pub fn is_stable(&self) -> bool {
+            pub(crate) fn is_stable(&self) -> bool {
                 matches!(self.group(), RuleGroup::Stable)
             }
 
@@ -369,7 +371,7 @@ fn generate_iter_impl(
     quote! {
         impl Linter {
             /// Rules not in the preview.
-            pub fn rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
+            pub(crate) fn rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
                 match self {
                     #linter_rules_match_arms
                 }
@@ -383,7 +385,7 @@ fn generate_iter_impl(
         }
 
         impl RuleCodePrefix {
-            pub fn iter() -> impl Iterator<Item = RuleCodePrefix> {
+            pub(crate) fn iter() -> impl Iterator<Item = RuleCodePrefix> {
                 use strum::IntoEnumIterator;
 
                 let mut prefixes = Vec::new();
@@ -402,8 +404,6 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
 
-    let mut from_impls_for_diagnostic_kind = quote!();
-
     for Rule {
         name, attrs, path, ..
     } in input
@@ -413,21 +413,17 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             #name,
         });
         // Apply the `attrs` to each arm, like `[cfg(feature = "foo")]`.
-        rule_message_formats_match_arms
-            .extend(quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::message_formats(),});
-        rule_fixable_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::FIX_AVAILABILITY,},
+        rule_message_formats_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::message_formats(),},
         );
-        rule_explanation_match_arms
-            .extend(quote! {#(#attrs)* Self::#name => #path::explanation(),});
-
-        // Enable conversion from `DiagnosticKind` to `Rule`.
-        from_impls_for_diagnostic_kind
-            .extend(quote! {#(#attrs)* stringify!(#name) => Rule::#name,});
+        rule_fixable_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::FIX_AVAILABILITY,},
+        );
+        rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
     }
 
     quote! {
-        use ruff_diagnostics::Violation;
+        use crate::Violation;
 
         #[derive(
             EnumIter,
@@ -440,8 +436,10 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             PartialOrd,
             Ord,
             ::ruff_macros::CacheKey,
-            AsRefStr,
             ::strum_macros::IntoStaticStr,
+            ::strum_macros::EnumString,
+            ::serde::Serialize,
+            ::serde::Deserialize,
         )]
         #[repr(u16)]
         #[strum(serialize_all = "kebab-case")]
@@ -455,21 +453,13 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
             /// Returns the documentation for this rule.
             pub fn explanation(&self) -> Option<&'static str> {
+                use crate::ViolationMetadata;
                 match self { #rule_explanation_match_arms }
             }
 
             /// Returns the fix status of this rule.
-            pub const fn fixable(&self) -> ruff_diagnostics::FixAvailability {
+            pub const fn fixable(&self) -> crate::FixAvailability {
                 match self { #rule_fixable_match_arms }
-            }
-        }
-
-        impl AsRule for ruff_diagnostics::DiagnosticKind {
-            fn rule(&self) -> Rule {
-                match self.name.as_str() {
-                    #from_impls_for_diagnostic_kind
-                    _ => unreachable!("invalid rule name: {}", self.name),
-                }
             }
         }
     }

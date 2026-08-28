@@ -5,7 +5,7 @@ global_at_module_level.py:1:1: PLW0604 (global-at-module-level) `global` at modu
   |
 1 | global price  # W0604
   | ^^^^^^^^^^^^ PLW0604 (global-at-module-level)
-2 | 
+2 |
 3 | price = 25
   |
 
@@ -14,6 +14,6 @@ global_at_module_level.py:6:5: PLW0604 (global-at-module-level) `global` at modu
 5 | if True:
 6 |     global X  # W0604
   |     ^^^^^^^^ PLW0604 (global-at-module-level)
-7 | 
+7 |
 8 | def no_error():
   |

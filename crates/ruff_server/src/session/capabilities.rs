@@ -2,7 +2,7 @@ use lsp_types::ClientCapabilities;
 use ruff_linter::display_settings;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientCapabilities {
     pub(crate) code_action_deferred_edit_resolution: bool,
     pub(crate) apply_edit: bool,
@@ -37,18 +37,12 @@ impl ResolvedClientCapabilities {
             .and_then(|workspace_edit| workspace_edit.document_changes)
             .unwrap_or_default();
 
-        let workspace_refresh = true;
-
-        // TODO(jane): Once the bug involving workspace.diagnostic(s) deserialization has been fixed,
-        // uncomment this.
-        /*
         let workspace_refresh = client_capabilities
             .workspace
             .as_ref()
-            .and_then(|workspace| workspace.diagnostic.as_ref())
+            .and_then(|workspace| workspace.diagnostics.as_ref())
             .and_then(|diagnostic| diagnostic.refresh_support)
             .unwrap_or_default();
-        */
 
         let pull_diagnostics = client_capabilities
             .text_document

@@ -1,20 +1,23 @@
-use std::fmt::Formatter;
+use std::fmt;
 use std::sync::Arc;
 
 use countme::Count;
 use dashmap::mapref::entry::Entry;
-use salsa::{Durability, Setter};
-
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
+use ruff_text_size::{Ranged, TextRange};
+use salsa::plumbing::AsId;
+use salsa::{Durability, Setter};
 
+use crate::diagnostic::{Span, UnifiedFile};
 use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
-use crate::system::{Metadata, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
+use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
-use crate::{vendored, Db, FxDashMap};
+use crate::{Db, FxDashMap, vendored};
 
 mod file_root;
 mod path;
@@ -47,7 +50,7 @@ pub fn vendored_path_to_file(
 }
 
 /// Lookup table that maps [file paths](`FilePath`) to salsa interned [`File`] instances.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Files {
     inner: Arc<FilesInner>,
 }
@@ -60,8 +63,8 @@ struct FilesInner {
     /// so that queries that depend on the existence of a file are re-executed when the file is created.
     system_by_path: FxDashMap<SystemPathBuf, File>,
 
-    /// Lookup table that maps [`SystemVirtualPathBuf`]s to salsa interned [`File`] instances.
-    system_virtual_by_path: FxDashMap<SystemVirtualPathBuf, File>,
+    /// Lookup table that maps [`SystemVirtualPathBuf`]s to [`VirtualFile`] instances.
+    system_virtual_by_path: FxDashMap<SystemVirtualPathBuf, VirtualFile>,
 
     /// Lookup table that maps vendored files to the salsa [`File`] ingredients.
     vendored_by_path: FxDashMap<VendoredPathBuf, File>,
@@ -85,14 +88,16 @@ impl Files {
             .system_by_path
             .entry(absolute.clone())
             .or_insert_with(|| {
-                tracing::trace!("Adding file {path}");
+                tracing::trace!("Adding file '{path}'");
 
                 let metadata = db.system().path_metadata(path);
                 let durability = self
                     .root(db, path)
                     .map_or(Durability::default(), |root| root.durability(db));
 
-                let builder = File::builder(FilePath::System(absolute)).durability(durability);
+                let builder = File::builder(FilePath::System(absolute))
+                    .durability(durability)
+                    .path_durability(Durability::HIGH);
 
                 let builder = match metadata {
                     Ok(metadata) if metadata.file_type().is_file() => builder
@@ -101,7 +106,9 @@ impl Files {
                     Ok(metadata) if metadata.file_type().is_directory() => {
                         builder.status(FileStatus::IsADirectory)
                     }
-                    _ => builder.status(FileStatus::NotFound),
+                    _ => builder
+                        .status(FileStatus::NotFound)
+                        .status_durability(Durability::MEDIUM.max(durability)),
                 };
 
                 builder.new(db)
@@ -131,7 +138,7 @@ impl Files {
                     Err(_) => return Err(FileError::NotFound),
                 };
 
-                tracing::trace!("Adding vendored file {}", path);
+                tracing::trace!("Adding vendored file `{}`", path);
                 let file = File::builder(FilePath::Vendored(path.to_path_buf()))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())
@@ -147,31 +154,33 @@ impl Files {
         Ok(file)
     }
 
-    /// Looks up a virtual file by its `path`.
+    /// Create a new virtual file at the given path and store it for future lookups.
     ///
-    /// For a non-existing file, creates a new salsa [`File`] ingredient and stores it for future lookups.
-    ///
-    /// The operations fails if the system failed to provide a metadata for the path.
-    pub fn add_virtual_file(&self, db: &dyn Db, path: &SystemVirtualPath) -> Option<File> {
-        let file = match self.inner.system_virtual_by_path.entry(path.to_path_buf()) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => {
-                let metadata = db.system().virtual_path_metadata(path).ok()?;
+    /// This will always create a new file, overwriting any existing file at `path` in the internal
+    /// storage.
+    pub fn virtual_file(&self, db: &dyn Db, path: &SystemVirtualPath) -> VirtualFile {
+        tracing::trace!("Adding virtual file {}", path);
+        let virtual_file = VirtualFile(
+            File::builder(FilePath::SystemVirtual(path.to_path_buf()))
+                .path_durability(Durability::HIGH)
+                .status(FileStatus::Exists)
+                .revision(FileRevision::zero())
+                .permissions(None)
+                .permissions_durability(Durability::HIGH)
+                .new(db),
+        );
+        self.inner
+            .system_virtual_by_path
+            .insert(path.to_path_buf(), virtual_file);
+        virtual_file
+    }
 
-                tracing::trace!("Adding virtual file {}", path);
-
-                let file = File::builder(FilePath::SystemVirtual(path.to_path_buf()))
-                    .revision(metadata.revision())
-                    .permissions(metadata.permissions())
-                    .new(db);
-
-                entry.insert(file);
-
-                file
-            }
-        };
-
-        Some(file)
+    /// Tries to look up a virtual file by its path. Returns `None` if no such file exists yet.
+    pub fn try_virtual_file(&self, path: &SystemVirtualPath) -> Option<VirtualFile> {
+        self.inner
+            .system_virtual_by_path
+            .get(&path.to_path_buf())
+            .map(|entry| *entry.value())
     }
 
     /// Looks up the closest  root for `path`. Returns `None` if `path` isn't enclosed by any source root.
@@ -211,7 +220,7 @@ impl Files {
     /// That's why [`File::sync_path`] and [`File::sync_path`] is preferred if it is known that the path is a file.
     pub fn sync_recursively(db: &mut dyn Db, path: &SystemPath) {
         let path = SystemPath::absolute(path, db.system().current_directory());
-        tracing::debug!("Syncing all files in {path}");
+        tracing::debug!("Syncing all files in '{path}'");
 
         let inner = Arc::clone(&db.files().inner);
         for entry in inner.system_by_path.iter_mut() {
@@ -224,9 +233,7 @@ impl Files {
 
         for root in roots.all() {
             if root.path(db).starts_with(&path) {
-                root.set_revision(db)
-                    .with_durability(Durability::HIGH)
-                    .to(FileRevision::now());
+                root.set_revision(db).to(FileRevision::now());
             }
         }
     }
@@ -249,21 +256,12 @@ impl Files {
         let roots = inner.roots.read().unwrap();
 
         for root in roots.all() {
-            root.set_revision(db)
-                .with_durability(Durability::HIGH)
-                .to(FileRevision::now());
-        }
-    }
-
-    #[must_use]
-    pub fn snapshot(&self) -> Self {
-        Self {
-            inner: Arc::clone(&self.inner),
+            root.set_revision(db).to(FileRevision::now());
         }
     }
 }
 
-impl std::fmt::Debug for Files {
+impl fmt::Debug for Files {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut map = f.debug_map();
 
@@ -277,10 +275,15 @@ impl std::fmt::Debug for Files {
 impl std::panic::RefUnwindSafe for Files {}
 
 /// A file that's either stored on the host system's file system or in the vendored file system.
+///
+/// # Ordering
+/// Ordering is based on the file's salsa-assigned id and not on its values.
+/// The id may change between runs.
 #[salsa::input]
+#[derive(PartialOrd, Ord)]
 pub struct File {
-    /// The path of the file.
-    #[return_ref]
+    /// The path of the file (immutable).
+    #[returns(ref)]
     pub path: FilePath,
 
     /// The unix permissions of the file. Only supported on unix systems. Always `None` on Windows
@@ -322,6 +325,9 @@ impl File {
             }
             FilePath::Vendored(vendored) => db.vendored().read_to_string(vendored),
             FilePath::SystemVirtual(system_virtual) => {
+                // Add a dependency on the revision to ensure the operation gets re-executed when the file changes.
+                let _ = self.revision(db);
+
                 db.system().read_virtual_path_to_string(system_virtual)
             }
         }
@@ -346,6 +352,9 @@ impl File {
                 "Reading a notebook from the vendored file system is not supported.",
             ))),
             FilePath::SystemVirtual(system_virtual) => {
+                // Add a dependency on the revision to ensure the operation gets re-executed when the file changes.
+                let _ = self.revision(db);
+
                 db.system().read_virtual_path_to_notebook(system_virtual)
             }
         }
@@ -356,6 +365,13 @@ impl File {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         Files::touch_root(db, &absolute);
         Self::sync_system_path(db, &absolute, None);
+    }
+
+    /// Increments the revision for the virtual file at `path`.
+    pub fn sync_virtual_path(db: &mut dyn Db, path: &SystemVirtualPath) {
+        if let Some(virtual_file) = db.files().try_virtual_file(path) {
+            virtual_file.sync(db);
+        }
     }
 
     /// Syncs the [`File`]'s state with the state of the file on the system.
@@ -370,35 +386,20 @@ impl File {
             FilePath::Vendored(_) => {
                 // Readonly, can never be out of date.
             }
-            FilePath::SystemVirtual(system_virtual) => {
-                Self::sync_system_virtual_path(db, &system_virtual, self);
+            FilePath::SystemVirtual(_) => {
+                VirtualFile(self).sync(db);
             }
         }
     }
 
+    /// Private method providing the implementation for [`Self::sync_path`] and [`Self::sync`] for
+    /// system paths.
     fn sync_system_path(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
         let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
             return;
         };
-        let metadata = db.system().path_metadata(path);
-        let durability = db.files().root(db, path).map(|root| root.durability(db));
-        Self::sync_impl(db, metadata, file, durability);
-    }
 
-    fn sync_system_virtual_path(db: &mut dyn Db, path: &SystemVirtualPath, file: File) {
-        let metadata = db.system().virtual_path_metadata(path);
-        Self::sync_impl(db, metadata, file, None);
-    }
-
-    /// Private method providing the implementation for [`Self::sync_system_path`] and
-    /// [`Self::sync_system_virtual_path`].
-    fn sync_impl(
-        db: &mut dyn Db,
-        metadata: crate::system::Result<Metadata>,
-        file: File,
-        durability: Option<Durability>,
-    ) {
-        let (status, revision, permission) = match metadata {
+        let (status, revision, permission) = match db.system().path_metadata(path) {
             Ok(metadata) if metadata.file_type().is_file() => (
                 FileStatus::Exists,
                 metadata.revision(),
@@ -410,31 +411,89 @@ impl File {
             _ => (FileStatus::NotFound, FileRevision::zero(), None),
         };
 
-        let durability = durability.unwrap_or_default();
-
         if file.status(db) != status {
-            tracing::debug!("Updating the status of {}", file.path(db),);
-            file.set_status(db).with_durability(durability).to(status);
+            tracing::debug!("Updating the status of `{}`", file.path(db));
+            file.set_status(db).to(status);
         }
 
         if file.revision(db) != revision {
-            tracing::debug!("Updating the revision of {}", file.path(db));
-            file.set_revision(db)
-                .with_durability(durability)
-                .to(revision);
+            tracing::debug!("Updating the revision of `{}`", file.path(db));
+            file.set_revision(db).to(revision);
         }
 
         if file.permissions(db) != permission {
-            tracing::debug!("Updating the permissions of {}", file.path(db),);
-            file.set_permissions(db)
-                .with_durability(durability)
-                .to(permission);
+            tracing::debug!("Updating the permissions of `{}`", file.path(db));
+            file.set_permissions(db).to(permission);
         }
     }
 
     /// Returns `true` if the file exists.
     pub fn exists(self, db: &dyn Db) -> bool {
         self.status(db) == FileStatus::Exists
+    }
+
+    /// Returns `true` if the file should be analyzed as a type stub.
+    pub fn is_stub(self, db: &dyn Db) -> bool {
+        self.source_type(db).is_stub()
+    }
+
+    pub fn source_type(self, db: &dyn Db) -> PySourceType {
+        match self.path(db) {
+            FilePath::System(path) => path
+                .extension()
+                .map_or(PySourceType::Python, PySourceType::from_extension),
+            FilePath::Vendored(_) => PySourceType::Stub,
+            FilePath::SystemVirtual(path) => path
+                .extension()
+                .map_or(PySourceType::Python, PySourceType::from_extension),
+        }
+    }
+}
+
+impl fmt::Debug for File {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        salsa::with_attached_database(|db| {
+            if f.alternate() {
+                f.debug_struct("File")
+                    .field("path", &self.path(db))
+                    .field("status", &self.status(db))
+                    .field("permissions", &self.permissions(db))
+                    .field("revision", &self.revision(db))
+                    .finish()
+            } else {
+                f.debug_tuple("File").field(&self.path(db)).finish()
+            }
+        })
+        .unwrap_or_else(|| f.debug_tuple("file").field(&self.as_id()).finish())
+    }
+}
+
+/// A virtual file that doesn't exist on the file system.
+///
+/// This is a wrapper around a [`File`] that provides additional methods to interact with a virtual
+/// file.
+#[derive(Copy, Clone)]
+pub struct VirtualFile(File);
+
+impl VirtualFile {
+    /// Returns the underlying [`File`].
+    pub fn file(&self) -> File {
+        self.0
+    }
+
+    /// Increments the revision of the underlying [`File`].
+    fn sync(&self, db: &mut dyn Db) {
+        let file = self.0;
+        tracing::debug!("Updating the revision of `{}`", file.path(db));
+        let current_revision = file.revision(db);
+        file.set_revision(db)
+            .to(FileRevision::new(current_revision.as_u128() + 1));
+    }
+
+    /// Closes the virtual file.
+    pub fn close(&self, db: &mut dyn Db) {
+        tracing::debug!("Closing virtual file `{}`", self.0.path(db));
+        self.0.set_status(db).to(FileStatus::NotFound);
     }
 }
 
@@ -461,8 +520,8 @@ pub enum FileError {
     NotFound,
 }
 
-impl std::fmt::Display for FileError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for FileError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             FileError::IsADirectory => f.write_str("Is a directory"),
             FileError::NotFound => f.write_str("Not found"),
@@ -472,13 +531,61 @@ impl std::fmt::Display for FileError {
 
 impl std::error::Error for FileError {}
 
+/// Range with its corresponding file.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct FileRange {
+    file: File,
+    range: TextRange,
+}
+
+impl FileRange {
+    pub const fn new(file: File, range: TextRange) -> Self {
+        Self { file, range }
+    }
+
+    pub const fn file(&self) -> File {
+        self.file
+    }
+}
+
+impl Ranged for FileRange {
+    #[inline]
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl TryFrom<&Span> for FileRange {
+    type Error = ();
+
+    fn try_from(value: &Span) -> Result<Self, Self::Error> {
+        let UnifiedFile::Ty(file) = value.file() else {
+            return Err(());
+        };
+
+        Ok(Self {
+            file: *file,
+            range: value.range().ok_or(())?,
+        })
+    }
+}
+
+impl TryFrom<Span> for FileRange {
+    type Error = ();
+
+    fn try_from(value: Span) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::file_revision::FileRevision;
-    use crate::files::{system_path_to_file, vendored_path_to_file, FileError};
-    use crate::system::DbWithTestSystem;
+    use crate::files::{FileError, system_path_to_file, vendored_path_to_file};
+    use crate::system::DbWithWritableSystem as _;
     use crate::tests::TestDb;
-    use crate::vendored::tests::VendoredFileSystemBuilder;
+    use crate::vendored::VendoredFileSystemBuilder;
+    use zip::CompressionMethod;
 
     #[test]
     fn system_existing_file() -> crate::system::Result<()> {
@@ -523,7 +630,7 @@ mod tests {
     fn stubbed_vendored_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
 
-        let mut vendored_builder = VendoredFileSystemBuilder::new();
+        let mut vendored_builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
         vendored_builder
             .add_file("test.pyi", "def foo() -> str")
             .unwrap();

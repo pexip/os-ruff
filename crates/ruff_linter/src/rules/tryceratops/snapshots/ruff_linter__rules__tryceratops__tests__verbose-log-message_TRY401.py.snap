@@ -54,7 +54,7 @@ TRY401.py:24:45: TRY401 (verbose-log-message) Redundant exception object include
 23 |         logger.exception(f"Found an error: {bad}")  # TRY401
 24 |         logger.exception(f"Found an error: {bad}")  # TRY401
    |                                             ^^^ TRY401 (verbose-log-message)
-25 | 
+25 |
 26 |         if True:
    |
 
@@ -142,7 +142,7 @@ TRY401.py:93:38: TRY401 (verbose-log-message) Redundant exception object include
 92 |         exception(f"Found an error: {bad}")  # TRY401
 93 |         exception(f"Found an error: {bad}")  # TRY401
    |                                      ^^^ TRY401 (verbose-log-message)
-94 | 
+94 |
 95 |         if True:
    |
 

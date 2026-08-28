@@ -1,13 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::{analyze, Modules, SemanticModel};
+use ruff_python_semantic::{Modules, SemanticModel, analyze};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers;
+use crate::rules::flake8_django::helpers;
 
 /// ## What it does
 /// Checks that a `__str__` method is defined in Django models.
@@ -40,18 +40,18 @@ use super::helpers;
 ///     def __str__(self):
 ///         return f"{self.field}"
 /// ```
-#[violation]
-pub struct DjangoModelWithoutDunderStr;
+#[derive(ViolationMetadata)]
+pub(crate) struct DjangoModelWithoutDunderStr;
 
 impl Violation for DjangoModelWithoutDunderStr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Model does not define `__str__` method")
+        "Model does not define `__str__` method".to_string()
     }
 }
 
 /// DJ008
-pub(crate) fn model_without_dunder_str(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn model_without_dunder_str(checker: &Checker, class_def: &ast::StmtClassDef) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -64,10 +64,7 @@ pub(crate) fn model_without_dunder_str(checker: &mut Checker, class_def: &ast::S
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
-        DjangoModelWithoutDunderStr,
-        class_def.identifier(),
-    ));
+    checker.report_diagnostic(DjangoModelWithoutDunderStr, class_def.identifier());
 }
 
 /// Returns `true` if the class has `__str__` method.

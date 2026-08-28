@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str::{self};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
 
@@ -35,12 +35,14 @@ use crate::rules::pep8_naming::helpers;
 /// from example import MyClassName
 /// ```
 ///
-/// [PEP 8]: https://peps.python.org/pep-0008/
-///
 /// ## Options
 /// - `lint.flake8-import-conventions.aliases`
-#[violation]
-pub struct CamelcaseImportedAsAcronym {
+/// - `lint.pep8-naming.ignore-names`
+/// - `lint.pep8-naming.extend-ignore-names`
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/
+#[derive(ViolationMetadata)]
+pub(crate) struct CamelcaseImportedAsAcronym {
     name: String,
     asname: String,
 }
@@ -60,32 +62,25 @@ pub(crate) fn camelcase_imported_as_acronym(
     alias: &Alias,
     stmt: &Stmt,
     checker: &Checker,
-) -> Option<Diagnostic> {
+) {
     if helpers::is_camelcase(name)
         && !str::is_cased_lowercase(asname)
         && str::is_cased_uppercase(asname)
         && helpers::is_acronym(name, asname)
     {
-        let ignore_names = &checker.settings.pep8_naming.ignore_names;
+        let ignore_names = &checker.settings().pep8_naming.ignore_names;
 
         // Ignore any explicitly-allowed names.
         if ignore_names.matches(name) || ignore_names.matches(asname) {
-            return None;
+            return;
         }
 
         // Ignore names that follow a community-agreed import convention.
-        if checker
-            .settings
-            .flake8_import_conventions
-            .aliases
-            .get(&*alias.name)
-            .map(String::as_str)
-            == Some(asname)
-        {
-            return None;
+        if is_ignored_because_of_import_convention(asname, stmt, alias, checker) {
+            return;
         }
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             CamelcaseImportedAsAcronym {
                 name: name.to_string(),
                 asname: asname.to_string(),
@@ -93,7 +88,36 @@ pub(crate) fn camelcase_imported_as_acronym(
             alias.range(),
         );
         diagnostic.set_parent(stmt.start());
-        return Some(diagnostic);
     }
-    None
+}
+
+fn is_ignored_because_of_import_convention(
+    asname: &str,
+    stmt: &Stmt,
+    alias: &Alias,
+    checker: &Checker,
+) -> bool {
+    let full_name = if let Some(import_from) = stmt.as_import_from_stmt() {
+        // Never test relative imports for exclusion because we can't resolve the full-module name.
+        let Some(module) = import_from.module.as_ref() else {
+            return false;
+        };
+
+        if import_from.level != 0 {
+            return false;
+        }
+
+        std::borrow::Cow::Owned(format!("{module}.{}", alias.name))
+    } else {
+        std::borrow::Cow::Borrowed(&*alias.name)
+    };
+
+    // Ignore names that follow a community-agreed import convention.
+    checker
+        .settings()
+        .flake8_import_conventions
+        .aliases
+        .get(&*full_name)
+        .map(String::as_str)
+        == Some(asname)
 }

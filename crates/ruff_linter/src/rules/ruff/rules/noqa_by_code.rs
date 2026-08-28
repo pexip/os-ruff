@@ -1,8 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_diagnostics::{Edit, Fix};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::LintContext;
 use crate::{
+    AlwaysFixableViolation,
     noqa::{Directive, NoqaDirectives, NoqaIdentifier},
     registry::Rule,
     rule_redirects::get_redirect_target,
@@ -24,9 +26,9 @@ use crate::{
 /// ```python
 /// from typing import Never  # noqa: unused-import
 /// ```
-#[violation]
-pub struct NOQAByCode {
-    pub codes_and_names: Vec<(String, String)>,
+#[derive(ViolationMetadata)]
+pub(crate) struct NOQAByCode {
+    codes_and_names: Vec<(String, String)>,
 }
 
 impl AlwaysFixableViolation for NOQAByCode {
@@ -48,8 +50,8 @@ impl AlwaysFixableViolation for NOQAByCode {
     }
 }
 
-/// RUF102
-pub(crate) fn noqa_by_code(diagnostics: &mut Vec<Diagnostic>, noqa_directives: &NoqaDirectives) {
+/// RUF851
+pub(crate) fn noqa_by_code(context: &LintContext, noqa_directives: &NoqaDirectives) {
     'line: for line in noqa_directives.lines() {
         let mut codes_and_names = Vec::new();
         let mut new_rule_identifiers = Vec::new();
@@ -68,15 +70,15 @@ pub(crate) fn noqa_by_code(diagnostics: &mut Vec<Diagnostic>, noqa_directives: &
                                 continue 'line;
                             }
                             if let Ok(rule) = Rule::from_code(rule_code) {
-                                new_rule_identifiers.push(rule.as_ref().to_string());
+                                new_rule_identifiers.push(rule.name().to_string());
                                 codes_and_names
-                                    .push((rule_code.to_string(), rule.as_ref().to_string()));
+                                    .push((rule_code.to_string(), rule.name().to_string()));
                             } else {
                                 new_rule_identifiers.push(original_code.to_string());
                             }
                         }
                         NoqaIdentifier::Name(name) => {
-                            if Rule::UnusedNOQA.as_ref() == name {
+                            if Rule::UnusedNOQA.name() == name {
                                 continue 'line;
                             }
 
@@ -85,14 +87,12 @@ pub(crate) fn noqa_by_code(diagnostics: &mut Vec<Diagnostic>, noqa_directives: &
                     }
                 }
                 if !codes_and_names.is_empty() {
-                    let mut diagnostic =
-                        Diagnostic::new(NOQAByCode { codes_and_names }, directive.range());
-
+                    let mut diagnostic = context
+                        .report_diagnostic(NOQAByCode { codes_and_names }, directive.range());
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         format!("# noqa: {}", new_rule_identifiers.join(", ")),
                         directive.range(),
                     )));
-                    diagnostics.push(diagnostic);
                 }
             }
         }

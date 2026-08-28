@@ -72,7 +72,7 @@ literal_membership.py:9:70: PLR6201 (literal-membership) [*] Use a set literal w
  8 | "cherry" in fruits
  9 | _ = {key: value for key, value in {"a": 1, "b": 2}.items() if key in ("a", "b")}
    |                                                                      ^^^^^^^^^^ PLR6201 (literal-membership)
-10 | 
+10 |
 11 | # OK
    |
    = help: Convert to `set`

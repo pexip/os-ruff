@@ -1,15 +1,15 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::{ExceptHandler, StmtTry};
 use ruff_text_size::Ranged;
 
 use crate::comments;
-use crate::comments::leading_alternate_branch_comments;
 use crate::comments::SourceComment;
+use crate::comments::leading_alternate_branch_comments;
 use crate::other::except_handler_except_handler::{
     ExceptHandlerKind, FormatExceptHandlerExceptHandler,
 };
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
+use crate::statement::clause::{ClauseHeader, ElseClause, clause_body, clause_header};
 use crate::statement::suite::SuiteKind;
 use crate::statement::{FormatRefWithRule, Stmt};
 
@@ -47,12 +47,10 @@ impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
 }
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for ExceptHandler {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ExceptHandler,
-        FormatExceptHandler,
-        PyFormatContext<'ast>,
-    > where Self: 'a;
+    type Format<'a>
+        = FormatRefWithRule<'a, ExceptHandler, FormatExceptHandler, PyFormatContext<'ast>>
+    where
+        Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatExceptHandler::default())
@@ -68,6 +66,7 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
             finalbody,
             is_star,
             range: _,
+            node_index: _,
         } = item;
 
         let comments_info = f.context().comments().clone();

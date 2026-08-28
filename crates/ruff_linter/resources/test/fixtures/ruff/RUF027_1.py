@@ -59,3 +59,18 @@ def negative_cases():
     # See https://docs.python.org/3/howto/logging-cookbook.html#formatting-styles
     import logging
     logging.info("yet {another} non-f-string")
+
+    # See https://fastapi.tiangolo.com/tutorial/path-params/
+    from fastapi import FastAPI
+    app = FastAPI()
+    item_id = 42
+
+    @app.get("/items/{item_id}")
+    async def read_item(item_id):
+        return {"item_id": item_id}
+
+    from typing import TYPE_CHECKING
+    if TYPE_CHECKING:
+        from datetime import date
+
+    t = "foo/{date}"

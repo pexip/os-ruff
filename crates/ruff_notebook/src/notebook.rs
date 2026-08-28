@@ -1,15 +1,14 @@
-use std::cmp::Ordering;
-use std::collections::HashSet;
-use std::fs::File;
-use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
-use std::path::Path;
-use std::{io, iter};
-
 use itertools::Itertools;
-use once_cell::sync::OnceCell;
 use rand::{Rng, SeedableRng};
 use serde::Serialize;
 use serde_json::error::Category;
+use std::cmp::Ordering;
+use std::collections::HashSet;
+use std::fs::File;
+use std::io;
+use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
+use std::path::Path;
+use std::sync::OnceLock;
 use thiserror::Error;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
@@ -19,7 +18,7 @@ use ruff_text_size::TextSize;
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
-use crate::{schema, CellMetadata, RawNotebookMetadata};
+use crate::{CellMetadata, RawNotebookMetadata, schema};
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -44,7 +43,9 @@ pub enum NotebookError {
     Io(#[from] io::Error),
     #[error(transparent)]
     Json(serde_json::Error),
-    #[error("Expected a Jupyter Notebook, which must be internally stored as JSON, but this file isn't valid JSON: {0}")]
+    #[error(
+        "Expected a Jupyter Notebook, which must be internally stored as JSON, but this file isn't valid JSON: {0}"
+    )]
     InvalidJson(serde_json::Error),
     #[error("This file does not match the schema expected of Jupyter Notebooks: {0}")]
     InvalidSchema(serde_json::Error),
@@ -63,7 +64,7 @@ pub struct Notebook {
     source_code: String,
     /// The index of the notebook. This is used to map between the concatenated
     /// source code and the original notebook.
-    index: OnceCell<NotebookIndex>,
+    index: OnceLock<NotebookIndex>,
     /// The raw notebook i.e., the deserialized version of JSON string.
     raw: RawNotebook,
     /// The offsets of each cell in the concatenated source code. This includes
@@ -178,7 +179,7 @@ impl Notebook {
                 };
                 if id.is_none() {
                     loop {
-                        let new_id = uuid::Builder::from_random_bytes(rng.gen())
+                        let new_id = uuid::Builder::from_random_bytes(rng.random())
                             .into_uuid()
                             .as_simple()
                             .to_string();
@@ -194,7 +195,7 @@ impl Notebook {
 
         Ok(Self {
             raw: raw_notebook,
-            index: OnceCell::new(),
+            index: OnceLock::new(),
             // The additional newline at the end is to maintain consistency for
             // all cells. These newlines will be removed before updating the
             // source code with the transformed content. Refer `update_cell_content`.
@@ -341,9 +342,10 @@ impl Notebook {
                     }
                 }
             };
-            row_to_cell.extend(
-                iter::repeat(OneIndexed::from_zero_indexed(cell_index as usize)).take(line_count),
-            );
+            row_to_cell.extend(std::iter::repeat_n(
+                OneIndexed::from_zero_indexed(cell_index as usize),
+                line_count,
+            ));
             row_to_row_in_cell.extend((0..line_count).map(OneIndexed::from_zero_indexed));
         }
 

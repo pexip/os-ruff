@@ -6,10 +6,7 @@ isort.ipynb:cell 1:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or
 1 | / from pathlib import Path
 2 | | import random
 3 | | import math
-4 | | from typing import Any
-  | |_^ I001 (unsorted-imports)
-5 |   import collections
-6 |   # Newline should be added here
+  | |___________^ I001 (unsorted-imports)
   |
   = help: Organize imports
 
@@ -27,10 +24,9 @@ isort.ipynb:cell 2:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or
   |
 1 | / from typing import Any
 2 | | import collections
-3 | | # Newline should be added here
-  | |_^ I001 (unsorted-imports)
+  | |__________________^ I001 (unsorted-imports)
+3 |   # Newline should be added here
 4 |   def foo():
-5 |       pass
   |
   = help: Organize imports
 
@@ -51,10 +47,9 @@ isort.ipynb:cell 3:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or
   |
 1 | / from pathlib import Path
 2 | | import sys
-3 | | 
-4 | | %matplotlib \
-  | |_^ I001 (unsorted-imports)
-5 |       --inline
+  | |__________^ I001 (unsorted-imports)
+3 |
+4 |   %matplotlib \
   |
   = help: Organize imports
 
@@ -72,9 +67,10 @@ isort.ipynb:cell 3:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or
 isort.ipynb:cell 3:7:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
   |
 5 |       --inline
-6 |   
+6 |
 7 | / import math
 8 | | import abc
+  | |__________^ I001 (unsorted-imports)
   |
   = help: Organize imports
 

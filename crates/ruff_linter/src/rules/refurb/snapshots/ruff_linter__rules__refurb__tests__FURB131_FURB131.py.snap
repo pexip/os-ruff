@@ -135,7 +135,7 @@ FURB131.py:48:5: FURB131 (delete-full-slice) [*] Prefer `clear` over deleting a 
 47 |     # FURB131
 48 |     del x[:]
    |     ^^^^^^^^ FURB131 (delete-full-slice)
-49 | 
+49 |
 50 |     x = 1
    |
    = help: Replace with `clear()`
@@ -156,7 +156,7 @@ FURB131.py:58:1: FURB131 (delete-full-slice) [*] Prefer `clear` over deleting a 
 57 | # FURB131
 58 | del sneaky[:]
    | ^^^^^^^^^^^^^ FURB131 (delete-full-slice)
-59 | 
+59 |
 60 | # these should not
    |
    = help: Replace with `clear()`

@@ -6,7 +6,7 @@ DTZ004.py:4:1: DTZ004 (call-datetime-utcfromtimestamp) `datetime.datetime.utcfro
 3 | # qualified
 4 | datetime.datetime.utcfromtimestamp(1234)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ004 (call-datetime-utcfromtimestamp)
-5 | 
+5 |
 6 | from datetime import datetime
   |
   = help: Use `datetime.datetime.fromtimestamp(ts, tz=...)` instead
@@ -16,7 +16,7 @@ DTZ004.py:9:1: DTZ004 (call-datetime-utcfromtimestamp) `datetime.datetime.utcfro
  8 | # unqualified
  9 | datetime.utcfromtimestamp(1234)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ004 (call-datetime-utcfromtimestamp)
-10 | 
+10 |
 11 | # uses `astimezone` method
    |
    = help: Use `datetime.datetime.fromtimestamp(ts, tz=...)` instead

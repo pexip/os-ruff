@@ -11,8 +11,8 @@ use lsp_types::{PositionEncodingKind, Url};
 pub use notebook::NotebookDocument;
 pub(crate) use range::{NotebookRange, RangeExt, ToRangeExt};
 pub(crate) use replacement::Replacement;
-pub(crate) use text_document::DocumentVersion;
 pub use text_document::TextDocument;
+pub(crate) use text_document::{DocumentVersion, LanguageId};
 
 use crate::{fix::Fixes, session::ResolvedClientCapabilities};
 
@@ -29,6 +29,16 @@ pub enum PositionEncoding {
 
     /// Ruff's preferred encoding
     UTF8,
+}
+
+impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
+    fn from(value: PositionEncoding) -> Self {
+        match value {
+            PositionEncoding::UTF8 => Self::Utf8,
+            PositionEncoding::UTF16 => Self::Utf16,
+            PositionEncoding::UTF32 => Self::Utf32,
+        }
+    }
 }
 
 /// A unique document ID, derived from a URL passed as part of an LSP request.

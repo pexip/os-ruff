@@ -40,7 +40,7 @@ def f():
 
 
 def f():
-    # Only `E741` should be ignored by the `noqa`.
+    # Neither of these should be ignored by the `noqa`.
     I = 1  # noqa: E741.unused-variable
 
 

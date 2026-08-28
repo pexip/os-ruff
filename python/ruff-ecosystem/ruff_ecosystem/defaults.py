@@ -4,6 +4,7 @@ Default projects for ecosystem checks
 
 from ruff_ecosystem.projects import (
     CheckOptions,
+    FormatOptions,
     Project,
     Repository,
 )
@@ -34,8 +35,7 @@ DEFAULT_TARGETS = [
         repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.3"),
         check_options=CheckOptions(select="ALL"),
     ),
-    # Disabled due to use of explicit `select` with `E999`, which is no longer
-    # supported in `--preview`.
+    # Disabled due to use of explicit `select` with `E999`, which has been removed.
     # See: https://github.com/astral-sh/ruff/pull/12129
     # Project(
     #     repo=Repository(owner="demisto", name="content", ref="master"),
@@ -122,9 +122,11 @@ DEFAULT_TARGETS = [
             # These notebooks contain syntax errors because certain plain text / markdown
             # cells are marked as code cells.
             "exclude": [
+                "examples/Assistants_API_overview_python.ipynb",
                 "examples/Chat_finetuning_data_prep.ipynb",
                 "examples/chatgpt/gpt_actions_library/gpt_action_google_drive.ipynb",
                 "examples/chatgpt/gpt_actions_library/gpt_action_redshift.ipynb",
+                "examples/chatgpt/gpt_actions_library/gpt_action_salesforce.ipynb",
             ],
         },
     ),
@@ -133,6 +135,12 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="wntrblm", name="nox", ref="main")),
     Project(repo=Repository(owner="pytest-dev", name="pytest", ref="main")),
     Project(repo=Repository(owner="encode", name="httpx", ref="master")),
-    Project(repo=Repository(owner="mesonbuild", name="meson-python", ref="main")),
+    Project(
+        repo=Repository(owner="mesonbuild", name="meson-python", ref="main"),
+        format_options=FormatOptions(
+            exclude="tests/packages/symlinks/baz.py,tests/packages/symlinks/qux.py"
+        ),
+    ),
     Project(repo=Repository(owner="pdm-project", name="pdm", ref="main")),
+    Project(repo=Repository(owner="astropy", name="astropy", ref="main")),
 ]

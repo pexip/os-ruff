@@ -7,7 +7,7 @@ PYI009.pyi:3:5: PYI009 (pass-statement-stub-body) [*] Empty body should contain 
 2 | def foo():
 3 |     pass  # ERROR PYI009, since we're in a stub file
   |     ^^^^ PYI009 (pass-statement-stub-body)
-4 | 
+4 |
 5 | class Bar: ...  # OK
   |
   = help: Replace `pass` with `...`

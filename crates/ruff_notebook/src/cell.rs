@@ -5,8 +5,8 @@ use itertools::Itertools;
 
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::schema::{Cell, SourceValue};
 use crate::CellMetadata;
+use crate::schema::{Cell, SourceValue};
 
 impl fmt::Display for SourceValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -66,7 +66,7 @@ impl Cell {
                     .metadata
                     .vscode
                     .as_ref()
-                    .map_or(true, |vscode| vscode.language_id == "python") =>
+                    .is_none_or(|vscode| vscode.language_id == "python") =>
             {
                 &cell.source
             }
@@ -238,9 +238,19 @@ impl Cell {
             //
             // This is to avoid false positives when these variables are referenced
             // elsewhere in the notebook.
+            //
+            // Refer https://github.com/astral-sh/ruff/issues/13718 for `ipytest`.
             !matches!(
                 command,
-                "capture" | "debug" | "prun" | "pypy" | "python" | "python3" | "time" | "timeit"
+                "capture"
+                    | "debug"
+                    | "ipytest"
+                    | "prun"
+                    | "pypy"
+                    | "python"
+                    | "python3"
+                    | "time"
+                    | "timeit"
             )
         })
     }

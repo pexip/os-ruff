@@ -65,6 +65,6 @@ __main__.py:8:24: PLC2701 (import-private-name) Private name import `_ddd` from 
  7 | import _aaa
  8 | import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
    |                        ^^^ PLC2701 (import-private-name)
- 9 | 
+ 9 |
 10 | # Non-errors.
    |

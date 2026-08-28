@@ -5,7 +5,7 @@ E30.ipynb:29:5: E303 (too-many-blank-lines) [*] Too many blank lines (2)
    |
 29 |     # arbitrary comment
    |     ^^^^^^^^^^^^^^^^^^^ E303 (too-many-blank-lines)
-30 | 
+30 |
 31 |     def inner():  # E306 not expected (pycodestyle detects E306)
    |
    = help: Remove extraneous blank line(s)

@@ -1,24 +1,24 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
-/// Checks for unnecessary generators that can be rewritten as `dict`
+/// Checks for unnecessary generators that can be rewritten as dict
 /// comprehensions.
 ///
 /// ## Why is this bad?
-/// It is unnecessary to use `dict` around a generator expression, since
+/// It is unnecessary to use `dict()` around a generator expression, since
 /// there are equivalent comprehensions for these types. Using a
 /// comprehension is clearer and more idiomatic.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict((x, f(x)) for x in foo)
 /// ```
@@ -31,23 +31,23 @@ use super::helpers;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
-#[violation]
-pub struct UnnecessaryGeneratorDict;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryGeneratorDict;
 
 impl AlwaysFixableViolation for UnnecessaryGeneratorDict {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary generator (rewrite as a `dict` comprehension)")
+        "Unnecessary generator (rewrite as a dict comprehension)".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Rewrite as a `dict` comprehension".to_string()
+        "Rewrite as a dict comprehension".to_string()
     }
 }
 
 /// C402 (`dict((x, y) for x, y in iterable)`)
 pub(crate) fn unnecessary_generator_dict(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -70,8 +70,7 @@ pub(crate) fn unnecessary_generator_dict(
     if tuple.iter().any(Expr::is_starred_expr) {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryGeneratorDict, expr.range());
     diagnostic
         .try_set_fix(|| fixes::fix_unnecessary_generator_dict(expr, checker).map(Fix::unsafe_edit));
-    checker.diagnostics.push(diagnostic);
 }

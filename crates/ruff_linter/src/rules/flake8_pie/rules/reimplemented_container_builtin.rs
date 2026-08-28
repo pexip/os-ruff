@@ -1,11 +1,11 @@
 use ruff_python_ast::{Expr, ExprLambda};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix};
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for lambdas that can be replaced with the `list` or `dict` builtins.
@@ -37,8 +37,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `list`](https://docs.python.org/3/library/functions.html#func-list)
-#[violation]
-pub struct ReimplementedContainerBuiltin {
+#[derive(ViolationMetadata)]
+pub(crate) struct ReimplementedContainerBuiltin {
     container: Container,
 }
 
@@ -58,11 +58,12 @@ impl Violation for ReimplementedContainerBuiltin {
 }
 
 /// PIE807
-pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &ExprLambda) {
+pub(crate) fn reimplemented_container_builtin(checker: &Checker, expr: &ExprLambda) {
     let ExprLambda {
         parameters,
         body,
         range: _,
+        node_index: _,
     } = expr;
 
     if parameters.is_some() {
@@ -74,7 +75,8 @@ pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &Expr
         Expr::Dict(dict) if dict.is_empty() => Container::Dict,
         _ => return,
     };
-    let mut diagnostic = Diagnostic::new(ReimplementedContainerBuiltin { container }, expr.range());
+    let mut diagnostic =
+        checker.report_diagnostic(ReimplementedContainerBuiltin { container }, expr.range());
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
             container.as_str(),
@@ -84,7 +86,6 @@ pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &Expr
         let binding_edit = Edit::range_replacement(binding, expr.range());
         Ok(Fix::safe_edits(binding_edit, import_edit))
     });
-    checker.diagnostics.push(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

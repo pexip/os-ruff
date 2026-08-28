@@ -1,5 +1,5 @@
 ---
-source: crates/ruff_python_ast_integration_tests/tests/preorder.rs
+source: crates/ruff_python_ast_integration_tests/tests/source_order.rs
 expression: trace
 ---
 - ModModule
@@ -7,11 +7,11 @@ expression: trace
     - ExprFString
       - StringLiteral
       - FString
-        - FStringLiteralElement
-        - FStringExpressionElement
+        - InterpolatedStringLiteralElement
+        - InterpolatedElement
           - ExprName
-          - FStringLiteralElement
-          - FStringExpressionElement
+          - InterpolatedStringLiteralElement
+          - InterpolatedElement
             - ExprName
-          - FStringLiteralElement
-        - FStringLiteralElement
+          - InterpolatedStringLiteralElement
+        - InterpolatedStringLiteralElement

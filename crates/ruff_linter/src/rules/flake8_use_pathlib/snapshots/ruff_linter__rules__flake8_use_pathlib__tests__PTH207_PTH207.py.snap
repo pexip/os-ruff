@@ -25,4 +25,6 @@ PTH207.py:11:1: PTH207 (glob) Replace `glob` with `Path.glob` or `Path.rglob`
 10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
 11 | search("*.png")
    | ^^^^^^ PTH207 (glob)
+12 |
+13 | # if `dir_fd` is set, suppress the diagnostic
    |

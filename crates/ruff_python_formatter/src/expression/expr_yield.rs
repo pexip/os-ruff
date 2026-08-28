@@ -5,7 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parenthesize,
+    NeedsParentheses, OptionalParentheses, Parenthesize, is_expression_parenthesized,
 };
 use crate::prelude::*;
 
@@ -14,7 +14,7 @@ pub(super) enum AnyExpressionYield<'a> {
     YieldFrom(&'a ExprYieldFrom),
 }
 
-impl<'a> AnyExpressionYield<'a> {
+impl AnyExpressionYield<'_> {
     const fn is_yield_from(&self) -> bool {
         matches!(self, AnyExpressionYield::YieldFrom(_))
     }

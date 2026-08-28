@@ -1,10 +1,10 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
 
@@ -38,8 +38,8 @@ use crate::rules::pep8_naming::helpers;
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
-#[violation]
-pub struct NonLowercaseVariableInFunction {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonLowercaseVariableInFunction {
     name: String,
 }
 
@@ -52,7 +52,7 @@ impl Violation for NonLowercaseVariableInFunction {
 }
 
 /// N806
-pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &Expr, name: &str) {
+pub(crate) fn non_lowercase_variable_in_function(checker: &Checker, expr: &Expr, name: &str) {
     if str::is_lowercase(name) {
         return;
     }
@@ -77,14 +77,14 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &E
     }
 
     // Ignore explicitly-allowed names.
-    if checker.settings.pep8_naming.ignore_names.matches(name) {
+    if checker.settings().pep8_naming.ignore_names.matches(name) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(
         NonLowercaseVariableInFunction {
             name: name.to_string(),
         },
         expr.range(),
-    ));
+    );
 }

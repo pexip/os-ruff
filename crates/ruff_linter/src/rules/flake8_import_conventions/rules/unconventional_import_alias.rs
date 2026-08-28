@@ -1,11 +1,11 @@
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Binding, Imported};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Fix, FixAvailability, Violation};
 
 use crate::renamer::Renamer;
 
@@ -34,8 +34,8 @@ use crate::renamer::Renamer;
 /// ## Options
 /// - `lint.flake8-import-conventions.aliases`
 /// - `lint.flake8-import-conventions.extend-aliases`
-#[violation]
-pub struct UnconventionalImportAlias {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnconventionalImportAlias {
     name: String,
     asname: String,
 }
@@ -60,17 +60,21 @@ pub(crate) fn unconventional_import_alias(
     checker: &Checker,
     binding: &Binding,
     conventions: &FxHashMap<String, String>,
-) -> Option<Diagnostic> {
-    let import = binding.as_any_import()?;
+) {
+    let Some(import) = binding.as_any_import() else {
+        return;
+    };
     let qualified_name = import.qualified_name().to_string();
-    let expected_alias = conventions.get(qualified_name.as_str())?;
+    let Some(expected_alias) = conventions.get(qualified_name.as_str()) else {
+        return;
+    };
 
-    let name = binding.name(checker.locator());
+    let name = binding.name(checker.source());
     if name == expected_alias {
-        return None;
+        return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnconventionalImportAlias {
             name: qualified_name,
             asname: expected_alias.to_string(),
@@ -92,5 +96,4 @@ pub(crate) fn unconventional_import_alias(
             });
         }
     }
-    Some(diagnostic)
 }

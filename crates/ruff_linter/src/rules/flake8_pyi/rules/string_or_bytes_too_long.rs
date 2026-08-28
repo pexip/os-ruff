@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, StringLike};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of string and bytes literals longer than 50 characters
@@ -23,22 +23,22 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg: str = ...) -> None: ...
 /// ```
-#[violation]
-pub struct StringOrBytesTooLong;
+#[derive(ViolationMetadata)]
+pub(crate) struct StringOrBytesTooLong;
 
 impl AlwaysFixableViolation for StringOrBytesTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("String and bytes literals longer than 50 characters are not permitted")
+        "String and bytes literals longer than 50 characters are not permitted".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for StringOrBytesTooLong {
 }
 
 /// PYI053
-pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike) {
+pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
     let semantic = checker.semantic();
 
     // Ignore docstrings.
@@ -59,21 +59,29 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
         return;
     }
 
+    if semantic.in_type_definition() | semantic.in_deferred_type_definition() {
+        return;
+    }
+
     let length = match string {
         StringLike::String(ast::ExprStringLiteral { value, .. }) => value.chars().count(),
         StringLike::Bytes(ast::ExprBytesLiteral { value, .. }) => value.len(),
         StringLike::FString(node) => count_f_string_chars(node),
+        // TODO(dylan): decide how to count chars, especially
+        // if interpolations are of different type than `str`
+        StringLike::TString(_) => {
+            return;
+        }
     };
     if length <= 50 {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, string.range());
+    let mut diagnostic = checker.report_diagnostic(StringOrBytesTooLong, string.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         string.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Count the number of visible characters in an f-string. This accounts for
@@ -88,8 +96,10 @@ fn count_f_string_chars(f_string: &ast::ExprFString) -> usize {
                 .elements
                 .iter()
                 .map(|element| match element {
-                    ast::FStringElement::Literal(string) => string.chars().count(),
-                    ast::FStringElement::Expression(expr) => expr.range().len().to_usize(),
+                    ast::InterpolatedStringElement::Literal(string) => string.chars().count(),
+                    ast::InterpolatedStringElement::Interpolation(expr) => {
+                        expr.range().len().to_usize()
+                    }
                 })
                 .sum(),
         })

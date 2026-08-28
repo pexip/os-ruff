@@ -8,7 +8,7 @@ S112.py:3:1: S112 (try-except-continue) `try`-`except`-`continue` detected, cons
 3 | / except Exception:
 4 | |     continue
   | |____________^ S112 (try-except-continue)
-5 |   
+5 |
 6 |   try:
   |
 
@@ -19,7 +19,7 @@ S112.py:8:1: S112 (try-except-continue) `try`-`except`-`continue` detected, cons
  8 | / except:
  9 | |     continue
    | |____________^ S112 (try-except-continue)
-10 |   
+10 |
 11 |   try:
    |
 
@@ -30,7 +30,7 @@ S112.py:13:1: S112 (try-except-continue) `try`-`except`-`continue` detected, con
 13 | / except (Exception,):
 14 | |     continue
    | |____________^ S112 (try-except-continue)
-15 |   
+15 |
 16 |   try:
    |
 
@@ -41,6 +41,6 @@ S112.py:18:1: S112 (try-except-continue) `try`-`except`-`continue` detected, con
 18 | / except (Exception, ValueError):
 19 | |     continue
    | |____________^ S112 (try-except-continue)
-20 |   
+20 |
 21 |   try:
    |

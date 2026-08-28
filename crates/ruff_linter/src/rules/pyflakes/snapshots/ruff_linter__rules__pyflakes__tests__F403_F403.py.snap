@@ -13,6 +13,6 @@ F403.py:2:1: F403 (undefined-local-with-import-star) `from F634 import *` used; 
 1 | from F634 import *
 2 | from F634 import *  # noqa: E501
   | ^^^^^^^^^^^^^^^^^^ F403 (undefined-local-with-import-star)
-3 | 
+3 |
 4 | from F634 import *  # noqa
   |

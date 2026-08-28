@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -34,18 +34,18 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `__str__` method](https://docs.python.org/3/reference/datamodel.html#object.__str__)
-#[violation]
-pub struct InvalidStrReturnType;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidStrReturnType;
 
 impl Violation for InvalidStrReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__str__` does not return `str`")
+        "`__str__` does not return `str`".to_string()
     }
 }
 
-/// E0307
-pub(crate) fn invalid_str_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+/// PLE0307
+pub(crate) fn invalid_str_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__str__" {
         return;
     }
@@ -68,10 +68,7 @@ pub(crate) fn invalid_str_return(checker: &mut Checker, function_def: &ast::Stmt
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.diagnostics.push(Diagnostic::new(
-            InvalidStrReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidStrReturnType, function_def.identifier());
         return;
     }
 
@@ -87,15 +84,11 @@ pub(crate) fn invalid_str_return(checker: &mut Checker, function_def: &ast::Stmt
                 ResolvedPythonType::from(value),
                 ResolvedPythonType::Unknown | ResolvedPythonType::Atom(PythonType::String)
             ) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(InvalidStrReturnType, value.range()));
+                checker.report_diagnostic(InvalidStrReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker
-                .diagnostics
-                .push(Diagnostic::new(InvalidStrReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidStrReturnType, stmt.range());
         }
     }
 }

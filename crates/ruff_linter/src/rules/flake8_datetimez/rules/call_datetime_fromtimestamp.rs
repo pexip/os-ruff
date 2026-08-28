@@ -1,12 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers::{self, DatetimeModuleAntipattern};
+use crate::rules::flake8_datetimez::helpers::{self, DatetimeModuleAntipattern};
 
 /// ## What it does
 /// Checks for usage of `datetime.datetime.fromtimestamp()` that do not specify
@@ -47,8 +47,8 @@ use super::helpers::{self, DatetimeModuleAntipattern};
 ///
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
-#[violation]
-pub struct CallDatetimeFromtimestamp(DatetimeModuleAntipattern);
+#[derive(ViolationMetadata)]
+pub(crate) struct CallDatetimeFromtimestamp(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeFromtimestamp {
     #[derive_message_formats]
@@ -56,10 +56,10 @@ impl Violation for CallDatetimeFromtimestamp {
         let CallDatetimeFromtimestamp(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
-                format!("`datetime.datetime.fromtimestamp()` called without a `tz` argument")
+                "`datetime.datetime.fromtimestamp()` called without a `tz` argument".to_string()
             }
             DatetimeModuleAntipattern::NonePassedToTzArgument => {
-                format!("`tz=None` passed to `datetime.datetime.fromtimestamp()`")
+                "`tz=None` passed to `datetime.datetime.fromtimestamp()`".to_string()
             }
         }
     }
@@ -69,7 +69,8 @@ impl Violation for CallDatetimeFromtimestamp {
     }
 }
 
-pub(crate) fn call_datetime_fromtimestamp(checker: &mut Checker, call: &ast::ExprCall) {
+/// DTZ006
+pub(crate) fn call_datetime_fromtimestamp(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -87,18 +88,15 @@ pub(crate) fn call_datetime_fromtimestamp(checker: &mut Checker, call: &ast::Exp
         return;
     }
 
-    if helpers::parent_expr_is_astimezone(checker) {
+    if helpers::followed_by_astimezone(checker) {
         return;
     }
 
-    let antipattern = match call.arguments.find_argument("tz", 1) {
+    let antipattern = match call.arguments.find_argument_value("tz", 1) {
         Some(ast::Expr::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
         Some(_) => return,
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,
     };
 
-    checker.diagnostics.push(Diagnostic::new(
-        CallDatetimeFromtimestamp(antipattern),
-        call.range,
-    ));
+    checker.report_diagnostic(CallDatetimeFromtimestamp(antipattern), call.range);
 }

@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -39,18 +39,18 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: The `__len__` method](https://docs.python.org/3/reference/datamodel.html#object.__len__)
-#[violation]
-pub struct InvalidLengthReturnType;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidLengthReturnType;
 
 impl Violation for InvalidLengthReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__len__` does not return a non-negative integer")
+        "`__len__` does not return a non-negative integer".to_string()
     }
 }
 
-/// E0303
-pub(crate) fn invalid_length_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+/// PLE0303
+pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__len__" {
         return;
     }
@@ -73,10 +73,7 @@ pub(crate) fn invalid_length_return(checker: &mut Checker, function_def: &ast::S
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.diagnostics.push(Diagnostic::new(
-            InvalidLengthReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidLengthReturnType, function_def.identifier());
         return;
     }
 
@@ -95,15 +92,11 @@ pub(crate) fn invalid_length_return(checker: &mut Checker, function_def: &ast::S
                         | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
                 )
             {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(InvalidLengthReturnType, value.range()));
+                checker.report_diagnostic(InvalidLengthReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker
-                .diagnostics
-                .push(Diagnostic::new(InvalidLengthReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidLengthReturnType, stmt.range());
         }
     }
 }

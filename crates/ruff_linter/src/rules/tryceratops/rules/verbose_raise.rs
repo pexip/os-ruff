@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for needless exception names in `raise` statements.
@@ -35,22 +35,22 @@ use crate::checkers::ast::Checker;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it doesn't properly handle bound
 /// exceptions that are shadowed between the `except` and `raise` statements.
-#[violation]
-pub struct VerboseRaise;
+#[derive(ViolationMetadata)]
+pub(crate) struct VerboseRaise;
 
 impl AlwaysFixableViolation for VerboseRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `raise` without specifying exception name")
+        "Use `raise` without specifying exception name".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove exception name")
+        "Remove exception name".to_string()
     }
 }
 
 /// TRY201
-pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn verbose_raise(checker: &Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         // If the handler assigned a name to the exception...
         if let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
@@ -72,12 +72,12 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                     // ...and the raised object is bound to the same name...
                     if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
                         if id == exception_name.as_str() {
-                            let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
+                            let mut diagnostic =
+                                checker.report_diagnostic(VerboseRaise, exc.range());
                             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                                 "raise".to_string(),
                                 raise.range(),
                             )));
-                            checker.diagnostics.push(diagnostic);
                         }
                     }
                 }
@@ -100,7 +100,7 @@ impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
             Stmt::Try(ast::StmtTry {
                 body, finalbody, ..
             }) => {
-                for stmt in body.iter().chain(finalbody.iter()) {
+                for stmt in body.iter().chain(finalbody) {
                     walk_stmt(self, stmt);
                 }
             }

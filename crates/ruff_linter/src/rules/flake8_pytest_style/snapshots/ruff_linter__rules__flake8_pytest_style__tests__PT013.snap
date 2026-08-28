@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 PT013.py:11:1: PT013 (pytest-incorrect-pytest-import) Incorrect import of `pytest`; use `import pytest` instead
    |
  9 | # Error
-10 | 
+10 |
 11 | import pytest as other_name
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT013 (pytest-incorrect-pytest-import)
 12 | from pytest import fixture

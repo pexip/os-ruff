@@ -368,7 +368,7 @@ RET505.py:207:5: RET505 (superfluous-else-return) [*] Unnecessary `else` after `
 206 |         return y
 207 |     else:
     |     ^^^^ RET505 (superfluous-else-return)
-208 | 
+208 |
 209 |         c = 3
     |
     = help: Remove unnecessary `else`

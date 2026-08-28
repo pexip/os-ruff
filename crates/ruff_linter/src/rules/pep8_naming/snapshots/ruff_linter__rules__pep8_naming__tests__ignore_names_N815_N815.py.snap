@@ -7,7 +7,7 @@ N815.py:3:5: N815 (mixed-case-variable-in-class-scope) Variable `stillBad` in cl
 2 |     badAllowed = 0
 3 |     stillBad = 0
   |     ^^^^^^^^ N815 (mixed-case-variable-in-class-scope)
-4 | 
+4 |
 5 |     _badAllowed = 0
   |
 
@@ -16,7 +16,7 @@ N815.py:6:5: N815 (mixed-case-variable-in-class-scope) Variable `_stillBad` in c
 5 |     _badAllowed = 0
 6 |     _stillBad = 0
   |     ^^^^^^^^^ N815 (mixed-case-variable-in-class-scope)
-7 | 
+7 |
 8 |     bad_Allowed = 0
   |
 
@@ -25,7 +25,7 @@ N815.py:9:5: N815 (mixed-case-variable-in-class-scope) Variable `still_Bad` in c
  8 |     bad_Allowed = 0
  9 |     still_Bad = 0
    |     ^^^^^^^^^ N815 (mixed-case-variable-in-class-scope)
-10 | 
+10 |
 11 | class D(TypedDict):
    |
 
@@ -35,7 +35,7 @@ N815.py:13:5: N815 (mixed-case-variable-in-class-scope) Variable `stillBad` in c
 12 |     badAllowed: bool
 13 |     stillBad: bool
    |     ^^^^^^^^ N815 (mixed-case-variable-in-class-scope)
-14 | 
+14 |
 15 |     _badAllowed: list
    |
 
@@ -44,7 +44,7 @@ N815.py:16:5: N815 (mixed-case-variable-in-class-scope) Variable `_stillBad` in 
 15 |     _badAllowed: list
 16 |     _stillBad: list
    |     ^^^^^^^^^ N815 (mixed-case-variable-in-class-scope)
-17 | 
+17 |
 18 |     bad_Allowed: set
    |
 

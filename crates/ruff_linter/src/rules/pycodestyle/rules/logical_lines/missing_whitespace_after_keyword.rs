@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for missing whitespace after keywords.
@@ -26,25 +26,22 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 ///
 /// ## References
 /// - [Python documentation: Keywords](https://docs.python.org/3/reference/lexical_analysis.html#keywords)
-#[violation]
-pub struct MissingWhitespaceAfterKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAfterKeyword;
 
 impl AlwaysFixableViolation for MissingWhitespaceAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace after keyword")
+        "Missing whitespace after keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Added missing whitespace after keyword")
+        "Added missing whitespace after keyword".to_string()
     }
 }
 
 /// E275
-pub(crate) fn missing_whitespace_after_keyword(
-    line: &LogicalLine,
-    context: &mut LogicalLinesContext,
-) {
+pub(crate) fn missing_whitespace_after_keyword(line: &LogicalLine, context: &LintContext) {
     for window in line.tokens().windows(2) {
         let tok0 = &window[0];
         let tok1 = &window[1];
@@ -71,9 +68,11 @@ pub(crate) fn missing_whitespace_after_keyword(
                 ))
             && tok0.end() == tok1.start()
         {
-            let mut diagnostic = Diagnostic::new(MissingWhitespaceAfterKeyword, tok0.range());
-            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(" ".to_string(), tok0.end())));
-            context.push_diagnostic(diagnostic);
+            if let Some(mut diagnostic) =
+                context.report_diagnostic_if_enabled(MissingWhitespaceAfterKeyword, tok0.range())
+            {
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(" ".to_string(), tok0.end())));
+            }
         }
     }
 }

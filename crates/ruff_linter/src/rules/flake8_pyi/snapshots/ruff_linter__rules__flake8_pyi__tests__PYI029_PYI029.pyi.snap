@@ -6,7 +6,7 @@ PYI029.pyi:10:9: PYI029 (str-or-repr-defined-in-stub) [*] Defining `__str__` in 
  9 | class ShouldRemoveSingle:
 10 |     def __str__(self) -> builtins.str: ...  # Error: PYI029
    |         ^^^^^^^ PYI029 (str-or-repr-defined-in-stub)
-11 | 
+11 |
 12 | class ShouldRemove:
    |
    = help: Remove definition of `__str__`
@@ -45,7 +45,7 @@ PYI029.pyi:14:9: PYI029 (str-or-repr-defined-in-stub) [*] Defining `__str__` in 
 13 |     def __repr__(self) -> str: ...  # Error: PYI029
 14 |     def __str__(self) -> builtins.str: ...  # Error: PYI029
    |         ^^^^^^^ PYI029 (str-or-repr-defined-in-stub)
-15 | 
+15 |
 16 | class NoReturnSpecified:
    |
    = help: Remove definition of `__str__`

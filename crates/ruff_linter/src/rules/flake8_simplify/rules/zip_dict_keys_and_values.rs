@@ -1,11 +1,12 @@
 use ast::{ExprAttribute, ExprName, Identifier};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
 
+use crate::fix::edits;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_python_semantic::analyze::typing::is_dict;
 
 /// ## What it does
 /// Checks for use of `zip()` to iterate over keys and values of a dictionary at once.
@@ -31,8 +32,8 @@ use ruff_python_semantic::analyze::typing::is_dict;
 ///
 /// ## References
 /// - [Python documentation: `dict.items`](https://docs.python.org/3/library/stdtypes.html#dict.items)
-#[violation]
-pub struct ZipDictKeysAndValues {
+#[derive(ViolationMetadata)]
+pub(crate) struct ZipDictKeysAndValues {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
 }
@@ -44,7 +45,7 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Use `{expected}` instead of `{actual}`")
         } else {
-            format!("Use `dict.items()` instead of `zip(dict.keys(), dict.values())`")
+            "Use `dict.items()` instead of `zip(dict.keys(), dict.values())`".to_string()
         }
     }
 
@@ -59,7 +60,7 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 }
 
 /// SIM911
-pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCall) {
+pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) {
     let ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
@@ -67,11 +68,13 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCa
     } = expr;
     match &keywords[..] {
         [] => {}
-        [ast::Keyword {
-            arg: Some(name), ..
-        }] if name.as_str() == "strict" => {}
+        [
+            ast::Keyword {
+                arg: Some(name), ..
+            },
+        ] if name.as_str() == "strict" => {}
         _ => return,
-    };
+    }
     let [arg1, arg2] = &args[..] else {
         return;
     };
@@ -90,7 +93,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCa
 
     let Some(binding) = checker
         .semantic()
-        .only_binding(var1)
+        .resolve_name(var1)
         .map(|id| checker.semantic().binding(id))
     else {
         return;
@@ -99,10 +102,14 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCa
         return;
     }
 
-    let expected = format!("{}.items()", checker.locator().slice(var1));
+    let expected = edits::pad(
+        format!("{}.items()", checker.locator().slice(var1)),
+        expr.range(),
+        checker.locator(),
+    );
     let actual = checker.locator().slice(expr);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ZipDictKeysAndValues {
             expected: SourceCodeSnippet::new(expected.clone()),
             actual: SourceCodeSnippet::from_str(actual),
@@ -113,7 +120,6 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCa
         expected,
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }
 
 fn get_var_attr(expr: &Expr) -> Option<(&ExprName, &Identifier)> {

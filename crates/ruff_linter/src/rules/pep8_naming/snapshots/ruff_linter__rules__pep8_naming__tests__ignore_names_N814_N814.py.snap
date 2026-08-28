@@ -6,7 +6,7 @@ N814.py:2:8: N814 (camelcase-imported-as-constant) Camelcase `StillBad` imported
 1 | import mod.BadAllowed as BADALLOWED
 2 | import mod.StillBad as STILLBAD
   |        ^^^^^^^^^^^^^^^^^^^^^^^^ N814 (camelcase-imported-as-constant)
-3 | 
+3 |
 4 | from mod import BadAllowed as BADALLOWED
   |
 
@@ -15,7 +15,7 @@ N814.py:5:17: N814 (camelcase-imported-as-constant) Camelcase `StillBad` importe
 4 | from mod import BadAllowed as BADALLOWED
 5 | from mod import StillBad as STILLBAD
   |                 ^^^^^^^^^^^^^^^^^^^^ N814 (camelcase-imported-as-constant)
-6 | 
+6 |
 7 | from mod import BadAllowed as BAD_ALLOWED
   |
 

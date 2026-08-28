@@ -44,4 +44,16 @@ class LockType4: ...
 ```
 
 
-
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -4,6 +4,7 @@
+ def count2(): ...
+ @final
+ def count3(): ...
++
+ @final
+ class LockType1: ...
+ 
+```

@@ -4,7 +4,7 @@ use bitflags::bitflags;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
-use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
+use ruff_index::{Idx, IndexSlice, IndexVec, newtype_index};
 
 use crate::binding::BindingId;
 use crate::globals::GlobalsId;
@@ -170,11 +170,22 @@ bitflags! {
 pub enum ScopeKind<'a> {
     Class(&'a ast::StmtClassDef),
     Function(&'a ast::StmtFunctionDef),
-    Generator,
+    Generator {
+        kind: GeneratorKind,
+        is_async: bool,
+    },
     Module,
     /// A Python 3.12+ [annotation scope](https://docs.python.org/3/reference/executionmodel.html#annotation-scopes)
     Type,
     Lambda(&'a ast::ExprLambda),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GeneratorKind {
+    Generator,
+    ListComprehension,
+    DictComprehension,
+    SetComprehension,
 }
 
 /// Id uniquely identifying a scope in a program.
@@ -247,7 +258,7 @@ impl<'a> Deref for Scopes<'a> {
     }
 }
 
-impl<'a> DerefMut for Scopes<'a> {
+impl DerefMut for Scopes<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

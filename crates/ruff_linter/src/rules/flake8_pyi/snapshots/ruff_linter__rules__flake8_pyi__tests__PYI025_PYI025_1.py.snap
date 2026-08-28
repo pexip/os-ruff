@@ -24,7 +24,7 @@ PYI025_1.py:14:51: PYI025 (unaliased-collections-abc-set-import) [*] Use `from c
 13 | def f():
 14 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
    |                                                   ^^^ PYI025 (unaliased-collections-abc-set-import)
-15 | 
+15 |
 16 |     GLOBAL: Set[int] = set()
    |
    = help: Alias `Set` to `AbstractSet`

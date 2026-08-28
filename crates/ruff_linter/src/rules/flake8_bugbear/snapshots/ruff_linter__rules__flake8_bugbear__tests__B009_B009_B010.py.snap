@@ -321,7 +321,7 @@ B009_B010.py:58:8: B009 (get-attr-with-constant) [*] Do not call `getattr` with 
 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
 58 | assert getattr(func, '_rpc')is True
    |        ^^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
-59 | 
+59 |
 60 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1732387247
    |
    = help: Replace `getattr` with attribute access
@@ -342,7 +342,7 @@ B009_B010.py:65:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with 
 65 | / getattr(self.
 66 | |    registration.registry, '__name__')
    | |_____________________________________^ B009 (get-attr-with-constant)
-67 |   
+67 |
 68 |   import builtins
    |
    = help: Replace `getattr` with attribute access
@@ -364,6 +364,8 @@ B009_B010.py:69:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with 
 68 | import builtins
 69 | builtins.getattr(foo, "bar")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B009 (get-attr-with-constant)
+70 |
+71 | # Regression test for: https://github.com/astral-sh/ruff/issues/18353
    |
    = help: Replace `getattr` with attribute access
 
@@ -373,3 +375,6 @@ B009_B010.py:69:1: B009 (get-attr-with-constant) [*] Do not call `getattr` with 
 68 68 | import builtins
 69    |-builtins.getattr(foo, "bar")
    69 |+foo.bar
+70 70 | 
+71 71 | # Regression test for: https://github.com/astral-sh/ruff/issues/18353
+72 72 | setattr(foo, "__debug__", 0)

@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for f-strings that do not contain any placeholder expressions.
@@ -52,14 +52,14 @@ use crate::checkers::ast::Checker;
 /// See [#10885](https://github.com/astral-sh/ruff/issues/10885) for more.
 ///
 /// ## References
-/// - [PEP 498](https://www.python.org/dev/peps/pep-0498/)
-#[violation]
-pub struct FStringMissingPlaceholders;
+/// - [PEP 498 – Literal String Interpolation](https://peps.python.org/pep-0498/)
+#[derive(ViolationMetadata)]
+pub(crate) struct FStringMissingPlaceholders;
 
 impl AlwaysFixableViolation for FStringMissingPlaceholders {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("f-string without any placeholders")
+        "f-string without any placeholders".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -68,12 +68,12 @@ impl AlwaysFixableViolation for FStringMissingPlaceholders {
 }
 
 /// F541
-pub(crate) fn f_string_missing_placeholders(checker: &mut Checker, expr: &ast::ExprFString) {
+pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprFString) {
     if expr.value.f_strings().any(|f_string| {
         f_string
             .elements
             .iter()
-            .any(ast::FStringElement::is_expression)
+            .any(ast::InterpolatedStringElement::is_interpolation)
     }) {
         return;
     }
@@ -91,13 +91,13 @@ pub(crate) fn f_string_missing_placeholders(checker: &mut Checker, expr: &ast::E
             TextSize::new(1),
         );
 
-        let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, f_string.range());
+        let mut diagnostic =
+            checker.report_diagnostic(FStringMissingPlaceholders, f_string.range());
         diagnostic.set_fix(convert_f_string_to_regular_string(
             prefix_range,
             f_string.range(),
             checker.locator(),
         ));
-        checker.diagnostics.push(diagnostic);
     }
 }
 

@@ -155,8 +155,7 @@ FURB113.py:69:5: FURB113 (repeated-append) [*] Use `nums.extend((1, 2))` instead
    |
 67 |   if True:
 68 |       # FURB113
-69 |       nums.append(1)
-   |  _____^
+69 | /     nums.append(1)
 70 | |     nums.append(2)
    | |__________________^ FURB113 (repeated-append)
    |
@@ -177,8 +176,7 @@ FURB113.py:75:5: FURB113 (repeated-append) [*] Use `nums.extend((1, 2))` instead
    |
 73 |   if True:
 74 |       # FURB113
-75 |       nums.append(1)
-   |  _____^
+75 | /     nums.append(1)
 76 | |     nums.append(2)
    | |__________________^ FURB113 (repeated-append)
 77 |       pass
@@ -200,8 +198,7 @@ FURB113.py:82:5: FURB113 (repeated-append) Use `nums.extend((1, 2, 3))` instead 
    |
 80 |   if True:
 81 |       # FURB113
-82 |       nums.append(1)
-   |  _____^
+82 | /     nums.append(1)
 83 | |     nums2.append(1)
 84 | |     nums.append(2)
 85 | |     nums.append(3)
@@ -213,8 +210,7 @@ FURB113.py:90:5: FURB113 (repeated-append) [*] Use `x.extend((1, 2))` instead of
    |
 88 |   def yes_one(x: list[int]):
 89 |       # FURB113
-90 |       x.append(1)
-   |  _____^
+90 | /     x.append(1)
 91 | |     x.append(2)
    | |_______________^ FURB113 (repeated-append)
    |
@@ -235,8 +231,7 @@ FURB113.py:96:5: FURB113 (repeated-append) [*] Use `x.extend((1, 2))` instead of
    |
 94 |   def yes_two(x: List[int]):
 95 |       # FURB113
-96 |       x.append(1)
-   |  _____^
+96 | /     x.append(1)
 97 | |     x.append(2)
    | |_______________^ FURB113 (repeated-append)
    |
@@ -257,8 +252,7 @@ FURB113.py:102:5: FURB113 (repeated-append) [*] Use `x.extend((1, 2))` instead o
     |
 100 |   def yes_three(*, x: list[int]):
 101 |       # FURB113
-102 |       x.append(1)
-    |  _____^
+102 | /     x.append(1)
 103 | |     x.append(2)
     | |_______________^ FURB113 (repeated-append)
     |
@@ -279,8 +273,7 @@ FURB113.py:108:5: FURB113 (repeated-append) [*] Use `x.extend((1, 2))` instead o
     |
 106 |   def yes_four(x: list[int], /):
 107 |       # FURB113
-108 |       x.append(1)
-    |  _____^
+108 | /     x.append(1)
 109 | |     x.append(2)
     | |_______________^ FURB113 (repeated-append)
     |
@@ -301,8 +294,7 @@ FURB113.py:114:5: FURB113 (repeated-append) Use `x.extend((1, 2, 3))` instead of
     |
 112 |   def yes_five(x: list[int], y: list[int]):
 113 |       # FURB113
-114 |       x.append(1)
-    |  _____^
+114 | /     x.append(1)
 115 | |     x.append(2)
 116 | |     y.append(1)
 117 | |     x.append(3)
@@ -314,8 +306,7 @@ FURB113.py:122:5: FURB113 (repeated-append) [*] Use `x.extend((1, 2))` instead o
     |
 120 |   def yes_six(x: list):
 121 |       # FURB113
-122 |       x.append(1)
-    |  _____^
+122 | /     x.append(1)
 123 | |     x.append(2)
     | |_______________^ FURB113 (repeated-append)
     |
@@ -336,8 +327,7 @@ FURB113.py:128:5: FURB113 (repeated-append) Use `nums.extend((1, 2, 3))` instead
     |
 126 |   if True:
 127 |       # FURB113
-128 |       nums.append(1)
-    |  _____^
+128 | /     nums.append(1)
 129 | |     # comment
 130 | |     nums.append(2)
 131 | |     # comment

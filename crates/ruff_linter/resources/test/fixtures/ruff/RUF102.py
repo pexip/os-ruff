@@ -1,38 +1,18 @@
-def f():
-    # These should both be left as-is
-    I = 1  # noqa: ambiguous-variable-name, unused-variable
-
-
-def f():
-    # These should both be left as-is
-    I = 1  # noqa: ambiguous-variable-name,unused-variable
-
-
-def f():
-    # This should be left as-is (including the comment)
-    I = 1  # noqa: ambiguous-variable-name  comment
-
-
-def f():
-    # These should both be converted, but the comment should be left as-is (including spacing beforehand)
-    I = 1  # noqa: E741 F841  comment
-
-
-def f():
-    # E741 should be converted to `ambiguous-variable-name`.
-    I = 1  # noqa: E741, unused-variable  comment
-
-
-def f():
-    # `F841` should be converted to `unused-variable`.
-    I = 1  # noqa: ambiguous-variable-name, F841
-
-
-def f():
-    # `F841` should be converted to `unused-variable`.
-    I = 1  # noqa: ambiguous-variable-name, F841
-
-
-def f():
-    # These should both be converted.
-    I = 1  # noqa: E741, F841
+# Invalid code
+import os  # noqa: INVALID123
+# External code
+import re  # noqa: V123
+# Valid noqa
+import sys  # noqa: E402
+from functools import cache  # Preceeding comment # noqa: F401, INVALID456
+from itertools import product  # Preceeding comment # noqa: INVALID789
+# Succeeding comment
+import math # noqa: INVALID000 # Succeeding comment
+# Mixed valid and invalid
+from typing import List  # noqa: F401, INVALID123
+# Test for multiple invalid
+from collections import defaultdict  # noqa: INVALID100, INVALID200, F401
+# Test for preserving valid codes when fixing
+from itertools import chain  # noqa: E402, INVALID300, F401
+# Test for mixed code types
+import json  # noqa: E402, INVALID400, V100

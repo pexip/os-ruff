@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, StmtFor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::SequenceIndexVisitor;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for key-based dict accesses during `.items()` iterations.
@@ -30,22 +30,22 @@ use crate::rules::pylint::helpers::SequenceIndexVisitor;
 /// for fruit_name, fruit_count in FRUITS.items():
 ///     print(fruit_count)
 /// ```
-#[violation]
-pub struct UnnecessaryDictIndexLookup;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDictIndexLookup;
 
 impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary lookup of dictionary value by key")
+        "Unnecessary lookup of dictionary value by key".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Use existing variable")
+        "Use existing variable".to_string()
     }
 }
 
 /// PLR1733
-pub(crate) fn unnecessary_dict_index_lookup(checker: &mut Checker, stmt_for: &StmtFor) {
+pub(crate) fn unnecessary_dict_index_lookup(checker: &Checker, stmt_for: &StmtFor) {
     let Some((dict_name, index_name, value_name)) = dict_items(&stmt_for.iter, &stmt_for.target)
     else {
         return;
@@ -59,17 +59,16 @@ pub(crate) fn unnecessary_dict_index_lookup(checker: &mut Checker, stmt_for: &St
     };
 
     for range in ranges {
-        let mut diagnostic = Diagnostic::new(UnnecessaryDictIndexLookup, range);
+        let mut diagnostic = checker.report_diagnostic(UnnecessaryDictIndexLookup, range);
         diagnostic.set_fix(Fix::safe_edits(
             Edit::range_replacement(value_name.id.to_string(), range),
             [noop(index_name), noop(value_name)],
         ));
-        checker.diagnostics.push(diagnostic);
     }
 }
 
 /// PLR1733
-pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &Checker, expr: &Expr) {
     let (Expr::Generator(ast::ExprGenerator {
         elt, generators, ..
     })
@@ -104,12 +103,11 @@ pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &mut Checker,
         };
 
         for range in ranges {
-            let mut diagnostic = Diagnostic::new(UnnecessaryDictIndexLookup, range);
+            let mut diagnostic = checker.report_diagnostic(UnnecessaryDictIndexLookup, range);
             diagnostic.set_fix(Fix::safe_edits(
                 Edit::range_replacement(value_name.id.to_string(), range),
                 [noop(index_name), noop(value_name)],
             ));
-            checker.diagnostics.push(diagnostic);
         }
     }
 }

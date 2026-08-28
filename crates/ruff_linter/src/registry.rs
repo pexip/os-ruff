@@ -1,6 +1,7 @@
 //! Remnant of the registry of all [`Rule`] implementations, now it's reexporting from codes.rs
 //! with some helper symbols
 
+use ruff_db::diagnostic::LintName;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -27,7 +28,7 @@ impl Rule {
 
     pub fn from_name(name: &str) -> Result<Self, FromCodeOrNameError> {
         for linter in Linter::iter() {
-            if let Some(rule) = linter.all_rules().find(|rule| rule.as_ref() == name) {
+            if let Some(rule) = linter.all_rules().find(|rule| rule.name() == name) {
                 return Ok(rule);
             }
         }
@@ -46,28 +47,15 @@ pub enum FromCodeOrNameError {
 
 #[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
 pub enum Linter {
-    /// [Pyflakes](https://pypi.org/project/pyflakes/)
-    #[prefix = "F"]
-    Pyflakes,
-    /// [pycodestyle](https://pypi.org/project/pycodestyle/)
-    #[prefix = "E"]
-    #[prefix = "W"]
-    Pycodestyle,
-    /// [mccabe](https://pypi.org/project/mccabe/)
-    #[prefix = "C90"]
-    McCabe,
-    /// [isort](https://pypi.org/project/isort/)
-    #[prefix = "I"]
-    Isort,
-    /// [pep8-naming](https://pypi.org/project/pep8-naming/)
-    #[prefix = "N"]
-    PEP8Naming,
-    /// [pydocstyle](https://pypi.org/project/pydocstyle/)
-    #[prefix = "D"]
-    Pydocstyle,
-    /// [pyupgrade](https://pypi.org/project/pyupgrade/)
-    #[prefix = "UP"]
-    Pyupgrade,
+    /// [Airflow](https://pypi.org/project/apache-airflow/)
+    #[prefix = "AIR"]
+    Airflow,
+    /// [eradicate](https://pypi.org/project/eradicate/)
+    #[prefix = "ERA"]
+    Eradicate,
+    /// [FastAPI](https://pypi.org/project/fastapi/)
+    #[prefix = "FAST"]
+    FastApi,
     /// [flake8-2020](https://pypi.org/project/flake8-2020/)
     #[prefix = "YTT"]
     Flake82020,
@@ -95,12 +83,12 @@ pub enum Linter {
     /// [flake8-commas](https://pypi.org/project/flake8-commas/)
     #[prefix = "COM"]
     Flake8Commas,
-    /// [flake8-copyright](https://pypi.org/project/flake8-copyright/)
-    #[prefix = "CPY"]
-    Flake8Copyright,
     /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
     #[prefix = "C4"]
     Flake8Comprehensions,
+    /// [flake8-copyright](https://pypi.org/project/flake8-copyright/)
+    #[prefix = "CPY"]
+    Flake8Copyright,
     /// [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
     #[prefix = "DTZ"]
     Flake8Datetimez,
@@ -116,9 +104,15 @@ pub enum Linter {
     /// [flake8-executable](https://pypi.org/project/flake8-executable/)
     #[prefix = "EXE"]
     Flake8Executable,
+    /// [flake8-fixme](https://github.com/tommilligan/flake8-fixme)
+    #[prefix = "FIX"]
+    Flake8Fixme,
     /// [flake8-future-annotations](https://pypi.org/project/flake8-future-annotations/)
     #[prefix = "FA"]
     Flake8FutureAnnotations,
+    /// [flake8-gettext](https://pypi.org/project/flake8-gettext/)
+    #[prefix = "INT"]
+    Flake8GetText,
     /// [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
     #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
@@ -158,72 +152,79 @@ pub enum Linter {
     /// [flake8-self](https://pypi.org/project/flake8-self/)
     #[prefix = "SLF"]
     Flake8Self,
-    /// [flake8-slots](https://pypi.org/project/flake8-slots/)
-    #[prefix = "SLOT"]
-    Flake8Slots,
     /// [flake8-simplify](https://pypi.org/project/flake8-simplify/)
     #[prefix = "SIM"]
     Flake8Simplify,
+    /// [flake8-slots](https://pypi.org/project/flake8-slots/)
+    #[prefix = "SLOT"]
+    Flake8Slots,
     /// [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
     #[prefix = "TID"]
     Flake8TidyImports,
+    /// [flake8-todos](https://github.com/orsinium-labs/flake8-todos/)
+    #[prefix = "TD"]
+    Flake8Todos,
     /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
-    #[prefix = "TCH"]
+    #[prefix = "TC"]
     Flake8TypeChecking,
-    /// [flake8-gettext](https://pypi.org/project/flake8-gettext/)
-    #[prefix = "INT"]
-    Flake8GetText,
     /// [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/)
     #[prefix = "ARG"]
     Flake8UnusedArguments,
     /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
     #[prefix = "PTH"]
     Flake8UsePathlib,
-    /// [flake8-todos](https://github.com/orsinium-labs/flake8-todos/)
-    #[prefix = "TD"]
-    Flake8Todos,
-    /// [flake8-fixme](https://github.com/tommilligan/flake8-fixme)
-    #[prefix = "FIX"]
-    Flake8Fixme,
-    /// [eradicate](https://pypi.org/project/eradicate/)
-    #[prefix = "ERA"]
-    Eradicate,
+    /// [flynt](https://pypi.org/project/flynt/)
+    #[prefix = "FLY"]
+    Flynt,
+    /// [isort](https://pypi.org/project/isort/)
+    #[prefix = "I"]
+    Isort,
+    /// [mccabe](https://pypi.org/project/mccabe/)
+    #[prefix = "C90"]
+    McCabe,
+    /// NumPy-specific rules
+    #[prefix = "NPY"]
+    Numpy,
     /// [pandas-vet](https://pypi.org/project/pandas-vet/)
     #[prefix = "PD"]
     PandasVet,
+    /// [pep8-naming](https://pypi.org/project/pep8-naming/)
+    #[prefix = "N"]
+    PEP8Naming,
+    /// [Perflint](https://pypi.org/project/perflint/)
+    #[prefix = "PERF"]
+    Perflint,
+    /// [pycodestyle](https://pypi.org/project/pycodestyle/)
+    #[prefix = "E"]
+    #[prefix = "W"]
+    Pycodestyle,
+    /// [pydoclint](https://pypi.org/project/pydoclint/)
+    #[prefix = "DOC"]
+    Pydoclint,
+    /// [pydocstyle](https://pypi.org/project/pydocstyle/)
+    #[prefix = "D"]
+    Pydocstyle,
+    /// [Pyflakes](https://pypi.org/project/pyflakes/)
+    #[prefix = "F"]
+    Pyflakes,
     /// [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks)
     #[prefix = "PGH"]
     PygrepHooks,
     /// [Pylint](https://pypi.org/project/pylint/)
     #[prefix = "PL"]
     Pylint,
-    /// [tryceratops](https://pypi.org/project/tryceratops/)
-    #[prefix = "TRY"]
-    Tryceratops,
-    /// [flynt](https://pypi.org/project/flynt/)
-    #[prefix = "FLY"]
-    Flynt,
-    /// NumPy-specific rules
-    #[prefix = "NPY"]
-    Numpy,
-    /// [FastAPI](https://pypi.org/project/fastapi/)
-    #[prefix = "FAST"]
-    FastApi,
-    /// [Airflow](https://pypi.org/project/apache-airflow/)
-    #[prefix = "AIR"]
-    Airflow,
-    /// [Perflint](https://pypi.org/project/perflint/)
-    #[prefix = "PERF"]
-    Perflint,
+    /// [pyupgrade](https://pypi.org/project/pyupgrade/)
+    #[prefix = "UP"]
+    Pyupgrade,
     /// [refurb](https://pypi.org/project/refurb/)
     #[prefix = "FURB"]
     Refurb,
-    /// [pydoclint](https://pypi.org/project/pydoclint/)
-    #[prefix = "DOC"]
-    Pydoclint,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
+    /// [tryceratops](https://pypi.org/project/tryceratops/)
+    #[prefix = "TRY"]
+    Tryceratops,
 }
 
 pub trait RuleNamespace: Sized {
@@ -270,6 +271,7 @@ impl Rule {
             Rule::BidirectionalUnicode
             | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong
+            | Rule::IndentedFormFeed
             | Rule::LineTooLong
             | Rule::MissingCopyrightNotice
             | Rule::MissingNewlineAtEndOfFile
@@ -323,7 +325,7 @@ impl Rule {
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage
             | Rule::InvalidModuleName
-            | Rule::BuiltinModuleShadowing => LintSource::Filesystem,
+            | Rule::StdlibModuleShadowing => LintSource::Filesystem,
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
             | Rule::MissingWhitespace
@@ -364,9 +366,18 @@ impl Rule {
 
     /// Return the URL for the rule documentation, if it exists.
     pub fn url(&self) -> Option<String> {
-        self.explanation()
-            .is_some()
-            .then(|| format!("{}/rules/{}", env!("CARGO_PKG_HOMEPAGE"), self.as_ref()))
+        self.explanation().is_some().then(|| {
+            format!(
+                "{}/rules/{name}",
+                env!("CARGO_PKG_HOMEPAGE"),
+                name = self.name()
+            )
+        })
+    }
+
+    pub fn name(&self) -> LintName {
+        let name: &'static str = self.into();
+        LintName::of(name)
     }
 }
 
@@ -374,9 +385,9 @@ impl Rule {
 pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 3] = &[
     (
         Rule::BlankLineBeforeClass,
-        Rule::OneBlankLineBeforeClass,
-        "`one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are \
-         incompatible. Ignoring `one-blank-line-before-class`.",
+        Rule::IncorrectBlankLineBeforeClass,
+        "`incorrect-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are \
+         incompatible. Ignoring `incorrect-blank-line-before-class`.",
     ),
     (
         Rule::MultiLineSummaryFirstLine,
@@ -387,7 +398,7 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 3] = &[
     (
         Rule::NOQAByCode,
         Rule::NOQAByName,
-        "`noqa-by-code` (RUF102) and `noqa-by-name` (RUF103) are incompatible. Ignoring \
+        "`noqa-by-code` (RUF851) and `noqa-by-name` (RUF852) are incompatible. Ignoring \
          `noqa-by-name`.",
     ),
 ];
@@ -443,7 +454,7 @@ pub mod clap_completion {
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
             Some(Box::new(Rule::iter().map(|rule| {
                 let name = rule.noqa_code().to_string();
-                let help = rule.as_ref().to_string();
+                let help = rule.name().as_str();
                 PossibleValue::new(name).help(help)
             })))
         }
@@ -452,6 +463,7 @@ pub mod clap_completion {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use std::mem::size_of;
 
     use strum::IntoEnumIterator;
@@ -464,7 +476,7 @@ mod tests {
             assert!(
                 rule.explanation().is_some(),
                 "Rule {} is missing documentation",
-                rule.as_ref()
+                rule.name()
             );
         }
     }
@@ -481,10 +493,10 @@ mod tests {
             .collect();
 
         for rule in Rule::iter() {
-            let rule_name = rule.as_ref();
+            let rule_name = rule.name();
             for pattern in &patterns {
                 assert!(
-                    !pattern.matches(rule_name),
+                    !pattern.matches(&rule_name),
                     "{rule_name} does not match naming convention, see CONTRIBUTING.md"
                 );
             }
@@ -514,5 +526,20 @@ mod tests {
     #[test]
     fn rule_size() {
         assert_eq!(2, size_of::<Rule>());
+    }
+
+    #[test]
+    fn linter_sorting() {
+        let names: Vec<_> = Linter::iter()
+            .map(|linter| linter.name().to_lowercase())
+            .collect();
+
+        let sorted: Vec<_> = names.iter().cloned().sorted().collect();
+
+        assert_eq!(
+            &names[..],
+            &sorted[..],
+            "Linters are not sorted alphabetically (case insensitive)"
+        );
     }
 }

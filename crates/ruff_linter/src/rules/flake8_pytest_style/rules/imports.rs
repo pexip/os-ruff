@@ -1,8 +1,9 @@
 use ruff_python_ast::Stmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
+
+use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
 /// Checks for incorrect import of pytest.
@@ -21,13 +22,13 @@ use ruff_text_size::Ranged;
 /// ```python
 /// import pytest
 /// ```
-#[violation]
-pub struct PytestIncorrectPytestImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestIncorrectPytestImport;
 
 impl Violation for PytestIncorrectPytestImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Incorrect import of `pytest`; use `import pytest` instead")
+        "Incorrect import of `pytest`; use `import pytest` instead".to_string()
     }
 }
 
@@ -36,39 +37,26 @@ fn is_pytest_or_subpackage(imported_name: &str) -> bool {
 }
 
 /// PT013
-pub(crate) fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Diagnostic> {
+pub(crate) fn import(checker: &Checker, import_from: &Stmt, name: &str, asname: Option<&str>) {
     if is_pytest_or_subpackage(name) {
         if let Some(alias) = asname {
             if alias != name {
-                return Some(Diagnostic::new(
-                    PytestIncorrectPytestImport,
-                    import_from.range(),
-                ));
+                checker.report_diagnostic(PytestIncorrectPytestImport, import_from.range());
             }
         }
     }
-    None
 }
 
 /// PT013
-pub(crate) fn import_from(
-    import_from: &Stmt,
-    module: Option<&str>,
-    level: u32,
-) -> Option<Diagnostic> {
+pub(crate) fn import_from(checker: &Checker, import_from: &Stmt, module: Option<&str>, level: u32) {
     // If level is not zero or module is none, return
     if level != 0 {
-        return None;
-    };
+        return;
+    }
 
     if let Some(module) = module {
         if is_pytest_or_subpackage(module) {
-            return Some(Diagnostic::new(
-                PytestIncorrectPytestImport,
-                import_from.range(),
-            ));
+            checker.report_diagnostic(PytestIncorrectPytestImport, import_from.range());
         }
-    };
-
-    None
+    }
 }

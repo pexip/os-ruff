@@ -7,7 +7,7 @@ docstring_doubles.py:1:1: Q002 (bad-quotes-docstring) [*] Double quote docstring
 2 | | Double quotes multiline module docstring
 3 | | """
   | |___^ Q002 (bad-quotes-docstring)
-4 |   
+4 |
 5 |   """
   |
   = help: Replace double quotes docstring with single quotes
@@ -25,12 +25,11 @@ docstring_doubles.py:1:1: Q002 (bad-quotes-docstring) [*] Double quote docstring
 docstring_doubles.py:12:5: Q002 (bad-quotes-docstring) [*] Double quote docstring found but single quotes preferred
    |
 11 |   class Cls:
-12 |       """
-   |  _____^
+12 | /     """
 13 | |     Double quotes multiline class docstring
 14 | |     """
    | |_______^ Q002 (bad-quotes-docstring)
-15 |   
+15 |
 16 |       """
    |
    = help: Replace double quotes docstring with single quotes
@@ -52,12 +51,11 @@ docstring_doubles.py:24:9: Q002 (bad-quotes-docstring) [*] Double quote docstrin
    |
 22 |           definitely not a docstring""",
 23 |           val=l[Cls():3]):
-24 |           """
-   |  _________^
+24 | /         """
 25 | |         Double quotes multiline function docstring
 26 | |         """
    | |___________^ Q002 (bad-quotes-docstring)
-27 |   
+27 |
 28 |           some_expression = 'hello world'
    |
    = help: Replace double quotes docstring with single quotes

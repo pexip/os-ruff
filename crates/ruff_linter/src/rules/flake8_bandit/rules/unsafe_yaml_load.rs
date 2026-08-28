@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -34,38 +34,38 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [PyYAML documentation: Loading YAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
 /// - [Common Weakness Enumeration: CWE-20](https://cwe.mitre.org/data/definitions/20.html)
-#[violation]
-pub struct UnsafeYAMLLoad {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnsafeYAMLLoad {
     pub loader: Option<String>,
 }
 
 impl Violation for UnsafeYAMLLoad {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnsafeYAMLLoad { loader } = self;
-        match loader {
+        match &self.loader {
             Some(name) => {
                 format!(
                     "Probable use of unsafe loader `{name}` with `yaml.load`. Allows \
                      instantiation of arbitrary objects. Consider `yaml.safe_load`."
                 )
             }
-            None => format!(
+            None => {
                 "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. \
                  Consider `yaml.safe_load`."
-            ),
+                    .to_string()
+            }
         }
     }
 }
 
 /// S506
-pub(crate) fn unsafe_yaml_load(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unsafe_yaml_load(checker: &Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
         .resolve_qualified_name(&call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["yaml", "load"]))
     {
-        if let Some(loader_arg) = call.arguments.find_argument("Loader", 1) {
+        if let Some(loader_arg) = call.arguments.find_argument_value("Loader", 1) {
             if !checker
                 .semantic()
                 .resolve_qualified_name(loader_arg)
@@ -82,16 +82,10 @@ pub(crate) fn unsafe_yaml_load(checker: &mut Checker, call: &ast::ExprCall) {
                     Expr::Name(ast::ExprName { id, .. }) => Some(id.to_string()),
                     _ => None,
                 };
-                checker.diagnostics.push(Diagnostic::new(
-                    UnsafeYAMLLoad { loader },
-                    loader_arg.range(),
-                ));
+                checker.report_diagnostic(UnsafeYAMLLoad { loader }, loader_arg.range());
             }
         } else {
-            checker.diagnostics.push(Diagnostic::new(
-                UnsafeYAMLLoad { loader: None },
-                call.func.range(),
-            ));
+            checker.report_diagnostic(UnsafeYAMLLoad { loader: None }, call.func.range());
         }
     }
 }

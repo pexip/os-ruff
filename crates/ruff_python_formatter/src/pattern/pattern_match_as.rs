@@ -13,6 +13,7 @@ impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
     fn fmt_fields(&self, item: &PatternMatchAs, f: &mut PyFormatter) -> FormatResult<()> {
         let PatternMatchAs {
             range: _,
+            node_index: _,
             pattern,
             name,
         } = item;
@@ -56,6 +57,10 @@ impl NeedsParentheses for PatternMatchAs {
         _parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Multiline
+        if self.name.is_some() {
+            OptionalParentheses::Multiline
+        } else {
+            OptionalParentheses::BestFit
+        }
     }
 }

@@ -1,7 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{Arguments, Expr, Int};
@@ -12,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `enumerate` that discard either the index or the value
@@ -57,8 +57,8 @@ use crate::fix::edits::pad;
 /// - [Python documentation: `enumerate`](https://docs.python.org/3/library/functions.html#enumerate)
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
 /// - [Python documentation: `len`](https://docs.python.org/3/library/functions.html#len)
-#[violation]
-pub struct UnnecessaryEnumerate {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryEnumerate {
     subset: EnumerateSubset,
 }
 
@@ -67,28 +67,27 @@ impl Violation for UnnecessaryEnumerate {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryEnumerate { subset } = self;
-        match subset {
+        match self.subset {
             EnumerateSubset::Indices => {
-                format!("`enumerate` value is unused, use `for x in range(len(y))` instead")
+                "`enumerate` value is unused, use `for x in range(len(y))` instead".to_string()
             }
             EnumerateSubset::Values => {
-                format!("`enumerate` index is unused, use `for x in y` instead")
+                "`enumerate` index is unused, use `for x in y` instead".to_string()
             }
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnnecessaryEnumerate { subset } = self;
-        match subset {
-            EnumerateSubset::Indices => Some("Replace with `range(len(...))`".to_string()),
-            EnumerateSubset::Values => Some("Remove `enumerate`".to_string()),
-        }
+        let title = match self.subset {
+            EnumerateSubset::Indices => "Replace with `range(len(...))`",
+            EnumerateSubset::Values => "Remove `enumerate`",
+        };
+        Some(title.to_string())
     }
 }
 
 /// FURB148
-pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) {
     // Check the for statement is of the form `for x, y in func(...)`.
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
         return;
@@ -125,7 +124,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             // Both the index and the value are used.
         }
         (true, false) => {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 UnnecessaryEnumerate {
                     subset: EnumerateSubset::Values,
                 },
@@ -144,8 +143,6 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                 stmt_for.target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
-
-            checker.diagnostics.push(diagnostic);
         }
         (false, true) => {
             // Ensure the sequence object works with `len`. If it doesn't, the
@@ -168,7 +165,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             }
 
             // The value is unused, so replace with `for index in range(len(sequence))`.
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 UnnecessaryEnumerate {
                     subset: EnumerateSubset::Indices,
                 },
@@ -179,8 +176,8 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             {
                 // If the `start` argument is set to something other than the `range` default,
                 // there's no clear fix.
-                let start = arguments.find_argument("start", 1);
-                if start.map_or(true, |start| {
+                let start = arguments.find_argument_value("start", 1);
+                if start.is_none_or(|start| {
                     matches!(
                         start,
                         Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -206,7 +203,6 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                     diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
                 }
             }
-            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -236,6 +232,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
         id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // Construct `len(name)`.
     let len = ast::ExprCall {
@@ -244,6 +241,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
                 id: Name::new_static("len"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             }
             .into(),
         ),
@@ -251,8 +249,10 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             args: Box::from([var.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // Construct `range(len(name))`.
     let range = ast::ExprCall {
@@ -261,6 +261,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
                 id: Name::new_static("range"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             }
             .into(),
         ),
@@ -268,13 +269,16 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             args: Box::from([len.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(range.into()),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     generator.stmt(&stmt.into())
 }

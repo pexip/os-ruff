@@ -1,9 +1,9 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -25,21 +25,19 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Lambdas](https://docs.python.org/3/reference/expressions.html#lambda)
-#[violation]
-pub struct UnnecessaryDirectLambdaCall;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDirectLambdaCall;
 
 impl Violation for UnnecessaryDirectLambdaCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Lambda expression called directly. Execute the expression inline instead.")
+        "Lambda expression called directly. Execute the expression inline instead.".to_string()
     }
 }
 
 /// PLC3002
-pub(crate) fn unnecessary_direct_lambda_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
+pub(crate) fn unnecessary_direct_lambda_call(checker: &Checker, expr: &Expr, func: &Expr) {
     if let Expr::Lambda(_) = func {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(UnnecessaryDirectLambdaCall, expr.range()));
+        checker.report_diagnostic(UnnecessaryDirectLambdaCall, expr.range());
     }
 }

@@ -43,7 +43,7 @@ B012.py:44:21: B012 (jump-statement-in-finally) `return` inside `finally` blocks
 43 |                 finally:
 44 |                     return  # warning
    |                     ^^^^^^ B012 (jump-statement-in-finally)
-45 | 
+45 |
 46 |         finally:
    |
 
@@ -53,7 +53,7 @@ B012.py:66:13: B012 (jump-statement-in-finally) `break` inside `finally` blocks 
 65 |         finally:
 66 |             break  # warning
    |             ^^^^^ B012 (jump-statement-in-finally)
-67 | 
+67 |
 68 |             def j():
    |
 
@@ -63,7 +63,7 @@ B012.py:78:13: B012 (jump-statement-in-finally) `continue` inside `finally` bloc
 77 |         finally:
 78 |             continue  # warning
    |             ^^^^^^^^ B012 (jump-statement-in-finally)
-79 | 
+79 |
 80 |             def j():
    |
 
@@ -81,7 +81,7 @@ B012.py:101:9: B012 (jump-statement-in-finally) `continue` inside `finally` bloc
 100 |     finally:
 101 |         continue  # warning
     |         ^^^^^^^^ B012 (jump-statement-in-finally)
-102 | 
+102 |
 103 | while True:
     |
 

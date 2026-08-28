@@ -80,7 +80,7 @@ N804.py:18:20: N804 (invalid-first-argument-name-for-class-method) [*] First arg
 N804.py:21:18: N804 (invalid-first-argument-name-for-class-method) [*] First argument of a class method should be named `cls`
    |
 19 |         pass
-20 | 
+20 |
 21 |     def stillBad(self):
    |                  ^^^^ N804 (invalid-first-argument-name-for-class-method)
 22 |         pass

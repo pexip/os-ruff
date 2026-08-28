@@ -8,7 +8,7 @@ self_or_cls_assignment.py:4:9: PLW0642 (self-or-cls-assignment) Reassigned `cls`
 4 |         cls = "apple"  # PLW0642
   |         ^^^ PLW0642 (self-or-cls-assignment)
 5 |         cls: Fruit = "apple"  # PLW0642
-6 |         cls += "orange"  # PLW0642
+6 |         cls += "orange"  # OK, augmented assignments are ignored
   |
   = help: Consider using a different variable name
 
@@ -18,26 +18,15 @@ self_or_cls_assignment.py:5:9: PLW0642 (self-or-cls-assignment) Reassigned `cls`
 4 |         cls = "apple"  # PLW0642
 5 |         cls: Fruit = "apple"  # PLW0642
   |         ^^^ PLW0642 (self-or-cls-assignment)
-6 |         cls += "orange"  # PLW0642
+6 |         cls += "orange"  # OK, augmented assignments are ignored
 7 |         *cls = "banana"  # PLW0642
-  |
-  = help: Consider using a different variable name
-
-self_or_cls_assignment.py:6:9: PLW0642 (self-or-cls-assignment) Reassigned `cls` variable in class method
-  |
-4 |         cls = "apple"  # PLW0642
-5 |         cls: Fruit = "apple"  # PLW0642
-6 |         cls += "orange"  # PLW0642
-  |         ^^^ PLW0642 (self-or-cls-assignment)
-7 |         *cls = "banana"  # PLW0642
-8 |         cls, blah = "apple", "orange"  # PLW0642
   |
   = help: Consider using a different variable name
 
 self_or_cls_assignment.py:7:10: PLW0642 (self-or-cls-assignment) Reassigned `cls` variable in class method
   |
 5 |         cls: Fruit = "apple"  # PLW0642
-6 |         cls += "orange"  # PLW0642
+6 |         cls += "orange"  # OK, augmented assignments are ignored
 7 |         *cls = "banana"  # PLW0642
   |          ^^^ PLW0642 (self-or-cls-assignment)
 8 |         cls, blah = "apple", "orange"  # PLW0642
@@ -47,7 +36,7 @@ self_or_cls_assignment.py:7:10: PLW0642 (self-or-cls-assignment) Reassigned `cls
 
 self_or_cls_assignment.py:8:9: PLW0642 (self-or-cls-assignment) Reassigned `cls` variable in class method
    |
- 6 |         cls += "orange"  # PLW0642
+ 6 |         cls += "orange"  # OK, augmented assignments are ignored
  7 |         *cls = "banana"  # PLW0642
  8 |         cls, blah = "apple", "orange"  # PLW0642
    |         ^^^ PLW0642 (self-or-cls-assignment)
@@ -72,7 +61,7 @@ self_or_cls_assignment.py:10:16: PLW0642 (self-or-cls-assignment) Reassigned `cl
  9 |         blah, (cls, blah2) = "apple", ("orange", "banana")  # PLW0642
 10 |         blah, [cls, blah2] = "apple", ("orange", "banana")  # PLW0642
    |                ^^^ PLW0642 (self-or-cls-assignment)
-11 | 
+11 |
 12 |     @classmethod
    |
    = help: Consider using a different variable name
@@ -83,7 +72,7 @@ self_or_cls_assignment.py:14:9: PLW0642 (self-or-cls-assignment) Reassigned `cls
 13 |     def add_fruits(cls, fruits, /) -> None:
 14 |         cls = fruits  # PLW0642
    |         ^^^ PLW0642 (self-or-cls-assignment)
-15 | 
+15 |
 16 |     def print_color(self) -> None:
    |
    = help: Consider using a different variable name
@@ -94,7 +83,7 @@ self_or_cls_assignment.py:17:9: PLW0642 (self-or-cls-assignment) Reassigned `sel
 17 |         self = "red"  # PLW0642
    |         ^^^^ PLW0642 (self-or-cls-assignment)
 18 |         self: Self = "red"  # PLW0642
-19 |         self += "blue"  # PLW0642
+19 |         self += "blue"  # OK, augmented assignments are ignored
    |
    = help: Consider using a different variable name
 
@@ -104,26 +93,15 @@ self_or_cls_assignment.py:18:9: PLW0642 (self-or-cls-assignment) Reassigned `sel
 17 |         self = "red"  # PLW0642
 18 |         self: Self = "red"  # PLW0642
    |         ^^^^ PLW0642 (self-or-cls-assignment)
-19 |         self += "blue"  # PLW0642
+19 |         self += "blue"  # OK, augmented assignments are ignored
 20 |         *self = "blue"  # PLW0642
-   |
-   = help: Consider using a different variable name
-
-self_or_cls_assignment.py:19:9: PLW0642 (self-or-cls-assignment) Reassigned `self` variable in instance method
-   |
-17 |         self = "red"  # PLW0642
-18 |         self: Self = "red"  # PLW0642
-19 |         self += "blue"  # PLW0642
-   |         ^^^^ PLW0642 (self-or-cls-assignment)
-20 |         *self = "blue"  # PLW0642
-21 |         self, blah = "red", "blue"  # PLW0642
    |
    = help: Consider using a different variable name
 
 self_or_cls_assignment.py:20:10: PLW0642 (self-or-cls-assignment) Reassigned `self` variable in instance method
    |
 18 |         self: Self = "red"  # PLW0642
-19 |         self += "blue"  # PLW0642
+19 |         self += "blue"  # OK, augmented assignments are ignored
 20 |         *self = "blue"  # PLW0642
    |          ^^^^ PLW0642 (self-or-cls-assignment)
 21 |         self, blah = "red", "blue"  # PLW0642
@@ -133,7 +111,7 @@ self_or_cls_assignment.py:20:10: PLW0642 (self-or-cls-assignment) Reassigned `se
 
 self_or_cls_assignment.py:21:9: PLW0642 (self-or-cls-assignment) Reassigned `self` variable in instance method
    |
-19 |         self += "blue"  # PLW0642
+19 |         self += "blue"  # OK, augmented assignments are ignored
 20 |         *self = "blue"  # PLW0642
 21 |         self, blah = "red", "blue"  # PLW0642
    |         ^^^^ PLW0642 (self-or-cls-assignment)
@@ -158,7 +136,7 @@ self_or_cls_assignment.py:23:16: PLW0642 (self-or-cls-assignment) Reassigned `se
 22 |         blah, (self, blah2) = "apple", ("orange", "banana")  # PLW0642
 23 |         blah, [self, blah2] = "apple", ("orange", "banana")  # PLW0642
    |                ^^^^ PLW0642 (self-or-cls-assignment)
-24 | 
+24 |
 25 |     def print_color(self, color, /) -> None:
    |
    = help: Consider using a different variable name
@@ -168,7 +146,16 @@ self_or_cls_assignment.py:26:9: PLW0642 (self-or-cls-assignment) Reassigned `sel
 25 |     def print_color(self, color, /) -> None:
 26 |         self = color
    |         ^^^^ PLW0642 (self-or-cls-assignment)
-27 | 
+27 |
 28 |     def ok(self) -> None:
+   |
+   = help: Consider using a different variable name
+
+self_or_cls_assignment.py:50:9: PLW0642 (self-or-cls-assignment) Reassigned `cls` variable in `__new__` method
+   |
+48 | class Foo:
+49 |     def __new__(cls):
+50 |         cls = "apple" # PLW0642
+   |         ^^^ PLW0642 (self-or-cls-assignment)
    |
    = help: Consider using a different variable name

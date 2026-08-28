@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/return_annotation.py
+snapshot_kind: text
 ---
 ## Input
 ```python
@@ -335,32 +336,24 @@ def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
 
 # Breaking return type annotations. Black adds parentheses if the parameters are
 # empty; otherwise, it leverages the expressions own parentheses if possible.
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-    Set[
-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    ]
-): ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]: ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-    Set[
-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    ]
-): ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]: ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-    Set[
-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    ]
-): ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]: ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-    Set[
-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    ]
-): ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]: ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
@@ -461,11 +454,8 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
 ): ...
 
 
-def double() -> (
-    first_item
-    and foo.bar.baz().bop(
-        1,
-    )
+def double() -> first_item and foo.bar.baz().bop(
+    1,
 ):
     return 2 * a
 
@@ -519,6 +509,3 @@ def process_board_action(
 ) -> Optional[Tuple[str, str]]:
     pass
 ```
-
-
-

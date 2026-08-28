@@ -1,15 +1,17 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
-use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::Scope;
+use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::analyze::function_type::FunctionType;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for static methods that use `self` or `cls` as their first argument.
+/// This rule also applies to `__new__` methods, which are implicitly static.
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends the use of `self` and `cls` as the first arguments for
@@ -34,8 +36,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
-#[violation]
-pub struct BadStaticmethodArgument {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadStaticmethodArgument {
     argument_name: String,
 }
 
@@ -48,11 +50,7 @@ impl Violation for BadStaticmethodArgument {
 }
 
 /// PLW0211
-pub(crate) fn bad_staticmethod_argument(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
     let Some(func) = scope.kind.as_function() else {
         return;
     };
@@ -73,11 +71,15 @@ pub(crate) fn bad_staticmethod_argument(
         decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
-    if !matches!(type_, function_type::FunctionType::StaticMethod) {
-        return;
+
+    match type_ {
+        FunctionType::StaticMethod | FunctionType::NewMethod => {}
+        FunctionType::Function | FunctionType::Method | FunctionType::ClassMethod => {
+            return;
+        }
     }
 
     let Some(ParameterWithDefault {
@@ -91,13 +93,18 @@ pub(crate) fn bad_staticmethod_argument(
         return;
     };
 
-    if matches!(self_or_cls.name.as_str(), "self" | "cls") {
-        let diagnostic = Diagnostic::new(
-            BadStaticmethodArgument {
-                argument_name: self_or_cls.name.to_string(),
-            },
-            self_or_cls.range(),
-        );
-        diagnostics.push(diagnostic);
+    match (name.as_str(), self_or_cls.name.as_str()) {
+        ("__new__", "cls") => {
+            return;
+        }
+        (_, "self" | "cls") => {}
+        _ => return,
     }
+
+    checker.report_diagnostic(
+        BadStaticmethodArgument {
+            argument_name: self_or_cls.name.to_string(),
+        },
+        self_or_cls.range(),
+    );
 }

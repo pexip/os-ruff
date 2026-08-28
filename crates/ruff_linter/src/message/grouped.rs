@@ -11,7 +11,7 @@ use crate::fs::relativize_path;
 use crate::message::diff::calculate_print_width;
 use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
-    group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
+    Emitter, EmitterContext, MessageWithLocation, OldDiagnostic, group_diagnostics_by_filename,
 };
 use crate::settings::types::UnsafeFixes;
 
@@ -46,10 +46,10 @@ impl Emitter for GroupedEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        for (filename, messages) in group_messages_by_filename(messages) {
+        for (filename, messages) in group_diagnostics_by_filename(diagnostics) {
             // Compute the maximum number of digits in the row and column, for messages in
             // this file.
 
@@ -57,7 +57,7 @@ impl Emitter for GroupedEmitter {
             let mut max_column_length = OneIndexed::MIN;
 
             for message in &messages {
-                max_row_length = max_row_length.max(message.start_location.row);
+                max_row_length = max_row_length.max(message.start_location.line);
                 max_column_length = max_column_length.max(message.start_location.column);
             }
 
@@ -65,7 +65,7 @@ impl Emitter for GroupedEmitter {
             let column_length = calculate_print_width(max_column_length);
 
             // Print the filename.
-            writeln!(writer, "{}:", relativize_path(filename).underline())?;
+            writeln!(writer, "{}:", relativize_path(&*filename).underline())?;
 
             // Print each message.
             for message in messages {
@@ -73,7 +73,7 @@ impl Emitter for GroupedEmitter {
                     writer,
                     "{}",
                     DisplayGroupedMessage {
-                        notebook_index: context.notebook_index(message.filename()),
+                        notebook_index: context.notebook_index(&message.filename()),
                         message,
                         show_fix_status: self.show_fix_status,
                         unsafe_fixes: self.unsafe_fixes,
@@ -115,8 +115,8 @@ impl Display for DisplayGroupedMessage<'_> {
         write!(
             f,
             "  {row_padding}",
-            row_padding =
-                " ".repeat(self.row_length.get() - calculate_print_width(start_location.row).get())
+            row_padding = " "
+                .repeat(self.row_length.get() - calculate_print_width(start_location.line).get())
         )?;
 
         // Check if we're working on a jupyter notebook and translate positions with cell accordingly
@@ -125,18 +125,18 @@ impl Display for DisplayGroupedMessage<'_> {
                 f,
                 "cell {cell}{sep}",
                 cell = jupyter_index
-                    .cell(start_location.row)
+                    .cell(start_location.line)
                     .unwrap_or(OneIndexed::MIN),
                 sep = ":".cyan()
             )?;
             (
                 jupyter_index
-                    .cell_row(start_location.row)
+                    .cell_row(start_location.line)
                     .unwrap_or(OneIndexed::MIN),
                 start_location.column,
             )
         } else {
-            (start_location.row, start_location.column)
+            (start_location.line, start_location.column)
         };
 
         writeln!(
@@ -205,16 +205,16 @@ impl std::fmt::Write for PadAdapter<'_> {
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
-    };
     use crate::message::GroupedEmitter;
+    use crate::message::tests::{
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
+    };
     use crate::settings::types::UnsafeFixes;
 
     #[test]
     fn default() {
         let mut emitter = GroupedEmitter::default();
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = GroupedEmitter::default();
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn show_source() {
         let mut emitter = GroupedEmitter::default().with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -240,7 +240,7 @@ mod tests {
         let mut emitter = GroupedEmitter::default()
             .with_show_fix_status(true)
             .with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -251,7 +251,7 @@ mod tests {
             .with_show_fix_status(true)
             .with_show_source(true)
             .with_unsafe_fixes(UnsafeFixes::Enabled);
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }

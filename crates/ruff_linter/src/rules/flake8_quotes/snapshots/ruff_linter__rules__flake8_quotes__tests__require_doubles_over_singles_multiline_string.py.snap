@@ -8,7 +8,7 @@ singles_multiline_string.py:1:5: Q001 (bad-quotes-multiline-string) [*] Single q
 2 | | be
 3 | | 'linted' '''
   | |____________^ Q001 (bad-quotes-multiline-string)
-4 |   
+4 |
 5 |   s = """ This 'should'
   |
   = help: Replace single multiline quotes with double quotes

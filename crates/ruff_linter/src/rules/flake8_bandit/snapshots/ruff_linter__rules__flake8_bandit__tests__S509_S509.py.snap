@@ -13,6 +13,6 @@ S509.py:5:16: S509 (snmp-weak-cryptography) You should not use SNMPv3 without en
 4 | insecure = UsmUserData("securityName")  # S509
 5 | auth_no_priv = UsmUserData("securityName", "authName")  # S509
   |                ^^^^^^^^^^^ S509 (snmp-weak-cryptography)
-6 | 
+6 |
 7 | less_insecure = UsmUserData("securityName", "authName", "privName")  # OK
   |

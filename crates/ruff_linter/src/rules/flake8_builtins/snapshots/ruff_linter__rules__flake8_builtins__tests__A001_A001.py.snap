@@ -1,36 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
 ---
-A001.py:1:16: A001 (builtin-variable-shadowing) Variable `sum` is shadowing a Python builtin
-  |
-1 | import some as sum
-  |                ^^^ A001 (builtin-variable-shadowing)
-2 | from some import other as int
-3 | from directory import new as dir
-  |
-
-A001.py:2:27: A001 (builtin-variable-shadowing) Variable `int` is shadowing a Python builtin
-  |
-1 | import some as sum
-2 | from some import other as int
-  |                           ^^^ A001 (builtin-variable-shadowing)
-3 | from directory import new as dir
-  |
-
-A001.py:3:30: A001 (builtin-variable-shadowing) Variable `dir` is shadowing a Python builtin
-  |
-1 | import some as sum
-2 | from some import other as int
-3 | from directory import new as dir
-  |                              ^^^ A001 (builtin-variable-shadowing)
-4 | 
-5 | print = 1
-  |
-
 A001.py:5:1: A001 (builtin-variable-shadowing) Variable `print` is shadowing a Python builtin
   |
 3 | from directory import new as dir
-4 | 
+4 |
 5 | print = 1
   | ^^^^^ A001 (builtin-variable-shadowing)
 6 | copyright: 'annotation' = 2
@@ -80,7 +54,7 @@ A001.py:9:1: A001 (builtin-variable-shadowing) Variable `min` is shadowing a Pyt
  8 | float = object = 4
  9 | min, max = 5, 6
    | ^^^ A001 (builtin-variable-shadowing)
-10 | 
+10 |
 11 | id = 4
    |
 
@@ -90,24 +64,24 @@ A001.py:9:6: A001 (builtin-variable-shadowing) Variable `max` is shadowing a Pyt
  8 | float = object = 4
  9 | min, max = 5, 6
    |      ^^^ A001 (builtin-variable-shadowing)
-10 | 
+10 |
 11 | id = 4
    |
 
 A001.py:11:1: A001 (builtin-variable-shadowing) Variable `id` is shadowing a Python builtin
    |
  9 | min, max = 5, 6
-10 | 
+10 |
 11 | id = 4
    | ^^ A001 (builtin-variable-shadowing)
-12 | 
+12 |
 13 | def bytes():
    |
 
 A001.py:13:5: A001 (builtin-variable-shadowing) Variable `bytes` is shadowing a Python builtin
    |
 11 | id = 4
-12 | 
+12 |
 13 | def bytes():
    |     ^^^^^ A001 (builtin-variable-shadowing)
 14 |     pass
@@ -116,7 +90,7 @@ A001.py:13:5: A001 (builtin-variable-shadowing) Variable `bytes` is shadowing a 
 A001.py:16:7: A001 (builtin-variable-shadowing) Variable `slice` is shadowing a Python builtin
    |
 14 |     pass
-15 | 
+15 |
 16 | class slice:
    |       ^^^^^ A001 (builtin-variable-shadowing)
 17 |     pass
@@ -134,7 +108,7 @@ A001.py:21:23: A001 (builtin-variable-shadowing) Variable `ValueError` is shadow
 A001.py:24:5: A001 (builtin-variable-shadowing) Variable `memoryview` is shadowing a Python builtin
    |
 22 |     ...
-23 | 
+23 |
 24 | for memoryview, *bytearray in []:
    |     ^^^^^^^^^^ A001 (builtin-variable-shadowing)
 25 |     pass
@@ -143,7 +117,7 @@ A001.py:24:5: A001 (builtin-variable-shadowing) Variable `memoryview` is shadowi
 A001.py:24:18: A001 (builtin-variable-shadowing) Variable `bytearray` is shadowing a Python builtin
    |
 22 |     ...
-23 | 
+23 |
 24 | for memoryview, *bytearray in []:
    |                  ^^^^^^^^^ A001 (builtin-variable-shadowing)
 25 |     pass
@@ -152,7 +126,7 @@ A001.py:24:18: A001 (builtin-variable-shadowing) Variable `bytearray` is shadowi
 A001.py:27:22: A001 (builtin-variable-shadowing) Variable `str` is shadowing a Python builtin
    |
 25 |     pass
-26 | 
+26 |
 27 | with open('file') as str, open('file2') as (all, any):
    |                      ^^^ A001 (builtin-variable-shadowing)
 28 |     pass
@@ -161,7 +135,7 @@ A001.py:27:22: A001 (builtin-variable-shadowing) Variable `str` is shadowing a P
 A001.py:27:45: A001 (builtin-variable-shadowing) Variable `all` is shadowing a Python builtin
    |
 25 |     pass
-26 | 
+26 |
 27 | with open('file') as str, open('file2') as (all, any):
    |                                             ^^^ A001 (builtin-variable-shadowing)
 28 |     pass
@@ -170,7 +144,7 @@ A001.py:27:45: A001 (builtin-variable-shadowing) Variable `all` is shadowing a P
 A001.py:27:50: A001 (builtin-variable-shadowing) Variable `any` is shadowing a Python builtin
    |
 25 |     pass
-26 | 
+26 |
 27 | with open('file') as str, open('file2') as (all, any):
    |                                                  ^^^ A001 (builtin-variable-shadowing)
 28 |     pass
@@ -179,7 +153,7 @@ A001.py:27:50: A001 (builtin-variable-shadowing) Variable `any` is shadowing a P
 A001.py:30:8: A001 (builtin-variable-shadowing) Variable `sum` is shadowing a Python builtin
    |
 28 |     pass
-29 | 
+29 |
 30 | [0 for sum in ()]
    |        ^^^ A001 (builtin-variable-shadowing)
    |

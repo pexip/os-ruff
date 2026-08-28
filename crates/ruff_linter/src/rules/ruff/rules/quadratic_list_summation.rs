@@ -1,16 +1,15 @@
 use anyhow::Result;
 use itertools::Itertools;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::AstNode;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of `sum()` to flatten lists of lists, which has
@@ -47,31 +46,40 @@ use crate::importer::ImportRequest;
 /// functools.reduce(operator.iadd, lists, [])
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because `sum` uses the `__add__` magic method while
+/// `operator.iadd` uses the `__iadd__` magic method, and these behave differently on lists.
+/// The former requires the right summand to be a list, whereas the latter allows for any iterable.
+/// Therefore, the fix could inadvertently cause code that previously raised an error to silently
+/// succeed. Moreover, the fix could remove comments from the original code.
+///
 /// ## References
 /// - [_How Not to Flatten a List of Lists in Python_](https://mathieularose.com/how-not-to-flatten-a-list-of-lists-in-python)
 /// - [_How do I make a flat list out of a list of lists?_](https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists/953097#953097)
 ///
 /// [microbenchmarks]: https://github.com/astral-sh/ruff/issues/5073#issuecomment-1591836349
-#[violation]
-pub struct QuadraticListSummation;
+#[derive(ViolationMetadata)]
+pub(crate) struct QuadraticListSummation;
 
 impl AlwaysFixableViolation for QuadraticListSummation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid quadratic list summation")
+        "Avoid quadratic list summation".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `functools.reduce`")
+        "Replace with `functools.reduce`".to_string()
     }
 }
 
 /// RUF017
-pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) {
     let ast::ExprCall {
         func,
         arguments,
         range,
+        node_index: _,
     } = call;
 
     let Some(iterable) = arguments.args.first() else {
@@ -86,11 +94,10 @@ pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCa
 
     if !start_is_empty_list(arguments, semantic) {
         return;
-    };
+    }
 
-    let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
+    let mut diagnostic = checker.report_diagnostic(QuadraticListSummation, *range);
     diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Generate a [`Fix`] to convert a `sum()` call to a `functools.reduce()` call.
@@ -110,7 +117,7 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
     let iterable = checker.locator().slice(
         parenthesized_range(
             iterable.into(),
-            call.arguments.as_any_node_ref(),
+            (&call.arguments).into(),
             checker.comment_ranges(),
             checker.locator().contents(),
         )
@@ -128,7 +135,7 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
 
 /// Returns `true` if the `start` argument to a `sum()` call is an empty list.
 fn start_is_empty_list(arguments: &Arguments, semantic: &SemanticModel) -> bool {
-    let Some(start_arg) = arguments.find_argument("start", 1) else {
+    let Some(start_arg) = arguments.find_argument_value("start", 1) else {
         return false;
     };
 

@@ -1,8 +1,8 @@
 use std::io::Write;
 
-use ruff_source_file::SourceLocation;
+use ruff_source_file::LineColumn;
 
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 
 /// Generate error logging commands for Azure Pipelines format.
 /// See [documentation](https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning)
@@ -13,29 +13,29 @@ impl Emitter for AzureEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        for message in messages {
-            let location = if context.is_notebook(message.filename()) {
+        for diagnostic in diagnostics {
+            let location = if context.is_notebook(&diagnostic.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
-                SourceLocation::default()
+                LineColumn::default()
             } else {
-                message.compute_start_location()
+                diagnostic.compute_start_location()
             };
 
             writeln!(
                 writer,
                 "##vso[task.logissue type=error\
                         ;sourcepath={filename};linenumber={line};columnnumber={col};{code}]{body}",
-                filename = message.filename(),
-                line = location.row,
+                filename = diagnostic.filename(),
+                line = location.line,
                 col = location.column,
-                code = message
-                    .rule()
-                    .map_or_else(String::new, |rule| format!("code={};", rule.noqa_code())),
-                body = message.body(),
+                code = diagnostic
+                    .noqa_code()
+                    .map_or_else(String::new, |code| format!("code={code};")),
+                body = diagnostic.body(),
             )?;
         }
 
@@ -47,15 +47,15 @@ impl Emitter for AzureEmitter {
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
-    };
     use crate::message::AzureEmitter;
+    use crate::message::tests::{
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
+    };
 
     #[test]
     fn output() {
         let mut emitter = AzureEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = AzureEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }

@@ -5,7 +5,7 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
   |
 2 | import os
   |        ^^ F401 (unused-import)
-3 | 
+3 |
 4 | def f():
   |
   = help: Remove unused import: `os`

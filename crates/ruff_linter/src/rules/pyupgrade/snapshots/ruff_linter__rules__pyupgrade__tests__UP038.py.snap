@@ -21,7 +21,7 @@ UP038.py:2:1: UP038 (non-pep604-isinstance) [*] Use `X | Y` in `issubclass` call
 1 | isinstance(1, (int, float))  # UP038
 2 | issubclass("yes", (int, float, str))  # UP038
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP038 (non-pep604-isinstance)
-3 | 
+3 |
 4 | isinstance(1, int)  # OK
   |
   = help: Convert to `X | Y`

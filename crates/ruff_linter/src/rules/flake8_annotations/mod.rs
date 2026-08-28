@@ -9,11 +9,11 @@ mod tests {
 
     use anyhow::Result;
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
+    use ruff_python_ast::PythonVersion;
 
     #[test]
     fn defaults() -> Result<()> {
@@ -24,8 +24,6 @@ mod tests {
                     Rule::MissingTypeFunctionArgument,
                     Rule::MissingTypeArgs,
                     Rule::MissingTypeKwargs,
-                    Rule::MissingTypeSelf,
-                    Rule::MissingTypeCls,
                     Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
@@ -35,7 +33,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -52,8 +50,6 @@ mod tests {
                     Rule::MissingTypeFunctionArgument,
                     Rule::MissingTypeArgs,
                     Rule::MissingTypeKwargs,
-                    Rule::MissingTypeSelf,
-                    Rule::MissingTypeCls,
                     Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
@@ -63,7 +59,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -80,12 +76,10 @@ mod tests {
                     Rule::MissingTypeFunctionArgument,
                     Rule::MissingTypeArgs,
                     Rule::MissingTypeKwargs,
-                    Rule::MissingTypeSelf,
-                    Rule::MissingTypeCls,
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -107,7 +101,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -125,7 +119,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -134,7 +128,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_annotations/auto_return_type.py"),
             &LinterSettings {
-                target_version: PythonVersion::Py38,
+                unresolved_target_version: PythonVersion::PY38.into(),
                 ..LinterSettings::for_rules(vec![
                     Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
@@ -144,7 +138,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -161,8 +155,6 @@ mod tests {
                     Rule::MissingTypeFunctionArgument,
                     Rule::MissingTypeArgs,
                     Rule::MissingTypeKwargs,
-                    Rule::MissingTypeSelf,
-                    Rule::MissingTypeCls,
                     Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
@@ -172,7 +164,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -188,7 +180,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::AnyType])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -206,7 +198,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -224,7 +216,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -234,7 +226,7 @@ mod tests {
             Path::new("flake8_annotations/simple_magic_methods.py"),
             &LinterSettings::for_rule(Rule::MissingReturnTypeSpecialMethod),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

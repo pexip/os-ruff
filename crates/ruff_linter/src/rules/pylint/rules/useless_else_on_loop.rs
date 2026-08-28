@@ -1,17 +1,18 @@
 use anyhow::Result;
 
 use ast::whitespace::indentation;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::adjust_indentation;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `else` clauses on loops without a `break` statement.
@@ -45,16 +46,15 @@ use crate::fix::edits::adjust_indentation;
 ///
 /// ## References
 /// - [Python documentation: `break` and `continue` Statements, and `else` Clauses on Loops](https://docs.python.org/3/tutorial/controlflow.html#break-and-continue-statements-and-else-clauses-on-loops)
-#[violation]
-pub struct UselessElseOnLoop;
+#[derive(ViolationMetadata)]
+pub(crate) struct UselessElseOnLoop;
 
 impl Violation for UselessElseOnLoop {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`else` clause on loop without a `break` statement; remove the `else` and dedent its contents"
-        )
+        "`else` clause on loop without a `break` statement; remove the `else` and dedent its contents".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -63,19 +63,14 @@ impl Violation for UselessElseOnLoop {
 }
 
 /// PLW0120
-pub(crate) fn useless_else_on_loop(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    body: &[Stmt],
-    orelse: &[Stmt],
-) {
+pub(crate) fn useless_else_on_loop(checker: &Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
     if orelse.is_empty() || loop_exits_early(body) {
         return;
     }
 
     let else_range = identifier::else_(stmt, checker.locator().contents()).expect("else clause");
 
-    let mut diagnostic = Diagnostic::new(UselessElseOnLoop, else_range);
+    let mut diagnostic = checker.report_diagnostic(UselessElseOnLoop, else_range);
     diagnostic.try_set_fix(|| {
         remove_else(
             stmt,
@@ -86,7 +81,6 @@ pub(crate) fn useless_else_on_loop(
             checker.stylist(),
         )
     });
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Returns `true` if the given body contains a `break` statement.
@@ -146,7 +140,7 @@ fn remove_else(
         return Err(anyhow::anyhow!("Empty `else` clause"));
     };
 
-    let start_indentation = indentation(locator, start);
+    let start_indentation = indentation(locator.contents(), start);
     if start_indentation.is_none() {
         // Inline `else` block (e.g., `else: x = 1`).
         Ok(Fix::safe_edit(Edit::deletion(
@@ -155,7 +149,7 @@ fn remove_else(
         )))
     } else {
         // Identify the indentation of the loop itself (e.g., the `while` or `for`).
-        let Some(desired_indentation) = indentation(locator, stmt) else {
+        let Some(desired_indentation) = indentation(locator.contents(), stmt) else {
             return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
         };
 

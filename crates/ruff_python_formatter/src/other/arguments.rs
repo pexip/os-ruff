@@ -1,14 +1,14 @@
-use ruff_formatter::{write, FormatContext};
-use ruff_python_ast::{ArgOrKeyword, Arguments, Expr};
+use ruff_formatter::{FormatContext, write};
+use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, StringFlags, StringLike};
 use ruff_python_trivia::{PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::expression::expr_generator::GeneratorExpParentheses;
 use crate::expression::is_expression_huggable;
-use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
+use crate::expression::parentheses::{Parentheses, empty_parenthesized, parenthesized};
 use crate::other::commas;
 use crate::prelude::*;
-use crate::string::AnyString;
+use crate::string::StringLikeExtensions;
 
 #[derive(Default)]
 pub struct FormatArguments;
@@ -19,6 +19,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             range,
             args,
             keywords,
+            node_index: _,
         } = item;
         // We have a case with `f()` without any argument, which is a special case because we can
         // have a comment with no node attachment inside:
@@ -137,6 +138,7 @@ fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source:
 
     false
 }
+
 /// Returns `true` if the arguments can hug directly to the enclosing parentheses in the call, as
 /// in Black's `hug_parens_with_braces_and_square_brackets` preview style behavior.
 ///
@@ -179,8 +181,8 @@ fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bo
 
     // If the expression itself isn't huggable, then we can't hug it.
     if !(is_expression_huggable(arg, context)
-        || AnyString::from_expression(arg)
-            .is_some_and(|string| is_huggable_string_argument(string, arguments, context)))
+        || StringLike::try_from(arg)
+            .is_ok_and(|string| is_huggable_string_argument(string, arguments, context)))
     {
         return false;
     }
@@ -219,11 +221,17 @@ fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bo
 /// )
 /// ```
 fn is_huggable_string_argument(
-    string: AnyString,
+    string: StringLike,
     arguments: &Arguments,
     context: &PyFormatContext,
 ) -> bool {
-    if string.is_implicit_concatenated() || !string.is_multiline(context.source()) {
+    if string.is_implicit_concatenated()
+        || !string.is_multiline(context)
+        || !string
+            .parts()
+            .next()
+            .is_some_and(|part| part.flags().is_triple_quoted())
+    {
         return false;
     }
 

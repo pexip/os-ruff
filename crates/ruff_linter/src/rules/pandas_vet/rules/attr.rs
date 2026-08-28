@@ -1,10 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
+use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 
 /// ## What it does
 /// Checks for uses of `.values` on Pandas Series and Index objects.
@@ -32,18 +33,22 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 ///
 /// ## References
 /// - [Pandas documentation: Accessing the values in a Series or Index](https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.24.0.html#accessing-the-values-in-a-series-or-index)
-#[violation]
-pub struct PandasUseOfDotValues;
+#[derive(ViolationMetadata)]
+pub(crate) struct PandasUseOfDotValues;
 
 impl Violation for PandasUseOfDotValues {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `.to_numpy()` instead of `.values`")
+        "Use `.to_numpy()` instead of `.values`".to_string()
     }
 }
 
 /// PD011
-pub(crate) fn attr(checker: &mut Checker, attribute: &ast::ExprAttribute) {
+pub(crate) fn attr(checker: &Checker, attribute: &ast::ExprAttribute) {
+    if !checker.semantic().seen_module(Modules::PANDAS) {
+        return;
+    }
+
     // Avoid, e.g., `x.values = y`.
     if !attribute.ctx.is_load() {
         return;
@@ -72,7 +77,5 @@ pub(crate) fn attr(checker: &mut Checker, attribute: &ast::ExprAttribute) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(PandasUseOfDotValues, attribute.range()));
+    checker.report_diagnostic(PandasUseOfDotValues, attribute.range());
 }

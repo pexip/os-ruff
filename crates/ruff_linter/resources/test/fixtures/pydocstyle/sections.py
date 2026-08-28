@@ -564,6 +564,17 @@ def titlecase_sub_section_header():
     """
 
 
+def newline_sub_section_header():
+    """Below, `returns:` should be considered a section header.
+
+    Args:
+        arg: Here's a note.
+
+    returns:
+        Here's another note.
+    """
+
+
 def test_method_should_be_correctly_capitalized(parameters: list[str], other_parameters: dict[str, str]): # noqa: D213
     """Test parameters and attributes sections are capitalized correctly.
 
@@ -605,3 +616,17 @@ def test_lowercase_sub_section_header_different_kind(returns: int):
        some value
 
    """
+
+
+# We used to incorrectly infer this as a numpy-style docstring,
+# which caused us to emit D406 and D407 on it;
+# see https://github.com/astral-sh/ruff/issues/13139
+def another_valid_google_style_docstring(a: str) -> str:
+    """Foo bar.
+
+    Examples:
+        Some explanation here.
+        >>> bla bla bla
+
+    """
+    return a

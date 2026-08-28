@@ -52,8 +52,7 @@ SIM102.py:8:5: SIM102 (collapsible-if) [*] Use a single `if` statement instead o
    |
  6 |   # SIM102
  7 |   if a:
- 8 |       if b:
-   |  _____^
+ 8 | /     if b:
  9 | |         if c:
    | |_____________^ SIM102 (collapsible-if)
 10 |               d
@@ -138,8 +137,7 @@ SIM102.py:51:5: SIM102 (collapsible-if) [*] Use a single `if` statement instead 
    |
 49 |   while x > 0:
 50 |       # SIM102
-51 |       if y > 0:
-   |  _____^
+51 | /     if y > 0:
 52 | |         if z > 0:
    | |_________________^ SIM102 (collapsible-if)
 53 |               """this
@@ -212,8 +210,7 @@ SIM102.py:83:5: SIM102 (collapsible-if) [*] Use a single `if` statement instead 
    |
 81 |   while x > 0:
 82 |       # SIM102
-83 |       if node.module:
-   |  _____^
+83 | /     if node.module:
 84 | |         if node.module == "multiprocessing" or node.module.startswith(
 85 | |             "multiprocessing."
 86 | |         ):
@@ -284,8 +281,7 @@ SIM102.py:106:5: SIM102 (collapsible-if) [*] Use a single `if` statement instead
     |
 104 |   # Regression test for https://github.com/apache/airflow/blob/145b16caaa43f0c42bffd97344df916c602cddde/airflow/configuration.py#L1161
 105 |   if a:
-106 |       if b:
-    |  _____^
+106 | /     if b:
 107 | |         if c:
     | |_____________^ SIM102 (collapsible-if)
 108 |               print("if")
@@ -310,8 +306,7 @@ SIM102.py:132:5: SIM102 (collapsible-if) [*] Use a single `if` statement instead
     |
 130 |   if a:
 131 |       # SIM 102
-132 |       if b:
-    |  _____^
+132 | /     if b:
 133 | |         if c:
     | |_____________^ SIM102 (collapsible-if)
 134 |               print("foo")
@@ -336,8 +331,7 @@ SIM102.py:165:5: SIM102 (collapsible-if) [*] Use a single `if` statement instead
     |
 163 |       if a:
 164 |           pass
-165 |       elif b:
-    |  _____^
+165 | /     elif b:
 166 | |         if c:
     | |_____________^ SIM102 (collapsible-if)
 167 |               d

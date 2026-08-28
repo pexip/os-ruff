@@ -33,6 +33,6 @@ potential_index_error.py:4:17: PLE0643 (potential-index-error) Expression is lik
 3 | print([1, 2, 3][999999999999999999999999999999999999999999])  # PLE0643
 4 | print([1, 2, 3][-999999999999999999999999999999999999999999])  # PLE0643
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE0643 (potential-index-error)
-5 | 
+5 |
 6 | print([1, 2, 3][2])  # OK
   |

@@ -5,7 +5,7 @@ PYI035.pyi:1:1: PYI035 (unassigned-special-variable-in-stub) `__all__` in a stub
   |
 1 | __all__: list[str]  # Error: PYI035
   | ^^^^^^^^^^^^^^^^^^ PYI035 (unassigned-special-variable-in-stub)
-2 | 
+2 |
 3 | __all__: list[str] = ["foo"]
   |
 
@@ -24,6 +24,6 @@ PYI035.pyi:8:5: PYI035 (unassigned-special-variable-in-stub) `__slots__` in a st
  7 |     __match_args__: tuple[str, ...]  # Error: PYI035
  8 |     __slots__: tuple[str, ...]  # Error: PYI035
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI035 (unassigned-special-variable-in-stub)
- 9 | 
+ 9 |
 10 | class Bar:
    |

@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true, optional = true }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true }
@@ -19,26 +20,31 @@ ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
+anstyle = { workspace = true }
+arc-swap = { workspace = true }
 camino = { workspace = true }
 countme = { workspace = true }
 dashmap = { workspace = true }
+dunce = { workspace = true }
 filetime = { workspace = true }
+glob = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
-salsa = { workspace = true }
 path-slash = { workspace = true }
+rustc-hash = { workspace = true }
+salsa = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
-tracing-tree = { workspace = true, optional = true }
-rustc-hash = { workspace = true }
-
-[target.'cfg(not(target_arch="wasm32"))'.dependencies]
-zip = { workspace = true, features = ["zstd"] }
+zip = { workspace = true }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
 web-time = { version = "1.1.0" }
-zip = { workspace = true, features = ["deflate"] }
+
+[target.'cfg(not(target_arch="wasm32"))'.dependencies]
+etcetera = { workspace = true, optional = true }
 
 [dev-dependencies]
 insta = { workspace = true }
@@ -46,6 +52,7 @@ tempfile = { workspace = true }
 
 [features]
 cache = ["ruff_cache"]
-os = ["ignore"]
+os = ["ignore", "dep:etcetera"]
+serde = ["dep:serde", "camino/serde1"]
 # Exposes testing utilities.
-testing = ["tracing-subscriber", "tracing-tree"]
+testing = ["tracing-subscriber"]

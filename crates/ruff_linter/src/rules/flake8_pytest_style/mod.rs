@@ -1,4 +1,5 @@
 //! Rules from [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/).
+mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 pub mod types;
@@ -13,11 +14,17 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::types::IdentifierPattern;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     use super::settings::Settings;
     use super::types;
 
+    #[test_case(
+        Rule::PytestParameterWithDefaultArgument,
+        Path::new("is_pytest_test.py"),
+        Settings::default(),
+        "is_pytest_test"
+    )]
     #[test_case(
         Rule::PytestFixtureIncorrectParenthesesStyle,
         Path::new("PT001.py"),
@@ -44,18 +51,6 @@ mod tests {
         Path::new("PT003.py"),
         Settings::default(),
         "PT003"
-    )]
-    #[test_case(
-        Rule::PytestMissingFixtureNameUnderscore,
-        Path::new("PT004.py"),
-        Settings::default(),
-        "PT004"
-    )]
-    #[test_case(
-        Rule::PytestIncorrectFixtureNameUnderscore,
-        Path::new("PT005.py"),
-        Settings::default(),
-        "PT005"
     )]
     #[test_case(
         Rule::PytestParametrizeNamesWrongType,
@@ -287,6 +282,66 @@ mod tests {
         Settings::default(),
         "PT027_1"
     )]
+    #[test_case(
+        Rule::PytestParameterWithDefaultArgument,
+        Path::new("PT028.py"),
+        Settings::default(),
+        "PT028"
+    )]
+    #[test_case(
+        Rule::PytestWarnsWithoutWarning,
+        Path::new("PT029.py"),
+        Settings::default(),
+        "PT029"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings::default(),
+        "PT030_default"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_extend_require_match_for: vec![IdentifierPattern::new("EncodingWarning").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_extend_broad_exceptions"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_require_match_for: vec![IdentifierPattern::new("EncodingWarning").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_replace_broad_exceptions"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_require_match_for: vec![IdentifierPattern::new("*").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_glob_all"
+    )]
+    #[test_case(
+        Rule::PytestWarnsTooBroad,
+        Path::new("PT030.py"),
+        Settings {
+            warns_require_match_for: vec![IdentifierPattern::new("foo.*").unwrap()],
+            ..Settings::default()
+        },
+        "PT030_glob_prefix"
+    )]
+    #[test_case(
+        Rule::PytestWarnsWithMultipleStatements,
+        Path::new("PT031.py"),
+        Settings::default(),
+        "PT031"
+    )]
     fn test_pytest_style(
         rule_code: Rule,
         path: &Path,
@@ -300,7 +355,26 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(name, diagnostics);
+        assert_diagnostics!(name, diagnostics);
+        Ok(())
+    }
+
+    /// This test ensure that PT006 and PT007 don't conflict when both of them suggest a fix that
+    /// edits `argvalues` for `pytest.mark.parametrize`.
+    #[test]
+    fn test_pytest_style_pt006_and_pt007() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_pytest_style")
+                .join(Path::new("PT006_and_PT007.py"))
+                .as_path(),
+            &settings::LinterSettings {
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::PytestParametrizeNamesWrongType,
+                    Rule::PytestParametrizeValuesWrongType,
+                ])
+            },
+        )?;
+        assert_diagnostics!("PT006_and_PT007", diagnostics);
         Ok(())
     }
 }

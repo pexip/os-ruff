@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_django/mod.rs
 DJ012.py:28:5: DJ012 (django-unordered-body-content-in-model) Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
    |
 26 |         return "foobar"
-27 | 
+27 |
 28 |     first_name = models.CharField(max_length=32)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012 (django-unordered-body-content-in-model)
    |
@@ -12,17 +12,16 @@ DJ012.py:28:5: DJ012 (django-unordered-body-content-in-model) Order of model's i
 DJ012.py:43:5: DJ012 (django-unordered-body-content-in-model) Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before manager declaration
    |
 41 |         return "foobar"
-42 | 
+42 |
 43 |     first_name = models.CharField(max_length=32)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012 (django-unordered-body-content-in-model)
    |
 
-DJ012.py:56:5: DJ012 (django-unordered-body-content-in-model) Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `__str__` method should come before custom method
+DJ012.py:56:5: DJ012 (django-unordered-body-content-in-model) Order of model's inner classes, methods, and fields does not follow the Django Style Guide: Magic method should come before custom method
    |
 54 |           pass
-55 |   
-56 |       def __str__(self):
-   |  _____^
+55 |
+56 | /     def __str__(self):
 57 | |         return "foobar"
    | |_______________________^ DJ012 (django-unordered-body-content-in-model)
    |
@@ -30,9 +29,8 @@ DJ012.py:56:5: DJ012 (django-unordered-body-content-in-model) Order of model's i
 DJ012.py:69:5: DJ012 (django-unordered-body-content-in-model) Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `save` method should come before `get_absolute_url` method
    |
 67 |           pass
-68 |   
-69 |       def save(self):
-   |  _____^
+68 |
+69 | /     def save(self):
 70 | |         pass
    | |____________^ DJ012 (django-unordered-body-content-in-model)
    |
@@ -40,7 +38,7 @@ DJ012.py:69:5: DJ012 (django-unordered-body-content-in-model) Order of model's i
 DJ012.py:123:5: DJ012 (django-unordered-body-content-in-model) Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
     |
 121 |         verbose_name = "test"
-122 | 
+122 |
 123 |     first_name = models.CharField(max_length=32)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012 (django-unordered-body-content-in-model)
 124 |     last_name = models.CharField(max_length=32)
@@ -49,7 +47,7 @@ DJ012.py:123:5: DJ012 (django-unordered-body-content-in-model) Order of model's 
 DJ012.py:129:5: DJ012 (django-unordered-body-content-in-model) Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
     |
 127 |         pass
-128 | 
+128 |
 129 |     middle_name = models.CharField(max_length=32)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012 (django-unordered-body-content-in-model)
     |
@@ -57,7 +55,7 @@ DJ012.py:129:5: DJ012 (django-unordered-body-content-in-model) Order of model's 
 DJ012.py:146:5: DJ012 (django-unordered-body-content-in-model) Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
     |
 144 |         return "foobar"
-145 | 
+145 |
 146 |     first_name = models.CharField(max_length=32)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012 (django-unordered-body-content-in-model)
     |

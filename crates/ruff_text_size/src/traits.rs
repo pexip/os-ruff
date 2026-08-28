@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use {crate::TextRange, crate::TextSize, std::convert::TryInto};
 
 use priv_in_pub::Sealed;
@@ -30,7 +31,7 @@ impl TextLen for &'_ String {
 impl Sealed for char {}
 impl TextLen for char {
     #[inline]
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     fn text_len(self) -> TextSize {
         (self.len_utf8() as u32).into()
     }
@@ -64,5 +65,35 @@ where
 {
     fn range(&self) -> TextRange {
         T::range(self)
+    }
+}
+
+impl<T> Ranged for Arc<T>
+where
+    T: Ranged,
+{
+    fn range(&self) -> TextRange {
+        T::range(self)
+    }
+}
+
+/// A slice of the source text.
+pub trait TextSlice: Sealed {
+    /// Returns the slice of the text within the given `range`.
+    ///
+    /// ## Note
+    ///
+    /// This is the same as `&self[range]` if `self` is a `str` and `range` a `TextRange`.
+    ///
+    /// ## Panics
+    /// If the range is out of bounds.
+    fn slice(&self, range: impl Ranged) -> &str;
+}
+
+impl Sealed for str {}
+
+impl TextSlice for str {
+    fn slice(&self, ranged: impl Ranged) -> &str {
+        &self[ranged.range()]
     }
 }

@@ -6,10 +6,9 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{contains_effect, Truthiness};
+use ruff_python_ast::helpers::{Truthiness, contains_effect};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_codegen::Generator;
@@ -17,6 +16,7 @@ use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for multiple `isinstance` calls on the same target.
@@ -44,8 +44,8 @@ use crate::fix::edits::pad;
 ///
 /// ## References
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
-#[violation]
-pub struct DuplicateIsinstanceCall {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateIsinstanceCall {
     name: Option<String>,
 }
 
@@ -54,18 +54,15 @@ impl Violation for DuplicateIsinstanceCall {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateIsinstanceCall { name } = self;
-        if let Some(name) = name {
+        if let Some(name) = &self.name {
             format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
         } else {
-            format!("Multiple `isinstance` calls for expression, merge into a single call")
+            "Multiple `isinstance` calls for expression, merge into a single call".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let DuplicateIsinstanceCall { name } = self;
-
-        Some(if let Some(name) = name {
+        Some(if let Some(name) = &self.name {
             format!("Merge `isinstance` calls for `{name}`")
         } else {
             "Merge `isinstance` calls".to_string()
@@ -95,8 +92,8 @@ impl Violation for DuplicateIsinstanceCall {
 ///
 /// ## References
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
-#[violation]
-pub struct CompareWithTuple {
+#[derive(ViolationMetadata)]
+pub(crate) struct CompareWithTuple {
     replacement: String,
 }
 
@@ -128,8 +125,8 @@ impl AlwaysFixableViolation for CompareWithTuple {
 ///
 /// ## References
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
-#[violation]
-pub struct ExprAndNotExpr {
+#[derive(ViolationMetadata)]
+pub(crate) struct ExprAndNotExpr {
     name: String,
 }
 
@@ -160,8 +157,8 @@ impl AlwaysFixableViolation for ExprAndNotExpr {
 ///
 /// ## References
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
-#[violation]
-pub struct ExprOrNotExpr {
+#[derive(ViolationMetadata)]
+pub(crate) struct ExprOrNotExpr {
     name: String,
 }
 
@@ -212,8 +209,8 @@ pub(crate) enum ContentAround {
 ///
 /// a = x or [1]
 /// ```
-#[violation]
-pub struct ExprOrTrue {
+#[derive(ViolationMetadata)]
+pub(crate) struct ExprOrTrue {
     expr: String,
     remove: ContentAround,
 }
@@ -264,8 +261,8 @@ impl AlwaysFixableViolation for ExprOrTrue {
 ///
 /// a = x and []
 /// ```
-#[violation]
-pub struct ExprAndFalse {
+#[derive(ViolationMetadata)]
+pub(crate) struct ExprAndFalse {
     expr: String,
     remove: ContentAround,
 }
@@ -310,8 +307,10 @@ fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         range: _,
+        node_index: _,
     } = call.as_call_expr()?;
     if args.len() != 2 {
         return None;
@@ -328,11 +327,12 @@ fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<
 }
 
 /// SIM101
-pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
         op: BoolOp::Or,
         values,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -377,7 +377,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 DuplicateIsinstanceCall {
                     name: if let Expr::Name(ast::ExprName { id, .. }) = target {
                         Some(id.to_string())
@@ -421,6 +421,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                         .collect(),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     parenthesized: true,
                 };
                 let isinstance_call = ast::ExprCall {
@@ -429,6 +430,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                             id: Name::new_static("isinstance"),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                         }
                         .into(),
                     ),
@@ -436,8 +438,10 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                         args: Box::from([target.clone(), tuple.into()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     },
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 }
                 .into();
 
@@ -454,6 +458,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                         .chain(after)
                         .collect(),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 }
                 .into();
                 let fixed_source = checker.generator().expr(&bool_op);
@@ -465,7 +470,6 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     expr.range(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -476,6 +480,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
         ops,
         comparators,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return None;
@@ -496,11 +501,12 @@ fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
 }
 
 /// SIM109
-pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
         op: BoolOp::Or,
         values,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -536,7 +542,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         // Avoid removing comments.
         if checker
             .comment_ranges()
-            .has_comments(expr, checker.locator())
+            .has_comments(expr, checker.source())
         {
             continue;
         }
@@ -546,21 +552,24 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             elts: comparators.into_iter().cloned().collect(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             parenthesized: true,
         };
         let node1 = ast::ExprName {
             id: id.clone(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         };
         let node2 = ast::ExprCompare {
             left: Box::new(node1.into()),
             ops: Box::from([CmpOp::In]),
             comparators: Box::from([node.into()]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         };
         let in_expr = node2.into();
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             CompareWithTuple {
                 replacement: checker.generator().expr(&in_expr),
             },
@@ -580,6 +589,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                 op: BoolOp::Or,
                 values: iter::once(in_expr).chain(unmatched).collect(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             };
             node.into()
         };
@@ -587,16 +597,16 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             checker.generator().expr(&in_expr),
             expr.range(),
         )));
-        checker.diagnostics.push(diagnostic);
     }
 }
 
 /// SIM220
-pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_and_not_expr(checker: &Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
         op: BoolOp::And,
         values,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -613,6 +623,7 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
             op: UnaryOp::Not,
             operand,
             range: _,
+            node_index: _,
         }) = expr
         {
             negated_expr.push(operand);
@@ -632,7 +643,7 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     ExprAndNotExpr {
                         name: id.to_string(),
                     },
@@ -642,18 +653,18 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     "False".to_string(),
                     expr.range(),
                 )));
-                checker.diagnostics.push(diagnostic);
             }
         }
     }
 }
 
 /// SIM221
-pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_or_not_expr(checker: &Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
         op: BoolOp::Or,
         values,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -670,6 +681,7 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
             op: UnaryOp::Not,
             operand,
             range: _,
+            node_index: _,
         }) = expr
         {
             negated_expr.push(operand);
@@ -689,7 +701,7 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     for negate_expr in negated_expr {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     ExprOrNotExpr {
                         name: id.to_string(),
                     },
@@ -699,7 +711,6 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     "True".to_string(),
                     expr.range(),
                 )));
-                checker.diagnostics.push(diagnostic);
             }
         }
     }
@@ -740,6 +751,7 @@ fn is_short_circuit(
         op,
         values,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return None;
@@ -835,9 +847,13 @@ fn is_short_circuit(
 }
 
 /// SIM222
-pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_or_true(checker: &Checker, expr: &Expr) {
+    if checker.semantic().in_string_type_definition() {
+        return;
+    }
+
     if let Some((edit, remove)) = is_short_circuit(expr, BoolOp::Or, checker) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             ExprOrTrue {
                 expr: edit.content().unwrap_or_default().to_string(),
                 remove,
@@ -845,14 +861,17 @@ pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
             edit.range(),
         );
         diagnostic.set_fix(Fix::unsafe_edit(edit));
-        checker.diagnostics.push(diagnostic);
     }
 }
 
 /// SIM223
-pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_and_false(checker: &Checker, expr: &Expr) {
+    if checker.semantic().in_string_type_definition() {
+        return;
+    }
+
     if let Some((edit, remove)) = is_short_circuit(expr, BoolOp::And, checker) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             ExprAndFalse {
                 expr: edit.content().unwrap_or_default().to_string(),
                 remove,
@@ -860,6 +879,5 @@ pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
             edit.range(),
         );
         diagnostic.set_fix(Fix::unsafe_edit(edit));
-        checker.diagnostics.push(diagnostic);
     }
 }

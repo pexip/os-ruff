@@ -89,7 +89,7 @@ redefined_loop_name.py:67:5: PLW2901 (redefined-loop-name) `for` loop variable `
 66 |     i = typing.cast(int, i)
 67 |     i = 5  # error
    |     ^ PLW2901 (redefined-loop-name)
-68 | 
+68 |
 69 | # For -> augmented assignment
    |
 
@@ -99,7 +99,7 @@ redefined_loop_name.py:71:5: PLW2901 (redefined-loop-name) `for` loop variable `
 70 | for i in []:
 71 |     i += 5  # error
    |     ^ PLW2901 (redefined-loop-name)
-72 | 
+72 |
 73 | # For -> annotated assignment
    |
 
@@ -109,7 +109,7 @@ redefined_loop_name.py:75:5: PLW2901 (redefined-loop-name) `for` loop variable `
 74 | for i in []:
 75 |     i: int = 5  # error
    |     ^ PLW2901 (redefined-loop-name)
-76 | 
+76 |
 77 | # For -> annotated assignment without value
    |
 
@@ -182,7 +182,7 @@ redefined_loop_name.py:137:13: PLW2901 (redefined-loop-name) `for` loop variable
 136 |         for i in []:  # no error
 137 |             i = 2  # error
     |             ^ PLW2901 (redefined-loop-name)
-138 | 
+138 |
 139 | # For -> class definition -> for -> for
     |
 

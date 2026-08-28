@@ -19,7 +19,7 @@ W291.py:1:23: W291 (trailing-whitespace) [*] Trailing whitespace
 W291.py:4:24: W291 (trailing-whitespace) [*] Trailing whitespace
   |
 2 | inside a multiline string'''
-3 | 
+3 |
 4 | f'''trailing whitespace 
   |                        ^ W291 (trailing-whitespace)
 5 | inside a multiline f-string'''

@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 S502.py:6:13: S502 (ssl-insecure-version) Call made with insecure SSL protocol: `PROTOCOL_SSLv3`
   |
 4 | from OpenSSL.SSL import Context
-5 | 
+5 |
 6 | wrap_socket(ssl_version=ssl.PROTOCOL_SSLv3)  # S502
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S502 (ssl-insecure-version)
 7 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_TLSv1)  # S502
@@ -65,6 +65,6 @@ S502.py:12:9: S502 (ssl-insecure-version) Call made with insecure SSL protocol: 
 11 | Context(method=SSL.SSLv3_METHOD)  # S502
 12 | Context(method=SSL.TLSv1_METHOD)  # S502
    |         ^^^^^^^^^^^^^^^^^^^^^^^ S502 (ssl-insecure-version)
-13 | 
+13 |
 14 | wrap_socket(ssl_version=ssl.PROTOCOL_TLS_CLIENT)  # OK
    |

@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -22,7 +22,7 @@ use crate::checkers::ast::Checker;
 /// User.objects.all().extra(select={"test": "%secure" % "nos"})
 /// ```
 ///
-/// ## Use instead:
+/// Use instead:
 /// ```python
 /// from django.contrib.auth.models import User
 ///
@@ -33,18 +33,18 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Django documentation: SQL injection protection](https://docs.djangoproject.com/en/dev/topics/security/#sql-injection-protection)
 /// - [Common Weakness Enumeration: CWE-89](https://cwe.mitre.org/data/definitions/89.html)
-#[violation]
-pub struct DjangoExtra;
+#[derive(ViolationMetadata)]
+pub(crate) struct DjangoExtra;
 
 impl Violation for DjangoExtra {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of Django `extra` can lead to SQL injection vulnerabilities")
+        "Use of Django `extra` can lead to SQL injection vulnerabilities".to_string()
     }
 }
 
 /// S610
-pub(crate) fn django_extra(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn django_extra(checker: &Checker, call: &ast::ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() else {
         return;
     };
@@ -54,15 +54,13 @@ pub(crate) fn django_extra(checker: &mut Checker, call: &ast::ExprCall) {
     }
 
     if is_call_insecure(call) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(DjangoExtra, call.arguments.range()));
+        checker.report_diagnostic(DjangoExtra, call.arguments.range());
     }
 }
 
 fn is_call_insecure(call: &ast::ExprCall) -> bool {
     for (argument_name, position) in [("select", 0), ("where", 1), ("tables", 3)] {
-        if let Some(argument) = call.arguments.find_argument(argument_name, position) {
+        if let Some(argument) = call.arguments.find_argument_value(argument_name, position) {
             match argument_name {
                 "select" => match argument {
                     Expr::Dict(dict) => {

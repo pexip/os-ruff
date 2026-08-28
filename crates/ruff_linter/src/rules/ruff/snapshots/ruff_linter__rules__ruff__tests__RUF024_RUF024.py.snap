@@ -132,7 +132,7 @@ RUF024.py:16:1: RUF024 (mutable-fromkeys-value) [*] Do not pass mutable objects 
 15 | import builtins
 16 | builtins.dict.fromkeys(pierogi_fillings, dict())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF024 (mutable-fromkeys-value)
-17 | 
+17 |
 18 | # Okay.
    |
    = help: Replace with comprehension

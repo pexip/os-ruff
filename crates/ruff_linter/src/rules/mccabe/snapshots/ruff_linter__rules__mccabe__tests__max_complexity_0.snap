@@ -155,7 +155,7 @@ C901.py:118:17: C901 (complex-structure) `a` is too complex (1 > 0)
 C901.py:121:17: C901 (complex-structure) `b` is too complex (2 > 0)
     |
 119 |                 pass
-120 | 
+120 |
 121 |             def b(self, data):
     |                 ^ C901 (complex-structure)
 122 |                 if not args:
@@ -173,7 +173,7 @@ C901.py:126:17: C901 (complex-structure) `c` is too complex (1 > 0)
 C901.py:129:17: C901 (complex-structure) `error` is too complex (1 > 0)
     |
 127 |                 pass
-128 | 
+128 |
 129 |             def error(self, message):
     |                 ^^^^^ C901 (complex-structure)
 130 |                 pass
@@ -182,7 +182,7 @@ C901.py:129:17: C901 (complex-structure) `error` is too complex (1 > 0)
 C901.py:132:17: C901 (complex-structure) `info` is too complex (1 > 0)
     |
 130 |                 pass
-131 | 
+131 |
 132 |             def info(self, message):
     |                 ^^^^ C901 (complex-structure)
 133 |                 pass
@@ -191,7 +191,7 @@ C901.py:132:17: C901 (complex-structure) `info` is too complex (1 > 0)
 C901.py:135:17: C901 (complex-structure) `exception` is too complex (1 > 0)
     |
 133 |                 pass
-134 | 
+134 |
 135 |             def exception(self):
     |                 ^^^^^^^^^ C901 (complex-structure)
 136 |                 pass

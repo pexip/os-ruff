@@ -5,7 +5,7 @@ SIM210.py:1:5: SIM210 (if-expr-with-true-false) [*] Use `bool(...)` instead of `
   |
 1 | a = True if b else False  # SIM210
   |     ^^^^^^^^^^^^^^^^^^^^ SIM210 (if-expr-with-true-false)
-2 | 
+2 |
 3 | a = True if b != c else False  # SIM210
   |
   = help: Replace with `bool(...)
@@ -20,10 +20,10 @@ SIM210.py:1:5: SIM210 (if-expr-with-true-false) [*] Use `bool(...)` instead of `
 SIM210.py:3:5: SIM210 (if-expr-with-true-false) [*] Remove unnecessary `True if ... else False`
   |
 1 | a = True if b else False  # SIM210
-2 | 
+2 |
 3 | a = True if b != c else False  # SIM210
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM210 (if-expr-with-true-false)
-4 | 
+4 |
 5 | a = True if b + c else False  # SIM210
   |
   = help: Remove unnecessary `True if ... else False`
@@ -40,10 +40,10 @@ SIM210.py:3:5: SIM210 (if-expr-with-true-false) [*] Remove unnecessary `True if 
 SIM210.py:5:5: SIM210 (if-expr-with-true-false) [*] Use `bool(...)` instead of `True if ... else False`
   |
 3 | a = True if b != c else False  # SIM210
-4 | 
+4 |
 5 | a = True if b + c else False  # SIM210
   |     ^^^^^^^^^^^^^^^^^^^^^^^^ SIM210 (if-expr-with-true-false)
-6 | 
+6 |
 7 | a = False if b else True  # OK
   |
   = help: Replace with `bool(...)
@@ -61,7 +61,7 @@ SIM210.py:5:5: SIM210 (if-expr-with-true-false) [*] Use `bool(...)` instead of `
 SIM210.py:15:9: SIM210 (if-expr-with-true-false) Use `bool(...)` instead of `True if ... else False`
    |
 13 |         return False
-14 | 
+14 |
 15 |     a = True if b else False
    |         ^^^^^^^^^^^^^^^^^^^^ SIM210 (if-expr-with-true-false)
    |

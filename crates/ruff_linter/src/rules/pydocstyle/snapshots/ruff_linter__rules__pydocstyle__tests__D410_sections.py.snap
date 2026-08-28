@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 sections.py:78:5: D410 (no-blank-line-after-section) [*] Missing blank line after section ("Returns")
    |
 76 |     """Toggle the gizmo.
-77 | 
+77 |
 78 |     Returns
    |     ^^^^^^^ D410 (no-blank-line-after-section)
 79 |     -------
@@ -24,7 +24,7 @@ sections.py:78:5: D410 (no-blank-line-after-section) [*] Missing blank line afte
 sections.py:224:5: D410 (no-blank-line-after-section) [*] Missing blank line after section ("Returns")
     |
 222 |     returns.
-223 | 
+223 |
 224 |     Returns
     |     ^^^^^^^ D410 (no-blank-line-after-section)
 225 |     ------

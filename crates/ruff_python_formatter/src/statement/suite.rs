@@ -1,5 +1,5 @@
 use ruff_formatter::{
-    write, FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
+    FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions, write,
 };
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
@@ -8,11 +8,12 @@ use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, l
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
-    leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
+    Comments, LeadingDanglingTrailingComments, leading_comments, trailing_comments,
 };
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
-use crate::expression::expr_string_literal::ExprStringLiteralKind;
+use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
+use crate::preview::is_blank_line_before_decorated_class_in_stub_enabled;
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
     suppressed_node, write_suppressed_statements_starting_with_leading_comment,
@@ -138,7 +139,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
             SuiteKind::Function | SuiteKind::Class | SuiteKind::TopLevel => {
                 if let Some(docstring) =
-                    DocstringStmt::try_from_statement(first, self.kind, source_type)
+                    DocstringStmt::try_from_statement(first, self.kind, f.context())
                 {
                     SuiteChildStatement::Docstring(docstring)
                 } else {
@@ -170,7 +171,6 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         } else {
             first.fmt(f)?;
 
-            #[allow(clippy::if_same_then_else)]
             let empty_line_after_docstring = if matches!(first, SuiteChildStatement::Docstring(_))
                 && self.kind == SuiteKind::Class
             {
@@ -179,7 +179,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // Insert a newline after a module level docstring, but treat
                 // it as a docstring otherwise. See: https://github.com/psf/black/pull/3932.
                 self.kind == SuiteKind::TopLevel
-                    && DocstringStmt::try_from_statement(first.statement(), self.kind, source_type)
+                    && DocstringStmt::try_from_statement(first.statement(), self.kind, f.context())
                         .is_some()
             };
 
@@ -701,10 +701,15 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
     //
     // class LockType2: ...
     // ```
-    let class_decorator_instead_of_empty_line = preceding.is_function_def_stmt()
-        && following
-            .as_class_def_stmt()
-            .is_some_and(|class| !class.decorator_list.is_empty());
+    //
+    // However, this behavior is incorrect and should not be replicated in preview mode.
+    // See: https://github.com/astral-sh/ruff/issues/18865
+    let class_decorator_instead_of_empty_line =
+        !is_blank_line_before_decorated_class_in_stub_enabled(f.context())
+            && preceding.is_function_def_stmt()
+            && following
+                .as_class_def_stmt()
+                .is_some_and(|class| !class.decorator_list.is_empty());
 
     // A function definition following a stub function definition
     // ```python
@@ -785,37 +790,23 @@ impl<'a> DocstringStmt<'a> {
     fn try_from_statement(
         stmt: &'a Stmt,
         suite_kind: SuiteKind,
-        source_type: PySourceType,
+        context: &PyFormatContext,
     ) -> Option<DocstringStmt<'a>> {
         // Notebooks don't have a concept of modules, therefore, don't recognise the first string as the module docstring.
-        if source_type.is_ipynb() && suite_kind == SuiteKind::TopLevel {
+        if context.options().source_type().is_ipynb() && suite_kind == SuiteKind::TopLevel {
             return None;
         }
 
-        let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
-            return None;
-        };
-
-        match value.as_ref() {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
-                if !value.is_implicit_concatenated() =>
-            {
-                Some(DocstringStmt {
-                    docstring: stmt,
-                    suite_kind,
-                })
-            }
-            _ => None,
-        }
+        Self::is_docstring_statement(stmt.as_expr_stmt()?, context).then_some(DocstringStmt {
+            docstring: stmt,
+            suite_kind,
+        })
     }
 
-    pub(crate) fn is_docstring_statement(stmt: &StmtExpr, source_type: PySourceType) -> bool {
-        if source_type.is_ipynb() {
-            return false;
-        }
-
+    pub(crate) fn is_docstring_statement(stmt: &StmtExpr, context: &PyFormatContext) -> bool {
         if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = stmt.value.as_ref() {
             !value.is_implicit_concatenated()
+                || !value.iter().any(|literal| context.comments().has(literal))
         } else {
             false
         }
@@ -850,7 +841,7 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                         .then_some(source_position(self.docstring.start())),
                     string_literal
                         .format()
-                        .with_options(ExprStringLiteralKind::Docstring),
+                        .with_options(StringLiteralKind::Docstring),
                     f.options()
                         .source_map_generation()
                         .is_enabled()
@@ -931,10 +922,10 @@ mod tests {
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::CommentRanges;
 
+    use crate::PyFormatOptions;
     use crate::comments::Comments;
     use crate::prelude::*;
     use crate::statement::suite::SuiteKind;
-    use crate::PyFormatOptions;
 
     fn format_suite(level: SuiteKind) -> String {
         let source = r"

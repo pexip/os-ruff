@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -35,18 +35,18 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Pandas documentation: `read_csv`](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html#pandas.read_csv)
 /// - [Pandas documentation: `read_table`](https://pandas.pydata.org/docs/reference/api/pandas.read_table.html#pandas.read_table)
-#[violation]
-pub struct PandasUseOfDotReadTable;
+#[derive(ViolationMetadata)]
+pub(crate) struct PandasUseOfDotReadTable;
 
 impl Violation for PandasUseOfDotReadTable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `.read_csv` instead of `.read_table` to read CSV files")
+        "Use `.read_csv` instead of `.read_table` to read CSV files".to_string()
     }
 }
 
 /// PD012
-pub(crate) fn use_of_read_table(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn use_of_read_table(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
@@ -62,9 +62,7 @@ pub(crate) fn use_of_read_table(checker: &mut Checker, call: &ast::ExprCall) {
             .map(|keyword| &keyword.value)
         {
             if value == "," {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PandasUseOfDotReadTable, call.func.range()));
+                checker.report_diagnostic(PandasUseOfDotReadTable, call.func.range());
             }
         }
     }

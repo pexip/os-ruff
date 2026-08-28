@@ -5,7 +5,7 @@ W292_0.py:2:9: W292 (missing-newline-at-end-of-file) [*] No newline at end of fi
   |
 1 | def fn() -> None:
 2 |     pass
-  |          W292 (missing-newline-at-end-of-file)
+  |         ^ W292 (missing-newline-at-end-of-file)
   |
   = help: Add trailing newline
 

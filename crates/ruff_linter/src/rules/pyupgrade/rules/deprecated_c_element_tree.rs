@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of the `xml.etree.cElementTree` module.
@@ -24,13 +24,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `xml.etree.ElementTree`](https://docs.python.org/3/library/xml.etree.elementtree.html)
-#[violation]
-pub struct DeprecatedCElementTree;
+#[derive(ViolationMetadata)]
+pub(crate) struct DeprecatedCElementTree;
 
 impl AlwaysFixableViolation for DeprecatedCElementTree {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`cElementTree` is deprecated, use `ElementTree`")
+        "`cElementTree` is deprecated, use `ElementTree`".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -38,23 +38,26 @@ impl AlwaysFixableViolation for DeprecatedCElementTree {
     }
 }
 
-fn add_check_for_node<T>(checker: &mut Checker, node: &T)
+fn add_check_for_node<T>(checker: &Checker, node: &T)
 where
     T: Ranged,
 {
-    let mut diagnostic = Diagnostic::new(DeprecatedCElementTree, node.range());
+    let mut diagnostic = checker.report_diagnostic(DeprecatedCElementTree, node.range());
     let contents = checker.locator().slice(node);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         contents.replacen("cElementTree", "ElementTree", 1),
         node.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// UP023
-pub(crate) fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
     match stmt {
-        Stmt::Import(ast::StmtImport { names, range: _ }) => {
+        Stmt::Import(ast::StmtImport {
+            names,
+            range: _,
+            node_index: _,
+        }) => {
             // Ex) `import xml.etree.cElementTree as ET`
             for name in names {
                 if &name.name == "xml.etree.cElementTree" && name.asname.is_some() {
@@ -67,6 +70,7 @@ pub(crate) fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
             names,
             level,
             range: _,
+            node_index: _,
         }) => {
             if *level > 0 {
                 // Ex) `import .xml.etree.cElementTree as ET`

@@ -6,7 +6,7 @@ D.py:20:9: D419 (empty-docstring) Docstring is empty
 19 |     class meta:
 20 |         """"""
    |         ^^^^^^ D419 (empty-docstring)
-21 | 
+21 |
 22 |     @expect('D102: Missing docstring in public method')
    |
 

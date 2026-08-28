@@ -216,6 +216,6 @@ S607.py:37:14: S607 (start-process-with-partial-path) Starting a process with a 
 36 | os.spawnvpe("true")
 37 | os.startfile("true")
    |              ^^^^^^ S607 (start-process-with-partial-path)
-38 | 
+38 |
 39 | # Check it does not fail for full paths.
    |

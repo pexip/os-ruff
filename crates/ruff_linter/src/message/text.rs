@@ -2,31 +2,30 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 
-use annotate_snippets::display_list::{DisplayList, FormatOptions};
-use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use bitflags::bitflags;
 use colored::Colorize;
+use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{OneIndexed, SourceLocation};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_source_file::{LineColumn, OneIndexed};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::Locator;
 use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 use crate::settings::types::UnsafeFixes;
-use crate::text_helpers::ShowNonprinting;
 
 bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
         /// Whether to show the fix status of a diagnostic.
-        const SHOW_FIX_STATUS    = 0b0000_0001;
+        const SHOW_FIX_STATUS   = 1 << 0;
         /// Whether to show the diff of a fix, for diagnostics that have a fix.
-        const SHOW_FIX_DIFF      = 0b0000_0010;
+        const SHOW_FIX_DIFF     = 1 << 1;
         /// Whether to show the source code of a diagnostic.
-        const SHOW_SOURCE        = 0b0000_0100;
+        const SHOW_SOURCE       = 1 << 2;
     }
 }
 
@@ -67,19 +66,19 @@ impl Emitter for TextEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        for message in messages {
+        for message in diagnostics {
             write!(
                 writer,
                 "{path}{sep}",
-                path = relativize_path(message.filename()).bold(),
+                path = relativize_path(&*message.filename()).bold(),
                 sep = ":".cyan(),
             )?;
 
             let start_location = message.compute_start_location();
-            let notebook_index = context.notebook_index(message.filename());
+            let notebook_index = context.notebook_index(&message.filename());
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
             let diagnostic_location = if let Some(notebook_index) = notebook_index {
@@ -87,14 +86,14 @@ impl Emitter for TextEmitter {
                     writer,
                     "cell {cell}{sep}",
                     cell = notebook_index
-                        .cell(start_location.row)
+                        .cell(start_location.line)
                         .unwrap_or(OneIndexed::MIN),
                     sep = ":".cyan(),
                 )?;
 
-                SourceLocation {
-                    row: notebook_index
-                        .cell_row(start_location.row)
+                LineColumn {
+                    line: notebook_index
+                        .cell_row(start_location.line)
                         .unwrap_or(OneIndexed::MIN),
                     column: start_location.column,
                 }
@@ -105,7 +104,7 @@ impl Emitter for TextEmitter {
             writeln!(
                 writer,
                 "{row}{sep}{col}{sep} {code_and_body}",
-                row = diagnostic_location.row,
+                row = diagnostic_location.line,
                 col = diagnostic_location.column,
                 sep = ":".cyan(),
                 code_and_body = RuleCodeAndBody {
@@ -141,7 +140,7 @@ impl Emitter for TextEmitter {
 }
 
 pub(super) struct RuleCodeAndBody<'a> {
-    pub(crate) message: &'a Message,
+    pub(crate) message: &'a OldDiagnostic,
     pub(crate) show_fix_status: bool,
     pub(crate) unsafe_fixes: UnsafeFixes,
 }
@@ -150,14 +149,14 @@ impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.show_fix_status {
             if let Some(fix) = self.message.fix() {
-                // Do not display an indicator for unapplicable fixes
+                // Do not display an indicator for inapplicable fixes
                 if fix.applies(self.unsafe_fixes.required_applicability()) {
-                    if let Some(rule) = self.message.rule() {
+                    if let Some(rule) = self.message.rule {
                         write!(
                             f,
                             "{code} ({rule_name}) ",
                             code = rule.noqa_code().to_string().red().bold(),
-                            rule_name = rule.as_ref().to_string().red().bold(),
+                            rule_name = rule.name().to_string().red().bold(),
                         )?;
                     }
                     return write!(
@@ -168,14 +167,14 @@ impl Display for RuleCodeAndBody<'_> {
                     );
                 }
             }
-        };
+        }
 
-        if let Some(rule) = self.message.rule() {
+        if let Some(rule) = self.message.rule {
             write!(
                 f,
                 "{code} ({rule_name}) {body}",
                 code = rule.noqa_code().to_string().red().bold(),
-                rule_name = rule.as_ref().to_string().red().bold(),
+                rule_name = rule.name().to_string().red().bold(),
                 body = self.message.body(),
             )
         } else {
@@ -185,24 +184,21 @@ impl Display for RuleCodeAndBody<'_> {
 }
 
 pub(super) struct MessageCodeFrame<'a> {
-    pub(crate) message: &'a Message,
+    pub(crate) message: &'a OldDiagnostic,
     pub(crate) notebook_index: Option<&'a NotebookIndex>,
 }
 
 impl Display for MessageCodeFrame<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let suggestion = self.message.suggestion();
-        let footer = if suggestion.is_some() {
-            vec![Annotation {
-                id: None,
-                label: suggestion,
-                annotation_type: AnnotationType::Help,
-            }]
+        let footers = if let Some(suggestion) = suggestion {
+            vec![Level::Help.title(suggestion)]
         } else {
             Vec::new()
         };
 
-        let source_code = self.message.source_file().to_source_code();
+        let source_file = self.message.source_file();
+        let source_code = source_file.to_source_code();
 
         let content_start_index = source_code.line_index(self.message.start());
         let mut start_index = content_start_index.saturating_sub(2);
@@ -256,96 +252,112 @@ impl Display for MessageCodeFrame<'_> {
         let start_offset = source_code.line_start(start_index);
         let end_offset = source_code.line_end(end_index);
 
-        let source = replace_whitespace(
+        let source = replace_whitespace_and_unprintable(
             source_code.slice(TextRange::new(start_offset, end_offset)),
             self.message.range() - start_offset,
-        );
+        )
+        .fix_up_empty_spans_after_line_terminator();
 
-        let source_text = source.text.show_nonprinting();
-
-        let start_char = source.text[TextRange::up_to(source.annotation_range.start())]
-            .chars()
-            .count();
-
-        let char_length = source.text[source.annotation_range].chars().count();
-
-        let label = self.message.rule().map_or_else(String::new, |rule| {
+        let label = self.message.rule.map_or_else(String::new, |rule| {
             format!(
                 "{code} ({rule_name})",
                 code = rule.noqa_code(),
-                rule_name = rule.as_ref(),
+                rule_name = rule.name(),
             )
         });
 
-        let snippet = Snippet {
-            title: None,
-            slices: vec![Slice {
-                source: &source_text,
-                line_start: self.notebook_index.map_or_else(
-                    || start_index.get(),
-                    |notebook_index| {
-                        notebook_index
-                            .cell_row(start_index)
-                            .unwrap_or(OneIndexed::MIN)
-                            .get()
-                    },
-                ),
-                annotations: vec![SourceAnnotation {
-                    label: &label,
-                    annotation_type: AnnotationType::Error,
-                    range: (start_char, start_char + char_length),
-                }],
-                // The origin (file name, line number, and column number) is already encoded
-                // in the `label`.
-                origin: None,
-                fold: false,
-            }],
-            footer,
-            opt: FormatOptions {
-                #[cfg(test)]
-                color: false,
-                #[cfg(not(test))]
-                color: colored::control::SHOULD_COLORIZE.should_colorize(),
-                ..FormatOptions::default()
+        let line_start = self.notebook_index.map_or_else(
+            || start_index.get(),
+            |notebook_index| {
+                notebook_index
+                    .cell_row(start_index)
+                    .unwrap_or(OneIndexed::MIN)
+                    .get()
             },
-        };
+        );
 
-        writeln!(f, "{message}", message = DisplayList::from(snippet))
+        let span = usize::from(source.annotation_range.start())
+            ..usize::from(source.annotation_range.end());
+        let annotation = Level::Error.span(span).label(&label);
+        let snippet = Snippet::source(&source.text)
+            .line_start(line_start)
+            .annotation(annotation)
+            .fold(false);
+        let message = Level::None.title("").snippet(snippet).footers(footers);
+
+        let renderer = if !cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize() {
+            Renderer::styled()
+        } else {
+            Renderer::plain()
+        }
+        .cut_indicator("…");
+        let rendered = renderer.render(message);
+        writeln!(f, "{rendered}")
     }
 }
 
-fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
+/// Given some source code and an annotation range, this routine replaces
+/// tabs with ASCII whitespace, and unprintable characters with printable
+/// representations of them.
+///
+/// The source code returned has an annotation that is updated to reflect
+/// changes made to the source code (if any).
+fn replace_whitespace_and_unprintable(source: &str, annotation_range: TextRange) -> SourceCode {
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
     let mut line_width = LineWidthBuilder::new(IndentWidth::default());
+
+    // Updates the range given by the caller whenever a single byte (at
+    // `index` in `source`) is replaced with `len` bytes.
+    //
+    // When the index occurs before the start of the range, the range is
+    // offset by `len`. When the range occurs after or at the start but before
+    // the end, then the end of the range only is offset by `len`.
+    let mut update_range = |index, len| {
+        if index < usize::from(annotation_range.start()) {
+            range += TextSize::new(len - 1);
+        } else if index < usize::from(annotation_range.end()) {
+            range = range.add_end(TextSize::new(len - 1));
+        }
+    };
+
+    // If `c` is an unprintable character, then this returns a printable
+    // representation of it (using a fancier Unicode codepoint).
+    let unprintable_replacement = |c: char| -> Option<char> {
+        match c {
+            '\x07' => Some('␇'),
+            '\x08' => Some('␈'),
+            '\x1b' => Some('␛'),
+            '\x7f' => Some('␡'),
+            _ => None,
+        }
+    };
 
     for (index, c) in source.char_indices() {
         let old_width = line_width.get();
         line_width = line_width.add_char(c);
 
         if matches!(c, '\t') {
-            // SAFETY: The difference is a value in the range [1..TAB_SIZE] which is guaranteed to be less than `u32`.
-            #[allow(clippy::cast_possible_truncation)]
-            let tab_width = (line_width.get() - old_width) as u32;
-
-            if index < usize::from(annotation_range.start()) {
-                range += TextSize::new(tab_width - 1);
-            } else if index < usize::from(annotation_range.end()) {
-                range = range.add_end(TextSize::new(tab_width - 1));
-            }
-
+            let tab_width = u32::try_from(line_width.get() - old_width)
+                .expect("small width because of tab size");
             result.push_str(&source[last_end..index]);
-
             for _ in 0..tab_width {
                 result.push(' ');
             }
-
             last_end = index + 1;
+            update_range(index, tab_width);
+        } else if let Some(printable) = unprintable_replacement(c) {
+            result.push_str(&source[last_end..index]);
+            result.push(printable);
+            last_end = index + 1;
+
+            let len = printable.text_len().to_u32();
+            update_range(index, len);
         }
     }
 
-    // No tabs
+    // No tabs or unprintable chars
     if result.is_empty() {
         SourceCode {
             annotation_range,
@@ -365,21 +377,56 @@ struct SourceCode<'a> {
     annotation_range: TextRange,
 }
 
+impl<'a> SourceCode<'a> {
+    /// This attempts to "fix up" the span on `SourceCode` in the case where
+    /// it's an empty span immediately following a line terminator.
+    ///
+    /// At present, `annotate-snippets` (both upstream and our vendored copy)
+    /// will render annotations of such spans to point to the space immediately
+    /// following the previous line. But ideally, this should point to the space
+    /// immediately preceding the next line.
+    ///
+    /// After attempting to fix `annotate-snippets` and giving up after a couple
+    /// hours, this routine takes a different tact: it adjusts the span to be
+    /// non-empty and it will cover the first codepoint of the following line.
+    /// This forces `annotate-snippets` to point to the right place.
+    ///
+    /// See also: <https://github.com/astral-sh/ruff/issues/15509>
+    fn fix_up_empty_spans_after_line_terminator(self) -> SourceCode<'a> {
+        if !self.annotation_range.is_empty()
+            || self.annotation_range.start() == TextSize::from(0)
+            || self.annotation_range.start() >= self.text.text_len()
+        {
+            return self;
+        }
+        if self.text.as_bytes()[self.annotation_range.start().to_usize() - 1] != b'\n' {
+            return self;
+        }
+        let locator = Locator::new(&self.text);
+        let start = self.annotation_range.start();
+        let end = locator.ceil_char_boundary(start + TextSize::from(1));
+        SourceCode {
+            annotation_range: TextRange::new(start, end),
+            ..self
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::message::tests::{
-        capture_emitter_notebook_output, capture_emitter_output, create_messages,
-        create_notebook_messages, create_syntax_error_messages,
-    };
     use crate::message::TextEmitter;
+    use crate::message::tests::{
+        capture_emitter_notebook_output, capture_emitter_output, create_diagnostics,
+        create_notebook_diagnostics, create_syntax_error_diagnostics,
+    };
     use crate::settings::types::UnsafeFixes;
 
     #[test]
     fn default() {
         let mut emitter = TextEmitter::default().with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -389,7 +436,7 @@ mod tests {
         let mut emitter = TextEmitter::default()
             .with_show_fix_status(true)
             .with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -400,7 +447,7 @@ mod tests {
             .with_show_fix_status(true)
             .with_show_source(true)
             .with_unsafe_fixes(UnsafeFixes::Enabled);
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -411,7 +458,7 @@ mod tests {
             .with_show_fix_status(true)
             .with_show_source(true)
             .with_unsafe_fixes(UnsafeFixes::Enabled);
-        let (messages, notebook_indexes) = create_notebook_messages();
+        let (messages, notebook_indexes) = create_notebook_diagnostics();
         let content = capture_emitter_notebook_output(&mut emitter, &messages, &notebook_indexes);
 
         assert_snapshot!(content);
@@ -420,7 +467,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = TextEmitter::default().with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }

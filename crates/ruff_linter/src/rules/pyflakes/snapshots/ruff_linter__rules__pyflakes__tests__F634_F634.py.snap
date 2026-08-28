@@ -11,7 +11,7 @@ F634.py:1:4: F634 (if-tuple) If test is a tuple, which is always `True`
 F634.py:4:4: F634 (if-tuple) If test is a tuple, which is always `True`
   |
 2 |     pass
-3 | 
+3 |
 4 | if (3, 4):
   |    ^^^^^^ F634 (if-tuple)
 5 |     pass

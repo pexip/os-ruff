@@ -21,7 +21,7 @@ unnecessary_lambda.py:2:5: PLW0108 (unnecessary-lambda) [*] Lambda may be unnece
 1 | _ = lambda: print()  # [unnecessary-lambda]
 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
   |     ^^^^^^^^^^^^^^^^^^^^^^ PLW0108 (unnecessary-lambda)
-3 | 
+3 |
 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
   |
   = help: Inline function call
@@ -37,7 +37,7 @@ unnecessary_lambda.py:2:5: PLW0108 (unnecessary-lambda) [*] Lambda may be unnece
 unnecessary_lambda.py:4:5: PLW0108 (unnecessary-lambda) [*] Lambda may be unnecessary; consider inlining inner function
   |
 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
-3 | 
+3 |
 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
   |     ^^^^^^^^^^^^^^^^^^^^^^ PLW0108 (unnecessary-lambda)
 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
@@ -101,7 +101,7 @@ unnecessary_lambda.py:7:5: PLW0108 (unnecessary-lambda) [*] Lambda may be unnece
 6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
 7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0108 (unnecessary-lambda)
-8 | 
+8 |
 9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
   |
   = help: Inline function call
@@ -119,7 +119,7 @@ unnecessary_lambda.py:7:5: PLW0108 (unnecessary-lambda) [*] Lambda may be unnece
 unnecessary_lambda.py:9:5: PLW0108 (unnecessary-lambda) [*] Lambda may be unnecessary; consider inlining inner function
    |
  7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
- 8 | 
+ 8 |
  9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0108 (unnecessary-lambda)
 10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
@@ -141,7 +141,7 @@ unnecessary_lambda.py:10:5: PLW0108 (unnecessary-lambda) [*] Lambda may be unnec
  9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
 10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0108 (unnecessary-lambda)
-11 | 
+11 |
 12 | # default value in lambda parameters
    |
    = help: Inline function call

@@ -2,34 +2,10 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
-- [The Basics](#the-basics)
-    - [Prerequisites](#prerequisites)
-    - [Development](#development)
-    - [Project Structure](#project-structure)
-    - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
-        - [Rule naming convention](#rule-naming-convention)
-        - [Rule testing: fixtures and snapshots](#rule-testing-fixtures-and-snapshots)
-    - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
-- [MkDocs](#mkdocs)
-- [Release Process](#release-process)
-    - [Creating a new release](#creating-a-new-release)
-- [Ecosystem CI](#ecosystem-ci)
-- [Benchmarking and Profiling](#benchmarking-and-profiling)
-    - [CPython Benchmark](#cpython-benchmark)
-    - [Microbenchmarks](#microbenchmarks)
-        - [Benchmark-driven Development](#benchmark-driven-development)
-        - [PR Summary](#pr-summary)
-        - [Tips](#tips)
-    - [Profiling Projects](#profiling-projects)
-        - [Linux](#linux)
-        - [Mac](#mac)
-- [`cargo dev`](#cargo-dev)
-- [Subsystems](#subsystems)
-    - [Compilation Pipeline](#compilation-pipeline)
-    - [Import Categorization](#import-categorization)
-        - [Project root](#project-root)
-        - [Package root](#package-root)
-        - [Import categorization](#import-categorization-1)
+> [!NOTE]
+>
+> This guide is for Ruff. If you're looking to contribute to ty, please see [the ty contributing
+> guide](https://github.com/astral-sh/ruff/blob/main/crates/ty/CONTRIBUTING.md).
 
 ## The Basics
 
@@ -58,16 +34,14 @@ You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 cargo install cargo-insta
 ```
 
-And you'll need pre-commit to run some validation checks:
-
-```shell
-pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
-```
+You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
+run Python utility commands.
 
 You can optionally install pre-commit hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
+uv tool install pre-commit
 pre-commit install
 ```
 
@@ -95,7 +69,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
-pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
+uvx pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -170,7 +144,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 1. Create a file for your rule (e.g., `crates/ruff_linter/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
 1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
-    `#[violation]` to see examples.
+    `#[derive(ViolationMetadata)]` to see examples.
 
 1. In that file, define a function that adds the violation to the diagnostic list as appropriate
     (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
@@ -296,26 +270,20 @@ To preview any changes to the documentation locally:
 
 1. Install the [Rust toolchain](https://www.rust-lang.org/tools/install).
 
-1. Install MkDocs and Material for MkDocs with:
-
-    ```shell
-    pip install -r docs/requirements.txt
-    ```
-
 1. Generate the MkDocs site with:
 
     ```shell
-    python scripts/generate_mkdocs.py
+    uv run --no-project --isolated --with-requirements docs/requirements.txt scripts/generate_mkdocs.py
     ```
 
 1. Run the development server with:
 
     ```shell
     # For contributors.
-    mkdocs serve -f mkdocs.public.yml
+    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.public.yml
 
     # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
-    mkdocs serve -f mkdocs.insiders.yml
+    uvx --with-requirements docs/requirements-insiders.txt -- mkdocs serve -f mkdocs.insiders.yml
     ```
 
 The documentation should then be available locally at
@@ -333,22 +301,45 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 ### Creating a new release
 
 1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
 1. Run `./scripts/release.sh`; this command will:
+
     - Generate a temporary virtual environment with `rooster`
     - Generate a changelog entry in `CHANGELOG.md`
     - Update versions in `pyproject.toml` and `Cargo.toml`
     - Update references to versions in the `README.md` and documentation
     - Display contributors for the release
+
 1. The changelog should then be editorialized for consistency
+
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
+
+    Additionally, for minor releases:
+
+    - Move the existing contents of `CHANGELOG.md` to `changelogs/0.MINOR.x.md`,
+        where `MINOR` is the previous minor release (e.g. `11` when preparing
+        the 0.12.0 release)
+    - Reverse the entries to put the oldest version first (`0.MINOR.0` instead
+        of `0.MINOR.LATEST` as in the main changelog)
+        - Use the
+            [`reverse-changelog.py`](https://github.com/astral-sh/uv/blob/main/scripts/reverse-changelog.py)
+            script from the uv repo to do this automatically
+
 1. Highlight any breaking changes in `BREAKING_CHANGES.md`
+
 1. Run `cargo check`. This should update the lock file with new versions.
+
 1. Create a pull request with the changelog and version updates
+
 1. Merge the PR
+
 1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yml) with:
+
     - The new version number (without starting `v`)
+
 1. The release workflow will do the following:
+
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
         uploaded anything, you can restart after pushing a fix. If you just need to rerun the build,
         make sure you're [re-running all the failed
@@ -359,14 +350,25 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
     1. Attach artifacts to draft GitHub release
     1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
         downstream jobs manually if needed.
+
 1. Verify the GitHub release:
+
     1. The Changelog should match the content of `CHANGELOG.md`
     1. Append the contributors from the `scripts/release.sh` script
+
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
+
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
     1. Once run successfully, you should follow the link in the output to create a PR.
-1. If needed, update the `ruff-lsp` and `ruff-vscode` repositories.
+
+1. If needed, update the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and
+    [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repositories and follow
+    the release instructions in those repositories. `ruff-lsp` should always be updated
+    before `ruff-vscode`.
+
+    This step is generally not required for a patch release, but should always be done
+    for a minor release.
 
 ## Ecosystem CI
 
@@ -374,12 +376,20 @@ GitHub Actions will run your changes against a number of real-world projects fro
 report on any linter or formatter differences. You can also run those checks locally via:
 
 ```shell
-pip install -e ./python/ruff-ecosystem
-ruff-ecosystem check ruff "./target/debug/ruff"
-ruff-ecosystem format ruff "./target/debug/ruff"
+uvx --from ./python/ruff-ecosystem ruff-ecosystem check ruff "./target/debug/ruff"
+uvx --from ./python/ruff-ecosystem ruff-ecosystem format ruff "./target/debug/ruff"
 ```
 
 See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/python/ruff-ecosystem) for more details.
+
+## Upgrading Rust
+
+1. Change the `channel` in `./rust-toolchain.toml` to the new Rust version (`<latest>`)
+1. Change the `rust-version` in the `./Cargo.toml` to `<latest> - 2` (e.g. 1.84 if the latest is 1.86)
+1. Run `cargo clippy --fix --allow-dirty --allow-staged` to fix new clippy warnings
+1. Create and merge the PR
+1. Bump the Rust version in Ruff's conda forge recipe. See [this PR](https://github.com/conda-forge/ruff-feedstock/pull/266) for an example.
+1. Enjoy the new Rust version!
 
 ## Benchmarking and Profiling
 
@@ -389,7 +399,7 @@ We have several ways of benchmarking and profiling Ruff:
 - Microbenchmarks which run the linter or the formatter on individual files. These run on pull requests.
 - Profiling the linter on either the microbenchmarks or entire projects
 
-> \[!NOTE\]
+> **Note**
 > When running benchmarks, ensure that your CPU is otherwise idle (e.g., close any background
 > applications, like web browsers). You may also want to switch your CPU to a "performance"
 > mode, if it exists, especially when benchmarking short-lived processes.
@@ -403,12 +413,18 @@ which makes it a good target for benchmarking.
 git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff_linter/resources/test/cpython
 ```
 
+Install `hyperfine`:
+
+```shell
+cargo install hyperfine
+```
+
 To benchmark the release build:
 
 ```shell
-cargo build --release && hyperfine --warmup 10 \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ -e"
+cargo build --release --bin ruff && hyperfine --warmup 10 \
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ -e"
 
 Benchmark 1: ./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache
   Time (mean ± σ):     293.8 ms ±   3.2 ms    [User: 2384.6 ms, System: 90.3 ms]
@@ -427,7 +443,7 @@ To benchmark against the ecosystem's existing tools:
 
 ```shell
 hyperfine --ignore-failure --warmup 5 \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache" \
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache" \
   "pyflakes crates/ruff_linter/resources/test/cpython" \
   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
   "pycodestyle crates/ruff_linter/resources/test/cpython" \
@@ -473,10 +489,10 @@ To benchmark a subset of rules, e.g. `LineTooLong` and `DocLineTooLong`:
 
 ```shell
 cargo build --release && hyperfine --warmup 10 \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
 ```
 
-You can run `poetry install` from `./scripts/benchmarks` to create a working environment for the
+You can run `uv venv --project ./scripts/benchmarks`, activate the venv and then run `uv sync --project ./scripts/benchmarks` to create a working environment for the
 above. All reported benchmarks were computed using the versions specified by
 `./scripts/benchmarks/pyproject.toml` on Python 3.11.
 
@@ -530,10 +546,12 @@ You can run the benchmarks with
 cargo benchmark
 ```
 
+`cargo benchmark` is an alias for `cargo bench -p ruff_benchmark --bench linter --bench formatter --`
+
 #### Benchmark-driven Development
 
 Ruff uses [Criterion.rs](https://bheisler.github.io/criterion.rs/book/) for benchmarks. You can use
-`--save-baseline=<name>` to store an initial baseline benchmark (e.g. on `main`) and then use
+`--save-baseline=<name>` to store an initial baseline benchmark (e.g., on `main`) and then use
 `--benchmark=<name>` to compare against that benchmark. Criterion will print a message telling you
 if the benchmark improved/regressed compared to that baseline.
 
@@ -568,7 +586,7 @@ cargo install critcmp
 
 #### Tips
 
-- Use `cargo bench -p ruff_benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark lexer`
+- Use `cargo bench -p ruff_benchmark <filter>` to only run specific benchmarks. For example: `cargo bench -p ruff_benchmark lexer`
     to only run the lexer benchmarks.
 - Use `cargo bench -p ruff_benchmark -- --quiet` for a more cleaned up output (without statistical relevance)
 - Use `cargo bench -p ruff_benchmark -- --quick` to get faster results (more prone to noise)
@@ -603,8 +621,7 @@ Then convert the recorded profile
 perf script -F +pid > /tmp/test.perf
 ```
 
-You can now view the converted file with [firefox profiler](https://profiler.firefox.com/), with a
-more in-depth guide [here](https://profiler.firefox.com/docs/#/./guide-perf-profiling)
+You can now view the converted file with [firefox profiler](https://profiler.firefox.com/). To learn more about Firefox profiler, read the [Firefox profiler profiling-guide](https://profiler.firefox.com/docs/#/./guide-perf-profiling).
 
 An alternative is to convert the perf data to `flamegraph.svg` using
 [flamegraph](https://github.com/flamegraph-rs/flamegraph) (`cargo install flamegraph`):
@@ -685,9 +702,9 @@ utils with it:
 23 Newline 24
 ```
 
-- `cargo dev print-cst <file>`: Print the CST of a python file using
+- `cargo dev print-cst <file>`: Print the CST of a Python file using
     [LibCST](https://github.com/Instagram/LibCST), which is used in addition to the RustPython parser
-    in Ruff. E.g. for `if True: pass # comment` everything including the whitespace is represented:
+    in Ruff. For example, for `if True: pass # comment`, everything, including the whitespace, is represented:
 
 ```text
 Module {
@@ -870,7 +887,7 @@ each configuration file.
 
 The package root is used to determine a file's "module path". Consider, again, `baz.py`. In that
 case, `./my_project/src/foo` was identified as the package root, so the module path for `baz.py`
-would resolve to  `foo.bar.baz` — as computed by taking the relative path from the package root
+would resolve to `foo.bar.baz` — as computed by taking the relative path from the package root
 (inclusive of the root itself). The module path can be thought of as "the path you would use to
 import the module" (e.g., `import foo.bar.baz`).
 

@@ -17,3 +17,11 @@ T00.py:2:3: FIX002 (line-contains-todo) Line contains TODO, consider resolving t
 3 | # XXX: xxx
 4 | # xxx: xxx
   |
+
+T00.py:10:10: FIX002 (line-contains-todo) Line contains TODO, consider resolving the issue
+   |
+ 8 | # fixme: fixme
+ 9 |
+10 | # test # TODO: todo
+   |          ^^^^ FIX002 (line-contains-todo)
+   |

@@ -6,7 +6,7 @@ UP009_1.py:2:1: UP009 (utf8-encoding-declaration) [*] UTF-8 encoding declaration
 1 | #!/usr/bin/python
 2 | # -*- coding: utf-8 -*-
   | ^^^^^^^^^^^^^^^^^^^^^^^ UP009 (utf8-encoding-declaration)
-3 | 
+3 |
 4 | print('Hello world')
   |
   = help: Remove unnecessary coding comment

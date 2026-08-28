@@ -1,9 +1,9 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -25,18 +25,19 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 /// - [Paramiko documentation: `SSHClient.exec_command()`](https://docs.paramiko.org/en/stable/api/client.html#paramiko.client.SSHClient.exec_command)
-#[violation]
-pub struct ParamikoCall;
+#[derive(ViolationMetadata)]
+pub(crate) struct ParamikoCall;
 
 impl Violation for ParamikoCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Possible shell injection via Paramiko call; check inputs are properly sanitized")
+        "Possible shell injection via Paramiko call; check inputs are properly sanitized"
+            .to_string()
     }
 }
 
 /// S601
-pub(crate) fn paramiko_call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn paramiko_call(checker: &Checker, func: &Expr) {
     if checker
         .semantic()
         .resolve_qualified_name(func)
@@ -44,8 +45,6 @@ pub(crate) fn paramiko_call(checker: &mut Checker, func: &Expr) {
             matches!(qualified_name.segments(), ["paramiko", "exec_command"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ParamikoCall, func.range()));
+        checker.report_diagnostic(ParamikoCall, func.range());
     }
 }

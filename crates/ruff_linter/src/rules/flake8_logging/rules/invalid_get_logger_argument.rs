@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for any usage of `__cached__` and `__file__` as an argument to
@@ -39,30 +39,35 @@ use crate::checkers::ast::Checker;
 /// logger = logging.getLogger(__name__)
 /// ```
 ///
+/// ## Fix safety
+/// This fix is always unsafe, as changing the arguments to `getLogger` can change the
+/// received logger object, and thus program behavior.
+///
 /// [logging documentation]: https://docs.python.org/3/library/logging.html#logger-objects
-#[violation]
-pub struct InvalidGetLoggerArgument;
+#[derive(ViolationMetadata)]
+pub(crate) struct InvalidGetLoggerArgument;
 
 impl Violation for InvalidGetLoggerArgument {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `__name__` with `logging.getLogger()`")
+        "Use `__name__` with `logging.getLogger()`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `__name__`"))
+        Some("Replace with `__name__`".to_string())
     }
 }
 
 /// LOG002
-pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
 
-    let Some(Expr::Name(expr @ ast::ExprName { id, .. })) = call.arguments.find_argument("name", 0)
+    let Some(Expr::Name(expr @ ast::ExprName { id, .. })) =
+        call.arguments.find_argument_value("name", 0)
     else {
         return;
     };
@@ -83,12 +88,11 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(InvalidGetLoggerArgument, expr.range());
+    let mut diagnostic = checker.report_diagnostic(InvalidGetLoggerArgument, expr.range());
     if checker.semantic().has_builtin_binding("__name__") {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             "__name__".to_string(),
             expr.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
 }

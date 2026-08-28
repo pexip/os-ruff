@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `raise` statements that raise `NotImplemented`.
@@ -34,15 +34,15 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `NotImplemented`](https://docs.python.org/3/library/constants.html#NotImplemented)
 /// - [Python documentation: `NotImplementedError`](https://docs.python.org/3/library/exceptions.html#NotImplementedError)
-#[violation]
-pub struct RaiseNotImplemented;
+#[derive(ViolationMetadata)]
+pub(crate) struct RaiseNotImplemented;
 
 impl Violation for RaiseNotImplemented {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`raise NotImplemented` should be `raise NotImplementedError`")
+        "`raise NotImplemented` should be `raise NotImplementedError`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -70,11 +70,11 @@ fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
 }
 
 /// F901
-pub(crate) fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn raise_not_implemented(checker: &Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(RaiseNotImplemented, expr.range());
+    let mut diagnostic = checker.report_diagnostic(RaiseNotImplemented, expr.range());
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
             "NotImplementedError",
@@ -86,5 +86,4 @@ pub(crate) fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
             import_edit,
         ))
     });
-    checker.diagnostics.push(diagnostic);
 }

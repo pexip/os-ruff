@@ -2,16 +2,16 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::slice::Iter;
 
-use ruff_formatter::{write, FormatError};
+use ruff_formatter::{FormatError, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Stmt;
 use ruff_python_parser::{self as parser, TokenKind};
 use ruff_python_trivia::lines_before;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::format::{empty_lines, format_comment};
-use crate::comments::{leading_comments, trailing_comments, SourceComment};
+use crate::comments::{SourceComment, leading_comments, trailing_comments};
 use crate::prelude::*;
 use crate::statement::clause::ClauseHeader;
 use crate::statement::suite::SuiteChildStatement;
@@ -478,7 +478,7 @@ enum SuppressionComments<'a> {
         /// Any following `fmt: off` comment if any.
         /// * `None`: The suppression ends here (for good)
         /// * `Some`: A `fmt: off`..`fmt: on` .. `fmt: off` sequence. The suppression continues after
-        ///     the `fmt: off` comment.
+        ///   the `fmt: off` comment.
         format_off_comment: Option<&'a SourceComment>,
     },
 
@@ -487,7 +487,7 @@ enum SuppressionComments<'a> {
 
     /// Comments that all fall into the formatted range.
     Formatted {
-        #[allow(unused)]
+        #[expect(unused)]
         comments: &'a [SourceComment],
     },
 }
@@ -647,7 +647,7 @@ struct Indentation(u32);
 
 impl Indentation {
     fn from_stmt(stmt: &Stmt, source: &str) -> Indentation {
-        let line_start = Locator::new(source).line_start(stmt.start());
+        let line_start = source.line_start(stmt.start());
 
         let mut indentation = 0u32;
         for c in source[TextRange::new(line_start, stmt.start())].chars() {
@@ -787,7 +787,7 @@ impl<'a> LogicalLinesIter<'a> {
     }
 }
 
-impl<'a> Iterator for LogicalLinesIter<'a> {
+impl Iterator for LogicalLinesIter<'_> {
     type Item = FormatResult<LogicalLine>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -798,13 +798,13 @@ impl<'a> Iterator for LogicalLinesIter<'a> {
                 Some(token) if token.kind() == TokenKind::Unknown => {
                     return Some(Err(FormatError::syntax_error(
                         "Unexpected token when lexing verbatim statement range.",
-                    )))
+                    )));
                 }
                 Some(token) => match token.kind() {
                     TokenKind::Newline => break (token.start(), token.end()),
                     // Ignore if inside an expression
                     TokenKind::NonLogicalNewline if parens == 0 => {
-                        break (token.start(), token.end())
+                        break (token.start(), token.end());
                     }
                     TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
                         parens = parens.saturating_add(1);
@@ -841,7 +841,7 @@ impl<'a> Iterator for LogicalLinesIter<'a> {
     }
 }
 
-impl<'a> FusedIterator for LogicalLinesIter<'a> {}
+impl FusedIterator for LogicalLinesIter<'_> {}
 
 /// A logical line or a comment (or form feed only) line
 struct LogicalLine {
@@ -878,7 +878,7 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
             },
         )));
 
-        match normalize_newlines(f.context().locator().slice(self.verbatim_range), ['\r']) {
+        match normalize_newlines(&f.context().source()[self.verbatim_range], ['\r']) {
             Cow::Borrowed(_) => {
                 write!(f, [source_text_slice(self.verbatim_range)])?;
             }

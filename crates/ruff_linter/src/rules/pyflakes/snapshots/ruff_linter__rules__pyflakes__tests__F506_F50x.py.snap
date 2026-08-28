@@ -26,6 +26,6 @@ F50x.py:11:1: F506 (percent-format-mixed-positional-and-named) `%`-format string
 10 | '%s %s' % {'k': 'v'}  # F503
 11 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ F506 (percent-format-mixed-positional-and-named)
-12 | 
+12 |
 13 | # ok: single %s with mapping
    |

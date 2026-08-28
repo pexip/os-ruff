@@ -4,9 +4,9 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 F821_20.py:3:24: F821 (undefined-name) Undefined name `Record`
   |
 1 | """Test lazy evaluation of type alias values."""
-2 | 
+2 |
 3 | type RecordCallback[R: Record] = Callable[[R], None]
   |                        ^^^^^^ F821 (undefined-name)
-4 | 
+4 |
 5 | from collections.abc import Callable
   |

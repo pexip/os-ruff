@@ -7,7 +7,7 @@ PIE794.py:4:5: PIE794 (duplicate-class-field-definition) [*] Class field `name` 
 3 |     # ....
 4 |     name = StringField()  # PIE794
   |     ^^^^^^^^^^^^^^^^^^^^ PIE794 (duplicate-class-field-definition)
-5 | 
+5 |
 6 |     def remove(self) -> None:
   |
   = help: Remove duplicate field definition for `name`
@@ -27,7 +27,7 @@ PIE794.py:13:5: PIE794 (duplicate-class-field-definition) [*] Class field `name`
 12 |     # ....
 13 |     name = StringField()  # PIE794
    |     ^^^^^^^^^^^^^^^^^^^^ PIE794 (duplicate-class-field-definition)
-14 | 
+14 |
 15 |     def foo(self) -> None:
    |
    = help: Remove duplicate field definition for `name`

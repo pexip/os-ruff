@@ -1,12 +1,12 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Decorator, Expr, ExprCall, Keyword, StmtFunctionDef};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for FastAPI routes that use the optional `response_model` parameter
@@ -58,14 +58,13 @@ use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 /// async def create_item(item: Item) -> Item:
 ///     return item
 /// ```
-
-#[violation]
-pub struct FastApiRedundantResponseModel;
+#[derive(ViolationMetadata)]
+pub(crate) struct FastApiRedundantResponseModel;
 
 impl AlwaysFixableViolation for FastApiRedundantResponseModel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("FastAPI route with redundant `response_model` argument")
+        "FastAPI route with redundant `response_model` argument".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -73,11 +72,8 @@ impl AlwaysFixableViolation for FastApiRedundantResponseModel {
     }
 }
 
-/// RUF102
-pub(crate) fn fastapi_redundant_response_model(
-    checker: &mut Checker,
-    function_def: &StmtFunctionDef,
-) {
+/// FAST001
+pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: &StmtFunctionDef) {
     if !checker.semantic().seen_module(Modules::FASTAPI) {
         return;
     }
@@ -88,17 +84,17 @@ pub(crate) fn fastapi_redundant_response_model(
             continue;
         };
         let mut diagnostic =
-            Diagnostic::new(FastApiRedundantResponseModel, response_model_arg.range());
+            checker.report_diagnostic(FastApiRedundantResponseModel, response_model_arg.range());
         diagnostic.try_set_fix(|| {
             remove_argument(
                 response_model_arg,
                 &call.arguments,
                 Parentheses::Preserve,
                 checker.locator().contents(),
+                checker.comment_ranges(),
             )
             .map(Fix::unsafe_edit)
         });
-        checker.diagnostics.push(diagnostic);
     }
 }
 

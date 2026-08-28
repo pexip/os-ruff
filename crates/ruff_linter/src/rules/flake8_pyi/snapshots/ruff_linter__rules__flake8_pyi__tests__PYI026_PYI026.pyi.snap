@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 PYI026.pyi:3:1: PYI026 (type-alias-without-annotation) [*] Use `typing.TypeAlias` for type alias, e.g., `NewAny: TypeAlias = Any`
   |
 1 | from typing import Literal, Any
-2 | 
+2 |
 3 | NewAny = Any
   | ^^^^^^ PYI026 (type-alias-without-annotation)
 4 | OptionalStr = typing.Optional[str]
@@ -95,7 +95,7 @@ PYI026.pyi:7:1: PYI026 (type-alias-without-annotation) [*] Use `typing.TypeAlias
 6 | IntOrStr = int | str
 7 | AliasNone = None
   | ^^^^^^^^^ PYI026 (type-alias-without-annotation)
-8 | 
+8 |
 9 | NewAny: typing.TypeAlias = Any
   |
   = help: Add `TypeAlias` annotation
@@ -119,7 +119,7 @@ PYI026.pyi:17:5: PYI026 (type-alias-without-annotation) [*] Use `typing.TypeAlia
 16 | class NotAnEnum:
 17 |     FLAG_THIS = None
    |     ^^^^^^^^^ PYI026 (type-alias-without-annotation)
-18 | 
+18 |
 19 | # these are ok
    |
    = help: Add `TypeAlias` annotation

@@ -7,13 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/simple_and_compound_s
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..59,
         body: [
             If(
                 StmtIf {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..13,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 3..7,
                             value: true,
                         },
@@ -21,6 +24,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 9..13,
                             },
                         ),
@@ -30,9 +34,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: AtomicNodeIndex(..),
                     range: 14..28,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 17..22,
                             value: false,
                         },
@@ -40,6 +46,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 24..28,
                             },
                         ),
@@ -49,9 +56,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: AtomicNodeIndex(..),
                     range: 29..42,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 32..36,
                             value: true,
                         },
@@ -59,6 +68,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 38..42,
                             },
                         ),
@@ -68,9 +78,11 @@ Module(
             ),
             If(
                 StmtIf {
+                    node_index: AtomicNodeIndex(..),
                     range: 44..58,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 47..52,
                             value: false,
                         },
@@ -78,6 +90,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 54..58,
                             },
                         ),

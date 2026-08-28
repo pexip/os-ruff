@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 G010.py:6:9: G010 (logging-warn) [*] Logging statement uses `warn` instead of `warning`
   |
 4 | from logging_setup import logger
-5 | 
+5 |
 6 | logging.warn("Hello World!")
   |         ^^^^ G010 (logging-warn)
 7 | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
@@ -28,7 +28,7 @@ G010.py:8:8: G010 (logging-warn) [*] Logging statement uses `warn` instead of `w
  7 | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
  8 | logger.warn("Hello world!")
    |        ^^^^ G010 (logging-warn)
- 9 | 
+ 9 |
 10 | logging . warn("Hello World!")
    |
    = help: Convert to `warning`
@@ -46,10 +46,10 @@ G010.py:8:8: G010 (logging-warn) [*] Logging statement uses `warn` instead of `w
 G010.py:10:11: G010 (logging-warn) [*] Logging statement uses `warn` instead of `warning`
    |
  8 | logger.warn("Hello world!")
- 9 | 
+ 9 |
 10 | logging . warn("Hello World!")
    |           ^^^^ G010 (logging-warn)
-11 | 
+11 |
 12 | from logging import warn, warning, exception
    |
    = help: Convert to `warning`

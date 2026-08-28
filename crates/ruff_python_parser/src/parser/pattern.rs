@@ -1,12 +1,14 @@
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, ExprContext, Number, Operator, Pattern, Singleton};
+use ruff_python_ast::{
+    self as ast, AtomicNodeIndex, Expr, ExprContext, Number, Operator, Pattern, Singleton,
+};
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::ParseErrorType;
 use crate::parser::progress::ParserProgress;
-use crate::parser::{recovery, Parser, RecoveryContextKind, SequenceMatchPatternParentheses};
+use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses, recovery};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::ParseErrorType;
 
 use super::expression::ExpressionContext;
 
@@ -49,7 +51,7 @@ const MAPPING_PATTERN_START_SET: TokenSet = TokenSet::new([
 ])
 .union(LITERAL_PATTERN_START_SET);
 
-impl<'src> Parser<'src> {
+impl Parser<'_> {
     /// Returns `true` if the current token is a valid start of a pattern.
     pub(super) fn at_pattern_start(&self) -> bool {
         self.at_ts(PATTERN_START_SET) || self.at_soft_keyword()
@@ -110,6 +112,7 @@ impl<'src> Parser<'src> {
             lhs = Pattern::MatchOr(ast::PatternMatchOr {
                 range: self.node_range(start),
                 patterns,
+                node_index: AtomicNodeIndex::dummy(),
             });
         }
 
@@ -125,6 +128,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 name: Some(ident),
                 pattern: Some(Box::new(lhs)),
+                node_index: AtomicNodeIndex::dummy(),
             });
         }
 
@@ -200,18 +204,25 @@ impl<'src> Parser<'src> {
             } else {
                 let key = match parser.parse_match_pattern_lhs(AllowStarPattern::No) {
                     Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
-                    Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range }) => {
-                        match value {
-                            Singleton::None => Expr::NoneLiteral(ast::ExprNoneLiteral { range }),
-                            Singleton::True => {
-                                Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, range })
-                            }
-                            Singleton::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                                value: false,
-                                range,
-                            }),
+                    Pattern::MatchSingleton(ast::PatternMatchSingleton {
+                        value,
+                        range,
+                        node_index,
+                    }) => match value {
+                        Singleton::None => {
+                            Expr::NoneLiteral(ast::ExprNoneLiteral { range, node_index })
                         }
-                    }
+                        Singleton::True => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                            value: true,
+                            range,
+                            node_index,
+                        }),
+                        Singleton::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                            value: false,
+                            range,
+                            node_index,
+                        }),
+                    },
                     pattern => {
                         parser.add_error(
                             ParseErrorType::OtherError("Invalid mapping pattern key".to_string()),
@@ -244,6 +255,7 @@ impl<'src> Parser<'src> {
             keys,
             patterns,
             rest,
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -267,6 +279,7 @@ impl<'src> Parser<'src> {
             } else {
                 Some(ident)
             },
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -306,6 +319,7 @@ impl<'src> Parser<'src> {
             return Pattern::MatchSequence(ast::PatternMatchSequence {
                 patterns: vec![],
                 range: self.node_range(start),
+                node_index: AtomicNodeIndex::dummy(),
             });
         }
 
@@ -360,6 +374,7 @@ impl<'src> Parser<'src> {
         ast::PatternMatchSequence {
             range: self.node_range(start),
             patterns,
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -374,6 +389,7 @@ impl<'src> Parser<'src> {
                 Pattern::MatchSingleton(ast::PatternMatchSingleton {
                     value: Singleton::None,
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::dummy(),
                 })
             }
             TokenKind::True => {
@@ -381,6 +397,7 @@ impl<'src> Parser<'src> {
                 Pattern::MatchSingleton(ast::PatternMatchSingleton {
                     value: Singleton::True,
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::dummy(),
                 })
             }
             TokenKind::False => {
@@ -388,14 +405,16 @@ impl<'src> Parser<'src> {
                 Pattern::MatchSingleton(ast::PatternMatchSingleton {
                     value: Singleton::False,
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::dummy(),
                 })
             }
-            TokenKind::String | TokenKind::FStringStart => {
+            TokenKind::String | TokenKind::FStringStart | TokenKind::TStringStart => {
                 let str = self.parse_strings();
 
                 Pattern::MatchValue(ast::PatternMatchValue {
                     value: Box::new(str),
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::dummy(),
                 })
             }
             TokenKind::Complex => {
@@ -408,8 +427,10 @@ impl<'src> Parser<'src> {
                     value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Complex { real, imag },
                         range,
+                        node_index: AtomicNodeIndex::dummy(),
                     })),
                     range,
+                    node_index: AtomicNodeIndex::dummy(),
                 })
             }
             TokenKind::Int => {
@@ -422,8 +443,10 @@ impl<'src> Parser<'src> {
                     value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Int(value),
                         range,
+                        node_index: AtomicNodeIndex::dummy(),
                     })),
                     range,
+                    node_index: AtomicNodeIndex::dummy(),
                 })
             }
             TokenKind::Float => {
@@ -436,8 +459,10 @@ impl<'src> Parser<'src> {
                     value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: Number::Float(value),
                         range,
+                        node_index: AtomicNodeIndex::dummy(),
                     })),
                     range,
+                    node_index: AtomicNodeIndex::dummy(),
                 })
             }
             kind => {
@@ -464,6 +489,7 @@ impl<'src> Parser<'src> {
                         return Pattern::MatchValue(ast::PatternMatchValue {
                             value: Box::new(Expr::UnaryOp(unary_expr)),
                             range: self.node_range(start),
+                            node_index: AtomicNodeIndex::dummy(),
                         });
                     }
                 }
@@ -483,23 +509,28 @@ impl<'src> Parser<'src> {
                         Pattern::MatchValue(ast::PatternMatchValue {
                             value: Box::new(attribute),
                             range: self.node_range(start),
+                            node_index: AtomicNodeIndex::dummy(),
                         })
                     } else {
                         // test_ok match_as_pattern_soft_keyword
                         // match foo:
                         //     case case: ...
+                        // match foo:
                         //     case match: ...
+                        // match foo:
                         //     case type: ...
                         let ident = self.parse_identifier();
 
                         // test_ok match_as_pattern
                         // match foo:
                         //     case foo_bar: ...
+                        // match foo:
                         //     case _: ...
                         Pattern::MatchAs(ast::PatternMatchAs {
                             range: ident.range,
                             pattern: None,
                             name: if &ident == "_" { None } else { Some(ident) },
+                            node_index: AtomicNodeIndex::dummy(),
                         })
                     }
                 } else {
@@ -513,10 +544,12 @@ impl<'src> Parser<'src> {
                         range: self.missing_node_range(),
                         id: Name::empty(),
                         ctx: ExprContext::Invalid,
+                        node_index: AtomicNodeIndex::dummy(),
                     });
                     Pattern::MatchValue(ast::PatternMatchValue {
                         range: invalid_node.range(),
                         value: Box::new(invalid_node),
+                        node_index: AtomicNodeIndex::dummy(),
                     })
                 }
             }
@@ -572,8 +605,10 @@ impl<'src> Parser<'src> {
                 op: operator,
                 right: rhs_value,
                 range,
+                node_index: AtomicNodeIndex::dummy(),
             })),
             range,
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -613,12 +648,14 @@ impl<'src> Parser<'src> {
                         range: ident.range(),
                         id: ident.id,
                         ctx: ExprContext::Load,
+                        node_index: AtomicNodeIndex::dummy(),
                     }))
                 } else {
                     Box::new(Expr::Name(ast::ExprName {
                         range: ident.range(),
                         id: Name::empty(),
                         ctx: ExprContext::Invalid,
+                        node_index: AtomicNodeIndex::dummy(),
                     }))
                 }
             }
@@ -670,6 +707,7 @@ impl<'src> Parser<'src> {
                         ast::Identifier {
                             id: Name::empty(),
                             range: parser.missing_node_range(),
+                            node_index: AtomicNodeIndex::dummy(),
                         }
                     };
 
@@ -679,6 +717,7 @@ impl<'src> Parser<'src> {
                         attr: key,
                         pattern: value_pattern,
                         range: parser.node_range(pattern_start),
+                        node_index: AtomicNodeIndex::dummy(),
                     });
                 } else {
                     has_seen_pattern = true;
@@ -704,8 +743,10 @@ impl<'src> Parser<'src> {
                 patterns,
                 keywords,
                 range: self.node_range(arguments_start),
+                node_index: AtomicNodeIndex::dummy(),
             },
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 }

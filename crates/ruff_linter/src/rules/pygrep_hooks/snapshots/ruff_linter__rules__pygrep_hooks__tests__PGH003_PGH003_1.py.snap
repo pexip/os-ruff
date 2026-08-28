@@ -23,6 +23,6 @@ PGH003_1.py:3:41: PGH003 (blanket-type-ignore) Use specific rule codes when igno
 2 | x = 1  # pyright:ignore
 3 | x = 1  # pyright: ignore[attr-defined]  # pyright: ignore
   |                                         ^^^^^^^^^^^^^^^^^ PGH003 (blanket-type-ignore)
-4 | 
+4 |
 5 | x = 1
   |

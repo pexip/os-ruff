@@ -85,7 +85,7 @@ useless_exception_statement.py:34:9: PLW0133 (useless-exception-statement) [*] M
 33 |     def inner():
 34 |         IndexError("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133 (useless-exception-statement)
-35 | 
+35 |
 36 |     inner()
    |
    = help: Add `raise` keyword
@@ -213,3 +213,39 @@ useless_exception_statement.py:71:5: PLW0133 (useless-exception-statement) [*] M
 72 72 | 
 73 73 | 
 74 74 | # Non-violation test cases: PLW0133
+
+useless_exception_statement.py:126:1: PLW0133 (useless-exception-statement) [*] Missing `raise` statement on exception
+    |
+124 | import builtins
+125 |
+126 | builtins.TypeError("still an exception even though it's an Attribute")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133 (useless-exception-statement)
+127 |
+128 | PythonFinalizationError("Added in Python 3.13")
+    |
+    = help: Add `raise` keyword
+
+ℹ Unsafe fix
+123 123 | 
+124 124 | import builtins
+125 125 | 
+126     |-builtins.TypeError("still an exception even though it's an Attribute")
+    126 |+raise builtins.TypeError("still an exception even though it's an Attribute")
+127 127 | 
+128 128 | PythonFinalizationError("Added in Python 3.13")
+
+useless_exception_statement.py:128:1: PLW0133 (useless-exception-statement) [*] Missing `raise` statement on exception
+    |
+126 | builtins.TypeError("still an exception even though it's an Attribute")
+127 |
+128 | PythonFinalizationError("Added in Python 3.13")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133 (useless-exception-statement)
+    |
+    = help: Add `raise` keyword
+
+ℹ Unsafe fix
+125 125 | 
+126 126 | builtins.TypeError("still an exception even though it's an Attribute")
+127 127 | 
+128     |-PythonFinalizationError("Added in Python 3.13")
+    128 |+raise PythonFinalizationError("Added in Python 3.13")

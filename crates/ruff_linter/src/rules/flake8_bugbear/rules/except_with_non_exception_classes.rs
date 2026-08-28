@@ -2,10 +2,10 @@ use std::collections::VecDeque;
 
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, Operator};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -34,21 +34,26 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 /// - [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)
-#[violation]
-pub struct ExceptWithNonExceptionClasses;
+#[derive(ViolationMetadata)]
+pub(crate) struct ExceptWithNonExceptionClasses {
+    is_star: bool,
+}
 
 impl Violation for ExceptWithNonExceptionClasses {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`except` handlers should only be exception classes or tuples of exception classes")
+        if self.is_star {
+            "`except*` handlers should only be exception classes or tuples of exception classes"
+                .to_string()
+        } else {
+            "`except` handlers should only be exception classes or tuples of exception classes"
+                .to_string()
+        }
     }
 }
 
 /// B030
-pub(crate) fn except_with_non_exception_classes(
-    checker: &mut Checker,
-    except_handler: &ExceptHandler,
-) {
+pub(crate) fn except_with_non_exception_classes(checker: &Checker, except_handler: &ExceptHandler) {
     let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
         except_handler;
     let Some(type_) = type_ else {
@@ -59,9 +64,12 @@ pub(crate) fn except_with_non_exception_classes(
             expr,
             Expr::Subscript(_) | Expr::Attribute(_) | Expr::Name(_) | Expr::Call(_),
         ) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ExceptWithNonExceptionClasses, expr.range()));
+            let is_star = checker
+                .semantic()
+                .current_statement()
+                .as_try_stmt()
+                .is_some_and(|try_stmt| try_stmt.is_star);
+            checker.report_diagnostic(ExceptWithNonExceptionClasses { is_star }, expr.range());
         }
     }
 }

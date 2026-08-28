@@ -1,12 +1,13 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::PythonWhitespace;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::Locator;
+use crate::checkers::ast::LintContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks if inline comments are separated by at least two spaces.
@@ -29,17 +30,17 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct TooFewSpacesBeforeInlineComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct TooFewSpacesBeforeInlineComment;
 
 impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Insert at least two spaces before an inline comment")
+        "Insert at least two spaces before an inline comment".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Insert spaces")
+        "Insert spaces".to_string()
     }
 }
 
@@ -65,17 +66,17 @@ impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct NoSpaceAfterInlineComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSpaceAfterInlineComment;
 
 impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Inline comment should start with `# `")
+        "Inline comment should start with `# `".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Format space")
+        "Format space".to_string()
     }
 }
 
@@ -102,17 +103,17 @@ impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct NoSpaceAfterBlockComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSpaceAfterBlockComment;
 
 impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Block comment should start with `# `")
+        "Block comment should start with `# `".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Format space")
+        "Format space".to_string()
     }
 }
 
@@ -148,17 +149,17 @@ impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
-#[violation]
-pub struct MultipleLeadingHashesForBlockComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleLeadingHashesForBlockComment;
 
 impl AlwaysFixableViolation for MultipleLeadingHashesForBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Too many leading `#` before block comment")
+        "Too many leading `#` before block comment".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove leading `#`")
+        "Remove leading `#`".to_string()
     }
 }
 
@@ -166,7 +167,7 @@ impl AlwaysFixableViolation for MultipleLeadingHashesForBlockComment {
 pub(crate) fn whitespace_before_comment(
     line: &LogicalLine,
     locator: &Locator,
-    context: &mut LogicalLinesContext,
+    context: &LintContext,
 ) {
     let mut prev_end = TextSize::default();
     for token in line.tokens() {
@@ -184,15 +185,15 @@ pub(crate) fn whitespace_before_comment(
             let is_inline_comment = !line_text.trim_whitespace().is_empty();
             if is_inline_comment {
                 if range.start() - prev_end < "  ".text_len() {
-                    let mut diagnostic = Diagnostic::new(
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                         TooFewSpacesBeforeInlineComment,
                         TextRange::new(prev_end, range.start()),
-                    );
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        "  ".to_string(),
-                        TextRange::new(prev_end, range.start()),
-                    )));
-                    context.push_diagnostic(diagnostic);
+                    ) {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            "  ".to_string(),
+                            TextRange::new(prev_end, range.start()),
+                        )));
+                    }
                 }
             }
 
@@ -209,30 +210,36 @@ pub(crate) fn whitespace_before_comment(
 
             if is_inline_comment {
                 if bad_prefix.is_some() || comment.chars().next().is_some_and(char::is_whitespace) {
-                    let mut diagnostic = Diagnostic::new(NoSpaceAfterInlineComment, range);
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        format_leading_space(token_text),
-                        range,
-                    )));
-                    context.push_diagnostic(diagnostic);
-                }
-            } else if let Some(bad_prefix) = bad_prefix {
-                if bad_prefix != '!' || !line.is_start_of_file() {
-                    if bad_prefix != '#' {
-                        let mut diagnostic = Diagnostic::new(NoSpaceAfterBlockComment, range);
+                    if let Some(mut diagnostic) =
+                        context.report_diagnostic_if_enabled(NoSpaceAfterInlineComment, range)
+                    {
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                             format_leading_space(token_text),
                             range,
                         )));
-                        context.push_diagnostic(diagnostic);
+                    }
+                }
+            } else if let Some(bad_prefix) = bad_prefix {
+                if bad_prefix != '!' || !line.is_start_of_file() {
+                    if bad_prefix != '#' {
+                        if let Some(mut diagnostic) =
+                            context.report_diagnostic_if_enabled(NoSpaceAfterBlockComment, range)
+                        {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                format_leading_space(token_text),
+                                range,
+                            )));
+                        }
                     } else if !comment.is_empty() {
-                        let mut diagnostic =
-                            Diagnostic::new(MultipleLeadingHashesForBlockComment, range);
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            format_leading_hashes(token_text),
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                            MultipleLeadingHashesForBlockComment,
                             range,
-                        )));
-                        context.push_diagnostic(diagnostic);
+                        ) {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                format_leading_hashes(token_text),
+                                range,
+                            )));
+                        }
                     }
                 }
             }

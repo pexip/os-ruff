@@ -1,9 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator};
+use ruff_python_semantic::{SemanticModel, analyze::typing::traverse_union};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `typing.NoReturn` and `typing.Never` in union types.
@@ -33,13 +34,15 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
-#[violation]
-pub struct NeverUnion {
+#[derive(ViolationMetadata)]
+pub(crate) struct NeverUnion {
     never_like: NeverLike,
     union_like: UnionLike,
 }
 
-impl AlwaysFixableViolation for NeverUnion {
+impl Violation for NeverUnion {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self {
@@ -47,7 +50,7 @@ impl AlwaysFixableViolation for NeverUnion {
             union_like,
         } = self;
         match union_like {
-            UnionLike::BinOp => {
+            UnionLike::PEP604 => {
                 format!("`{never_like} | T` is equivalent to `T`")
             }
             UnionLike::TypingUnion => {
@@ -56,14 +59,14 @@ impl AlwaysFixableViolation for NeverUnion {
         }
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let Self { never_like, .. } = self;
-        format!("Remove `{never_like}`")
+        Some(format!("Remove `{never_like}`"))
     }
 }
 
 /// RUF020
-pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
     match expr {
         // Ex) `typing.NoReturn | int`
         Expr::BinOp(ast::ExprBinOp {
@@ -71,37 +74,45 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
             left,
             right,
             range: _,
+            node_index: _,
         }) => {
             // Analyze the left-hand side of the `|` operator.
             if let Some(never_like) = NeverLike::from_expr(left, checker.semantic()) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     NeverUnion {
                         never_like,
-                        union_like: UnionLike::BinOp,
+                        union_like: UnionLike::PEP604,
                     },
                     left.range(),
                 );
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    checker.locator().slice(right.as_ref()).to_string(),
-                    expr.range(),
-                )));
-                checker.diagnostics.push(diagnostic);
+                // Avoid producing code that would raise an exception when
+                // `Never | None` would be fixed to `None | None`.
+                // Instead do not provide a fix. No action needed for `typing.Union`,
+                // as `Union[None, None]` is valid Python.
+                // See https://github.com/astral-sh/ruff/issues/14567.
+                if !is_pep604_union_with_bare_none(checker.semantic()) {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        checker.locator().slice(right.as_ref()).to_string(),
+                        expr.range(),
+                    )));
+                }
             }
 
             // Analyze the right-hand side of the `|` operator.
             if let Some(never_like) = NeverLike::from_expr(right, checker.semantic()) {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     NeverUnion {
                         never_like,
-                        union_like: UnionLike::BinOp,
+                        union_like: UnionLike::PEP604,
                     },
                     right.range(),
                 );
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    checker.locator().slice(left.as_ref()).to_string(),
-                    expr.range(),
-                )));
-                checker.diagnostics.push(diagnostic);
+                if !is_pep604_union_with_bare_none(checker.semantic()) {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        checker.locator().slice(left.as_ref()).to_string(),
+                        expr.range(),
+                    )));
+                }
             }
         }
 
@@ -111,6 +122,7 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
             slice,
             ctx: _,
             range: _,
+            node_index: _,
         }) if checker.semantic().match_typing_expr(value, "Union") => {
             let Expr::Tuple(tuple_slice) = &**slice else {
                 return;
@@ -131,7 +143,7 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                         return;
                     }
 
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         NeverUnion {
                             never_like,
                             union_like: UnionLike::TypingUnion,
@@ -152,15 +164,16 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                                         elts: rest,
                                         ctx: ast::ExprContext::Load,
                                         range: TextRange::default(),
+                                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                                         parenthesized: true,
                                     })),
                                     ctx: ast::ExprContext::Load,
                                     range: TextRange::default(),
+                                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                                 }))
                         },
                         expr.range(),
                     )));
-                    checker.diagnostics.push(diagnostic);
                 }
             }
         }
@@ -174,7 +187,7 @@ enum UnionLike {
     /// E.g., `typing.Union[int, str]`
     TypingUnion,
     /// E.g., `int | str`
-    BinOp,
+    PEP604,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -205,4 +218,45 @@ impl std::fmt::Display for NeverLike {
             NeverLike::Never => f.write_str("Never"),
         }
     }
+}
+
+/// Return `true` if this union is a [PEP 604 union] that contains `None`,
+/// e.g. `int | Never | None`.
+///
+/// Autofixing these unions can be dangerous,
+/// as `None | None` results in a runtime exception in Python.
+///
+/// [PEP 604 union]: https://docs.python.org/3/library/stdtypes.html#types-union
+fn is_pep604_union_with_bare_none(semantic: &SemanticModel) -> bool {
+    let enclosing_pep604_union = semantic
+        .current_expressions()
+        .skip(1)
+        .take_while(|expr| {
+            matches!(
+                expr,
+                Expr::BinOp(ExprBinOp {
+                    op: Operator::BitOr,
+                    ..
+                })
+            )
+        })
+        .last();
+
+    let Some(enclosing_pep604_union) = enclosing_pep604_union else {
+        return false;
+    };
+
+    let mut union_contains_bare_none = false;
+
+    traverse_union(
+        &mut |expr, _| {
+            if matches!(expr, Expr::NoneLiteral(_)) {
+                union_contains_bare_none = true;
+            }
+        },
+        semantic,
+        enclosing_pep604_union,
+    );
+
+    union_contains_bare_none
 }

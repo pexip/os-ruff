@@ -1,17 +1,17 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::is_known_dunder_method;
 
 /// ## What it does
-/// Checks for misspelled and unknown dunder names in method definitions.
+/// Checks for dunder methods that have no special meaning in Python 3.
 ///
 /// ## Why is this bad?
-/// Misspelled dunder name methods may cause your code to not function
+/// Misspelled or no longer supported dunder name methods may cause your code to not function
 /// as expected.
 ///
 /// Since dunder methods are associated with customizing the behavior
@@ -42,8 +42,8 @@ use crate::rules::pylint::helpers::is_known_dunder_method;
 ///
 /// ## Options
 /// - `lint.pylint.allow-dunder-method-names`
-#[violation]
-pub struct BadDunderMethodName {
+#[derive(ViolationMetadata)]
+pub(crate) struct BadDunderMethodName {
     name: String,
 }
 
@@ -51,12 +51,16 @@ impl Violation for BadDunderMethodName {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadDunderMethodName { name } = self;
-        format!("Bad or misspelled dunder method name `{name}`")
+        format!("Dunder method `{name}` has no special meaning in Python 3")
     }
 }
 
 /// PLW3201
-pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFunctionDef) {
+pub(crate) fn bad_dunder_method_name(checker: &Checker, method: &ast::StmtFunctionDef) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     // If the name isn't a dunder, skip it.
     if !method.name.starts_with('_') || !method.name.ends_with('_') {
         return;
@@ -65,7 +69,7 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFu
     // If the name is explicitly allowed, skip it.
     if is_known_dunder_method(&method.name)
         || checker
-            .settings
+            .settings()
             .pylint
             .allow_dunder_method_names
             .contains(method.name.as_str())
@@ -78,10 +82,10 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFu
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(
         BadDunderMethodName {
             name: method.name.to_string(),
         },
         method.identifier(),
-    ));
+    );
 }

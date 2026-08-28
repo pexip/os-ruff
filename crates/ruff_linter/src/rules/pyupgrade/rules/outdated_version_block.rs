@@ -2,17 +2,19 @@ use std::cmp::Ordering;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
+use ruff_python_ast::stmt_if::{BranchKind, IfElifBranch, if_elif_branches};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Int, StmtIf};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{adjust_indentation, delete_stmt};
-use crate::settings::types::PythonVersion;
+use crate::{Edit, Fix, FixAvailability, Violation};
+use ruff_python_ast::PythonVersion;
+use ruff_python_semantic::SemanticModel;
 
 /// ## What it does
 /// Checks for conditional blocks gated on `sys.version_info` comparisons
@@ -43,10 +45,14 @@ use crate::settings::types::PythonVersion;
 /// ## Options
 /// - `target-version`
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe because it will remove all code,
+/// comments, and annotations within unreachable version blocks.
+///
 /// ## References
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
-#[violation]
-pub struct OutdatedVersionBlock {
+#[derive(ViolationMetadata)]
+pub(crate) struct OutdatedVersionBlock {
     reason: Reason,
 }
 
@@ -55,17 +61,19 @@ impl Violation for OutdatedVersionBlock {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let OutdatedVersionBlock { reason } = self;
-        match reason {
-            Reason::Outdated => format!("Version block is outdated for minimum Python version"),
-            Reason::Invalid => format!("Version specifier is invalid"),
+        match self.reason {
+            Reason::AlwaysFalse | Reason::AlwaysTrue => {
+                "Version block is outdated for minimum Python version".to_string()
+            }
+            Reason::Invalid => "Version specifier is invalid".to_string(),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let OutdatedVersionBlock { reason } = self;
-        match reason {
-            Reason::Outdated => Some("Remove outdated version block".to_string()),
+        match self.reason {
+            Reason::AlwaysFalse | Reason::AlwaysTrue => {
+                Some("Remove outdated version block".to_string())
+            }
             Reason::Invalid => None,
         }
     }
@@ -73,18 +81,20 @@ impl Violation for OutdatedVersionBlock {
 
 #[derive(Debug, PartialEq, Eq)]
 enum Reason {
-    Outdated,
+    AlwaysTrue,
+    AlwaysFalse,
     Invalid,
 }
 
 /// UP036
-pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
+pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
     for branch in if_elif_branches(stmt_if) {
         let Expr::Compare(ast::ExprCompare {
             left,
             ops,
             comparators,
             range: _,
+            node_index: _,
         }) = &branch.test
         else {
             continue;
@@ -94,14 +104,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
             continue;
         };
 
-        // Detect `sys.version_info`, along with slices (like `sys.version_info[:2]`).
-        if !checker
-            .semantic()
-            .resolve_qualified_name(map_subscript(left))
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["sys", "version_info"])
-            })
-        {
+        if !is_valid_version_info(checker.semantic(), left) {
             continue;
         }
 
@@ -111,7 +114,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                     let Some(version) = extract_version(elts) else {
                         return;
                     };
-                    let target = checker.settings.target_version;
+                    let target = checker.target_version();
                     match version_always_less_than(
                         &version,
                         target,
@@ -121,9 +124,13 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                     ) {
                         Ok(false) => {}
                         Ok(true) => {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = checker.report_diagnostic(
                                 OutdatedVersionBlock {
-                                    reason: Reason::Outdated,
+                                    reason: if op.is_lt() || op.is_lt_e() {
+                                        Reason::AlwaysFalse
+                                    } else {
+                                        Reason::AlwaysTrue
+                                    },
                                 },
                                 branch.test.range(),
                             );
@@ -134,15 +141,14 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                             } {
                                 diagnostic.set_fix(fix);
                             }
-                            checker.diagnostics.push(diagnostic);
                         }
                         Err(_) => {
-                            checker.diagnostics.push(Diagnostic::new(
+                            checker.report_diagnostic(
                                 OutdatedVersionBlock {
                                     reason: Reason::Invalid,
                                 },
                                 comparison.range(),
-                            ));
+                            );
                         }
                     }
                 }
@@ -152,41 +158,48 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                 value: ast::Number::Int(int),
                 ..
             }) => {
-                if op == &CmpOp::Eq {
-                    match int.as_u8() {
-                        Some(2) => {
-                            let mut diagnostic = Diagnostic::new(
-                                OutdatedVersionBlock {
-                                    reason: Reason::Outdated,
-                                },
-                                branch.test.range(),
-                            );
-                            if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
-                                diagnostic.set_fix(fix);
-                            }
-                            checker.diagnostics.push(diagnostic);
+                let reason = match (int.as_u8(), op) {
+                    (Some(2), CmpOp::Eq) => Reason::AlwaysFalse,
+                    (Some(3), CmpOp::Eq) => Reason::AlwaysTrue,
+                    (Some(2), CmpOp::NotEq) => Reason::AlwaysTrue,
+                    (Some(3), CmpOp::NotEq) => Reason::AlwaysFalse,
+                    (Some(2), CmpOp::Lt) => Reason::AlwaysFalse,
+                    (Some(3), CmpOp::Lt) => Reason::AlwaysFalse,
+                    (Some(2), CmpOp::LtE) => Reason::AlwaysFalse,
+                    (Some(3), CmpOp::LtE) => Reason::AlwaysTrue,
+                    (Some(2), CmpOp::Gt) => Reason::AlwaysTrue,
+                    (Some(3), CmpOp::Gt) => Reason::AlwaysFalse,
+                    (Some(2), CmpOp::GtE) => Reason::AlwaysTrue,
+                    (Some(3), CmpOp::GtE) => Reason::AlwaysTrue,
+                    (None, _) => Reason::Invalid,
+                    _ => return,
+                };
+                match reason {
+                    Reason::AlwaysTrue => {
+                        let mut diagnostic = checker.report_diagnostic(
+                            OutdatedVersionBlock { reason },
+                            branch.test.range(),
+                        );
+                        if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
+                            diagnostic.set_fix(fix);
                         }
-                        Some(3) => {
-                            let mut diagnostic = Diagnostic::new(
-                                OutdatedVersionBlock {
-                                    reason: Reason::Outdated,
-                                },
-                                branch.test.range(),
-                            );
-                            if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
-                                diagnostic.set_fix(fix);
-                            }
-                            checker.diagnostics.push(diagnostic);
+                    }
+                    Reason::AlwaysFalse => {
+                        let mut diagnostic = checker.report_diagnostic(
+                            OutdatedVersionBlock { reason },
+                            branch.test.range(),
+                        );
+                        if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
+                            diagnostic.set_fix(fix);
                         }
-                        None => {
-                            checker.diagnostics.push(Diagnostic::new(
-                                OutdatedVersionBlock {
-                                    reason: Reason::Invalid,
-                                },
-                                comparison.range(),
-                            ));
-                        }
-                        _ => {}
+                    }
+                    Reason::Invalid => {
+                        checker.report_diagnostic(
+                            OutdatedVersionBlock {
+                                reason: Reason::Invalid,
+                            },
+                            comparison.range(),
+                        );
                     }
                 }
             }
@@ -223,14 +236,27 @@ fn version_always_less_than(
                 return Err(anyhow::anyhow!("invalid minor version: {if_minor}"));
             };
 
+            let if_micro = match check_version_iter.next() {
+                None => None,
+                Some(micro) => match micro.as_u8() {
+                    Some(micro) => Some(micro),
+                    None => anyhow::bail!("invalid micro version: {micro}"),
+                },
+            };
+
             Ok(if or_equal {
                 // Ex) `sys.version_info <= 3.8`. If Python 3.8 is the minimum supported version,
                 // the condition won't always evaluate to `false`, so we want to return `false`.
                 if_minor < py_minor
             } else {
-                // Ex) `sys.version_info < 3.8`. If Python 3.8 is the minimum supported version,
-                // the condition _will_ always evaluate to `false`, so we want to return `true`.
-                if_minor <= py_minor
+                if let Some(if_micro) = if_micro {
+                    // Ex) `sys.version_info < 3.8.3`
+                    if_minor < py_minor || if_minor == py_minor && if_micro == 0
+                } else {
+                    // Ex) `sys.version_info < 3.8`. If Python 3.8 is the minimum supported version,
+                    // the condition _will_ always evaluate to `false`, so we want to return `true`.
+                    if_minor <= py_minor
+                }
             })
         }
     }
@@ -285,7 +311,7 @@ fn fix_always_false_branch(
             }) => {
                 let start = body.first()?;
                 let end = body.last()?;
-                if indentation(checker.locator(), start).is_none() {
+                if indentation(checker.source(), start).is_none() {
                     // Inline `else` block (e.g., `else: x = 1`).
                     Some(Fix::unsafe_edit(Edit::range_replacement(
                         checker
@@ -295,7 +321,7 @@ fn fix_always_false_branch(
                         stmt_if.range(),
                     )))
                 } else {
-                    indentation(checker.locator(), stmt_if)
+                    indentation(checker.source(), stmt_if)
                         .and_then(|indentation| {
                             adjust_indentation(
                                 TextRange::new(
@@ -353,7 +379,7 @@ fn fix_always_false_branch(
 /// if sys.version_info >= (3, 8): ...
 /// ```
 fn fix_always_true_branch(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt_if: &StmtIf,
     branch: &IfElifBranch,
 ) -> Option<Fix> {
@@ -363,7 +389,7 @@ fn fix_always_true_branch(
             // the rest.
             let start = branch.body.first()?;
             let end = branch.body.last()?;
-            if indentation(checker.locator(), start).is_none() {
+            if indentation(checker.source(), start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
                 Some(Fix::unsafe_edit(Edit::range_replacement(
                     checker
@@ -373,7 +399,7 @@ fn fix_always_true_branch(
                     stmt_if.range,
                 )))
             } else {
-                indentation(checker.locator(), &stmt_if)
+                indentation(checker.source(), &stmt_if)
                     .and_then(|indentation| {
                         adjust_indentation(
                             TextRange::new(checker.locator().line_start(start.start()), end.end()),
@@ -424,23 +450,38 @@ fn extract_version(elts: &[Expr]) -> Option<Vec<Int>> {
     Some(version)
 }
 
+/// Returns `true` if the expression is related to `sys.version_info`.
+///
+/// This includes:
+/// - Direct access: `sys.version_info`
+/// - Subscript access: `sys.version_info[:2]`, `sys.version_info[0]`
+/// - Major version attribute: `sys.version_info.major`
+fn is_valid_version_info(semantic: &SemanticModel, left: &Expr) -> bool {
+    semantic
+        .resolve_qualified_name(map_subscript(left))
+        .is_some_and(|name| matches!(name.segments(), ["sys", "version_info"]))
+        || semantic
+            .resolve_qualified_name(left)
+            .is_some_and(|name| matches!(name.segments(), ["sys", "version_info", "major"]))
+}
+
 #[cfg(test)]
 mod tests {
     use test_case::test_case;
 
     use super::*;
 
-    #[test_case(PythonVersion::Py37, & [2], true, true; "compare-2.0")]
-    #[test_case(PythonVersion::Py37, & [2, 0], true, true; "compare-2.0-whole")]
-    #[test_case(PythonVersion::Py37, & [3], true, true; "compare-3.0")]
-    #[test_case(PythonVersion::Py37, & [3, 0], true, true; "compare-3.0-whole")]
-    #[test_case(PythonVersion::Py37, & [3, 1], true, true; "compare-3.1")]
-    #[test_case(PythonVersion::Py37, & [3, 5], true, true; "compare-3.5")]
-    #[test_case(PythonVersion::Py37, & [3, 7], true, false; "compare-3.7")]
-    #[test_case(PythonVersion::Py37, & [3, 7], false, true; "compare-3.7-not-equal")]
-    #[test_case(PythonVersion::Py37, & [3, 8], false, false; "compare-3.8")]
-    #[test_case(PythonVersion::Py310, & [3, 9], true, true; "compare-3.9")]
-    #[test_case(PythonVersion::Py310, & [3, 11], true, false; "compare-3.11")]
+    #[test_case(PythonVersion::PY37, & [2], true, true; "compare-2.0")]
+    #[test_case(PythonVersion::PY37, & [2, 0], true, true; "compare-2.0-whole")]
+    #[test_case(PythonVersion::PY37, & [3], true, true; "compare-3.0")]
+    #[test_case(PythonVersion::PY37, & [3, 0], true, true; "compare-3.0-whole")]
+    #[test_case(PythonVersion::PY37, & [3, 1], true, true; "compare-3.1")]
+    #[test_case(PythonVersion::PY37, & [3, 5], true, true; "compare-3.5")]
+    #[test_case(PythonVersion::PY37, & [3, 7], true, false; "compare-3.7")]
+    #[test_case(PythonVersion::PY37, & [3, 7], false, true; "compare-3.7-not-equal")]
+    #[test_case(PythonVersion::PY37, & [3, 8], false, false; "compare-3.8")]
+    #[test_case(PythonVersion::PY310, & [3, 9], true, true; "compare-3.9")]
+    #[test_case(PythonVersion::PY310, & [3, 11], true, false; "compare-3.11")]
     fn test_compare_version(
         version: PythonVersion,
         target_versions: &[u8],

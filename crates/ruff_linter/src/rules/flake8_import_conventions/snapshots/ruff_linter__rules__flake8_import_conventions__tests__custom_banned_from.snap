@@ -23,14 +23,14 @@ custom_banned_from.py:3:1: ICN003 (banned-import-from) Members of `typing` shoul
 2 | from typing import Any, Dict  # banned
 3 | from typing import *  # banned
   | ^^^^^^^^^^^^^^^^^^^^ ICN003 (banned-import-from)
-4 | 
+4 |
 5 | from pandas import DataFrame  # banned
   |
 
 custom_banned_from.py:5:1: ICN003 (banned-import-from) Members of `pandas` should not be imported explicitly
   |
 3 | from typing import *  # banned
-4 | 
+4 |
 5 | from pandas import DataFrame  # banned
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN003 (banned-import-from)
 6 | from pandas import *  # banned
@@ -41,6 +41,6 @@ custom_banned_from.py:6:1: ICN003 (banned-import-from) Members of `pandas` shoul
 5 | from pandas import DataFrame  # banned
 6 | from pandas import *  # banned
   | ^^^^^^^^^^^^^^^^^^^^ ICN003 (banned-import-from)
-7 | 
+7 |
 8 | import logging.config  # ok
   |

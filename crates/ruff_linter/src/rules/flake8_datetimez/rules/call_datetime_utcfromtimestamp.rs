@@ -1,13 +1,13 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers;
+use crate::rules::flake8_datetimez::helpers;
 
 /// ## What it does
 /// Checks for usage of `datetime.datetime.utcfromtimestamp()`.
@@ -46,13 +46,13 @@ use super::helpers;
 ///
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
-#[violation]
-pub struct CallDatetimeUtcfromtimestamp;
+#[derive(ViolationMetadata)]
+pub(crate) struct CallDatetimeUtcfromtimestamp;
 
 impl Violation for CallDatetimeUtcfromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`datetime.datetime.utcfromtimestamp()` used")
+        "`datetime.datetime.utcfromtimestamp()` used".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -60,11 +60,8 @@ impl Violation for CallDatetimeUtcfromtimestamp {
     }
 }
 
-pub(crate) fn call_datetime_utcfromtimestamp(
-    checker: &mut Checker,
-    func: &Expr,
-    location: TextRange,
-) {
+/// DTZ004
+pub(crate) fn call_datetime_utcfromtimestamp(checker: &Checker, func: &Expr, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -82,11 +79,9 @@ pub(crate) fn call_datetime_utcfromtimestamp(
         return;
     }
 
-    if helpers::parent_expr_is_astimezone(checker) {
+    if helpers::followed_by_astimezone(checker) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(CallDatetimeUtcfromtimestamp, location));
+    checker.report_diagnostic(CallDatetimeUtcfromtimestamp, location);
 }

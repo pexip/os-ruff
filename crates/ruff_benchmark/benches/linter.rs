@@ -1,14 +1,18 @@
-use ruff_benchmark::criterion::{
-    criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
+use ruff_benchmark::criterion;
+
+use criterion::{
+    BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
 };
-use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
-use ruff_linter::linter::{lint_only, ParseSource};
+use ruff_benchmark::{
+    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
+};
+use ruff_linter::linter::{ParseSource, lint_only};
 use ruff_linter::rule_selector::PreviewOptions;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::PreviewMode;
-use ruff_linter::settings::{flags, LinterSettings};
+use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::source_kind::SourceKind;
-use ruff_linter::{registry::Rule, RuleSelector};
+use ruff_linter::{RuleSelector, registry::Rule};
 use ruff_python_ast::PySourceType;
 use ruff_python_parser::parse_module;
 
@@ -28,24 +32,36 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
-    Ok(vec![
-        TestCase::fast(TestFile::try_download("numpy/globals.py", "https://raw.githubusercontent.com/numpy/numpy/89d64415e349ca75a25250f22b874aa16e5c0973/numpy/_globals.py")?),
-        TestCase::fast(TestFile::try_download("unicode/pypinyin.py", "https://raw.githubusercontent.com/mozillazg/python-pinyin/9521e47d96e3583a5477f5e43a2e82d513f27a3f/pypinyin/standard.py")?),
-        TestCase::normal(TestFile::try_download(
-            "pydantic/types.py",
-            "https://raw.githubusercontent.com/pydantic/pydantic/83b3c49e99ceb4599d9286a3d793cea44ac36d4b/pydantic/types.py",
-        )?),
-        TestCase::normal(TestFile::try_download("numpy/ctypeslib.py", "https://raw.githubusercontent.com/numpy/numpy/e42c9503a14d66adfd41356ef5640c6975c45218/numpy/ctypeslib.py")?),
-        TestCase::slow(TestFile::try_download(
-            "large/dataset.py",
-            "https://raw.githubusercontent.com/DHI/mikeio/b7d26418f4db2909b0aa965253dbe83194d7bb5b/tests/test_dataset.py",
-        )?),
-    ])
+// Disable decay after 10s because it can show up as *random* slow allocations
+// in benchmarks. We don't need purging in benchmarks because it isn't important
+// to give unallocated pages back to the OS.
+// https://jemalloc.net/jemalloc.3.html#opt.dirty_decay_ms
+#[cfg(all(
+    not(target_os = "windows"),
+    not(target_os = "openbsd"),
+    any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "powerpc64"
+    )
+))]
+#[unsafe(export_name = "_rjem_malloc_conf")]
+#[expect(non_upper_case_globals)]
+#[expect(unsafe_code)]
+pub static _rjem_malloc_conf: &[u8] = b"dirty_decay_ms:-1,muzzy_decay_ms:-1\0";
+
+fn create_test_cases() -> Vec<TestCase> {
+    vec![
+        TestCase::fast(NUMPY_GLOBALS.clone()),
+        TestCase::fast(UNICODE_PYPINYIN.clone()),
+        TestCase::normal(PYDANTIC_TYPES.clone()),
+        TestCase::normal(NUMPY_CTYPESLIB.clone()),
+        TestCase::slow(LARGE_DATASET.clone()),
+    ]
 }
 
 fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
-    let test_cases = create_test_cases().unwrap();
+    let test_cases = create_test_cases();
 
     for case in test_cases {
         group.throughput(Throughput::Bytes(case.code().len() as u64));
@@ -73,7 +89,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                         );
 
                         // Assert that file contains no parse errors
-                        assert!(!result.has_syntax_error);
+                        assert!(!result.has_syntax_errors());
                     },
                     criterion::BatchSize::SmallInput,
                 );

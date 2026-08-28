@@ -88,3 +88,39 @@ nan_comparison.py:53:9: PLW0177 (nan-comparison) Comparing against a NaN value; 
    |         ^^^^^^^^^^^^^^^^^^^^^ PLW0177 (nan-comparison)
 54 |     pass
    |
+
+nan_comparison.py:59:10: PLW0177 (nan-comparison) Comparing against a NaN value; use `np.isnan` instead
+   |
+57 | match number:
+58 |     # Errors
+59 |     case np.nan: ...
+   |          ^^^^^^ PLW0177 (nan-comparison)
+60 |     case math.nan: ...
+   |
+
+nan_comparison.py:60:10: PLW0177 (nan-comparison) Comparing against a NaN value; use `math.isnan` instead
+   |
+58 |     # Errors
+59 |     case np.nan: ...
+60 |     case math.nan: ...
+   |          ^^^^^^^^ PLW0177 (nan-comparison)
+61 |
+62 |     # No errors
+   |
+
+nan_comparison.py:98:13: PLW0177 (nan-comparison) Comparing against a NaN value; use `math.isnan` instead
+   |
+96 | # PLW0117
+97 | # https://github.com/astral-sh/ruff/issues/18596
+98 | assert x == float("-NaN ")
+   |             ^^^^^^^^^^^^^^ PLW0177 (nan-comparison)
+99 | assert x == float(" \n+nan   \t")
+   |
+
+nan_comparison.py:99:13: PLW0177 (nan-comparison) Comparing against a NaN value; use `math.isnan` instead
+   |
+97 | # https://github.com/astral-sh/ruff/issues/18596
+98 | assert x == float("-NaN ")
+99 | assert x == float(" \n+nan   \t")
+   |             ^^^^^^^^^^^^^^^^^^^^^ PLW0177 (nan-comparison)
+   |

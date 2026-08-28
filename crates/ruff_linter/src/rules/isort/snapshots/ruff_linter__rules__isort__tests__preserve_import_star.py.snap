@@ -9,6 +9,7 @@ preserve_import_star.py:1:1: I001 (unsorted-imports) [*] Import block is un-sort
 4 | | from some_module import some_class  # Aside
 5 | | # Above
 6 | | from some_module import *  # Aside
+  | |_________________________^ I001 (unsorted-imports)
   |
   = help: Organize imports
 

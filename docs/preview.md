@@ -12,7 +12,7 @@ Enabling preview mode does not on its own enable all preview rules. See the [rul
 Preview mode can be enabled with the `--preview` flag on the CLI or by setting `preview = true` in your Ruff
 configuration file.
 
-Preview mode can be configured separately for linting and formatting (requires Ruff v0.1.1+). To enable preview lint rules without preview style formatting:
+Preview mode can be configured separately for linting and formatting. To enable preview lint rules without preview style formatting:
 
 === "pyproject.toml"
 
@@ -177,7 +177,7 @@ setting in your configuration file:
     ```
 
 In our previous example, `--select` with `ALL` `HYP`, `HYP0`, or `HYP00` would not enable `HYP001`. Each preview
-rule will need to be selected with its exact code, e.g. `--select ALL,HYP001`.
+rule will need to be selected with its exact code: for example, `--select ALL,HYP001`.
 
 If preview mode is not enabled, this setting has no effect.
 

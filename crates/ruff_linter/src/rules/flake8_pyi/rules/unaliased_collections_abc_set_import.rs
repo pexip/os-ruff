@@ -1,12 +1,11 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Imported;
 use ruff_python_semantic::{Binding, BindingKind, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-
 use crate::renamer::Renamer;
+use crate::{Applicability, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `from collections.abc import Set` imports that do not alias
@@ -21,12 +20,12 @@ use crate::renamer::Renamer;
 /// `set` builtin.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// from collections.abc import Set
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from collections.abc import Set as AbstractSet
 /// ```
 ///
@@ -40,45 +39,41 @@ use crate::renamer::Renamer;
 /// re-exported if they are included in `__all__`, use a "redundant"
 /// `import foo as foo` alias, or are imported via a `*` import. As such, the
 /// fix is marked as safe in more cases for `.pyi` files.
-#[violation]
-pub struct UnaliasedCollectionsAbcSetImport;
+#[derive(ViolationMetadata)]
+pub(crate) struct UnaliasedCollectionsAbcSetImport;
 
 impl Violation for UnaliasedCollectionsAbcSetImport {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin"
-        )
+        "Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Alias `Set` to `AbstractSet`"))
+        Some("Alias `Set` to `AbstractSet`".to_string())
     }
 }
 
 /// PYI025
-pub(crate) fn unaliased_collections_abc_set_import(
-    checker: &Checker,
-    binding: &Binding,
-) -> Option<Diagnostic> {
+pub(crate) fn unaliased_collections_abc_set_import(checker: &Checker, binding: &Binding) {
     let BindingKind::FromImport(import) = &binding.kind else {
-        return None;
+        return;
     };
     if !matches!(
         import.qualified_name().segments(),
         ["collections", "abc", "Set"]
     ) {
-        return None;
+        return;
     }
 
-    let name = binding.name(checker.locator());
+    let name = binding.name(checker.source());
     if name == "AbstractSet" {
-        return None;
+        return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range());
+    let mut diagnostic =
+        checker.report_diagnostic(UnaliasedCollectionsAbcSetImport, binding.range());
     if checker.semantic().is_available("AbstractSet") {
         diagnostic.try_set_fix(|| {
             let semantic = checker.semantic();
@@ -89,7 +84,6 @@ pub(crate) fn unaliased_collections_abc_set_import(
             Ok(Fix::applicable_edits(edit, rest, applicability))
         });
     }
-    Some(diagnostic)
 }
 
 fn determine_applicability(binding: &Binding, scope: &Scope, checker: &Checker) -> Applicability {

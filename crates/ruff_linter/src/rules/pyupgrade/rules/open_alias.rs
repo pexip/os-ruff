@@ -1,10 +1,10 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `io.open`.
@@ -29,15 +29,15 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `io.open`](https://docs.python.org/3/library/io.html#io.open)
-#[violation]
-pub struct OpenAlias;
+#[derive(ViolationMetadata)]
+pub(crate) struct OpenAlias;
 
 impl Violation for OpenAlias {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use builtin `open`")
+        "Use builtin `open`".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -46,13 +46,13 @@ impl Violation for OpenAlias {
 }
 
 /// UP020
-pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
+pub(crate) fn open_alias(checker: &Checker, expr: &Expr, func: &Expr) {
     if checker
         .semantic()
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["io", "open"]))
     {
-        let mut diagnostic = Diagnostic::new(OpenAlias, expr.range());
+        let mut diagnostic = checker.report_diagnostic(OpenAlias, expr.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
                 "open",
@@ -64,6 +64,5 @@ pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
                 import_edit,
             ))
         });
-        checker.diagnostics.push(diagnostic);
     }
 }

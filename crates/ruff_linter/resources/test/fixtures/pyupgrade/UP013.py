@@ -41,3 +41,14 @@ MyType = TypedDict("MyType", {})
 
 # Empty dict call
 MyType = TypedDict("MyType", dict())
+
+# Unsafe fix if comments are present
+X = TypedDict("X", {
+    "some_config": int,  # important
+})
+
+# Private names should not be reported (OK)
+WithPrivate = TypedDict("WithPrivate", {"__x": int})
+
+# Dunder names should not be reported (OK)
+WithDunder = TypedDict("WithDunder", {"__x__": int})

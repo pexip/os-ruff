@@ -1,26 +1,25 @@
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
-use std::ops::Add;
+use std::sync::LazyLock;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
-use ruff_python_trivia::{textwrap::dedent, Cursor};
-use ruff_source_file::{Line, NewlineWithTrailingNewline};
+use ruff_python_trivia::textwrap::dedent;
+use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::docstrings::Docstring;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
-use crate::docstrings::Docstring;
 use crate::registry::Rule;
+use crate::rules::pydocstyle::helpers::find_underline;
 use crate::rules::pydocstyle::settings::Convention;
+use crate::{AlwaysFixableViolation, Violation};
+use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for over-indented sections in docstrings.
@@ -35,6 +34,9 @@ use crate::rules::pydocstyle::settings::Convention;
 /// consistent indentation. In each section, the header should match the
 /// indentation of the docstring's opening quotes, and the body should be
 /// indented one level further.
+///
+/// This rule is enabled when using the `numpy` and `google` conventions, and
+/// disabled when using the `pep257` convention.
 ///
 /// ## Example
 /// ```python
@@ -86,20 +88,20 @@ use crate::rules::pydocstyle::settings::Convention;
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct SectionNotOverIndented {
+#[derive(ViolationMetadata)]
+pub(crate) struct OverindentedSection {
     name: String,
 }
 
-impl AlwaysFixableViolation for SectionNotOverIndented {
+impl AlwaysFixableViolation for OverindentedSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SectionNotOverIndented { name } = self;
+        let OverindentedSection { name } = self;
         format!("Section is over-indented (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let SectionNotOverIndented { name } = self;
+        let OverindentedSection { name } = self;
         format!("Remove over-indentation from \"{name}\"")
     }
 }
@@ -189,20 +191,20 @@ impl AlwaysFixableViolation for SectionNotOverIndented {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct SectionUnderlineNotOverIndented {
+#[derive(ViolationMetadata)]
+pub(crate) struct OverindentedSectionUnderline {
     name: String,
 }
 
-impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
+impl AlwaysFixableViolation for OverindentedSectionUnderline {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SectionUnderlineNotOverIndented { name } = self;
+        let OverindentedSectionUnderline { name } = self;
         format!("Section underline is over-indented (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let SectionUnderlineNotOverIndented { name } = self;
+        let OverindentedSectionUnderline { name } = self;
         format!("Remove over-indentation from \"{name}\" underline")
     }
 }
@@ -218,6 +220,9 @@ impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
 /// Multiline docstrings are typically composed of a summary line, followed by
 /// a blank line, followed by a series of sections. Each section typically has
 /// a header and a body.
+///
+/// This rule is enabled when using the `numpy` and `google` conventions, and
+/// disabled when using the `pep257` convention.
 ///
 /// ## Example
 /// ```python
@@ -269,20 +274,20 @@ impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct CapitalizeSectionName {
+#[derive(ViolationMetadata)]
+pub(crate) struct NonCapitalizedSectionName {
     name: String,
 }
 
-impl AlwaysFixableViolation for CapitalizeSectionName {
+impl AlwaysFixableViolation for NonCapitalizedSectionName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CapitalizeSectionName { name } = self;
+        let NonCapitalizedSectionName { name } = self;
         format!("Section name should be properly capitalized (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let CapitalizeSectionName { name } = self;
+        let NonCapitalizedSectionName { name } = self;
         format!("Capitalize \"{name}\"")
     }
 }
@@ -367,20 +372,20 @@ impl AlwaysFixableViolation for CapitalizeSectionName {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct NewLineAfterSectionName {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingNewLineAfterSectionName {
     name: String,
 }
 
-impl AlwaysFixableViolation for NewLineAfterSectionName {
+impl AlwaysFixableViolation for MissingNewLineAfterSectionName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NewLineAfterSectionName { name } = self;
+        let MissingNewLineAfterSectionName { name } = self;
         format!("Section name should end with a newline (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let NewLineAfterSectionName { name } = self;
+        let MissingNewLineAfterSectionName { name } = self;
         format!("Add newline after \"{name}\"")
     }
 }
@@ -470,20 +475,20 @@ impl AlwaysFixableViolation for NewLineAfterSectionName {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct DashedUnderlineAfterSection {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingDashedUnderlineAfterSection {
     name: String,
 }
 
-impl AlwaysFixableViolation for DashedUnderlineAfterSection {
+impl AlwaysFixableViolation for MissingDashedUnderlineAfterSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DashedUnderlineAfterSection { name } = self;
+        let MissingDashedUnderlineAfterSection { name } = self;
         format!("Missing dashed underline after section (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let DashedUnderlineAfterSection { name } = self;
+        let MissingDashedUnderlineAfterSection { name } = self;
         format!("Add dashed line under \"{name}\"")
     }
 }
@@ -576,20 +581,20 @@ impl AlwaysFixableViolation for DashedUnderlineAfterSection {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct SectionUnderlineAfterName {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingSectionUnderlineAfterName {
     name: String,
 }
 
-impl AlwaysFixableViolation for SectionUnderlineAfterName {
+impl AlwaysFixableViolation for MissingSectionUnderlineAfterName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SectionUnderlineAfterName { name } = self;
+        let MissingSectionUnderlineAfterName { name } = self;
         format!("Section underline should be in the line following the section's name (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let SectionUnderlineAfterName { name } = self;
+        let MissingSectionUnderlineAfterName { name } = self;
         format!("Add underline to \"{name}\"")
     }
 }
@@ -680,20 +685,20 @@ impl AlwaysFixableViolation for SectionUnderlineAfterName {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct SectionUnderlineMatchesSectionLength {
+#[derive(ViolationMetadata)]
+pub(crate) struct MismatchedSectionUnderlineLength {
     name: String,
 }
 
-impl AlwaysFixableViolation for SectionUnderlineMatchesSectionLength {
+impl AlwaysFixableViolation for MismatchedSectionUnderlineLength {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SectionUnderlineMatchesSectionLength { name } = self;
+        let MismatchedSectionUnderlineLength { name } = self;
         format!("Section underline should match the length of its name (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let SectionUnderlineMatchesSectionLength { name } = self;
+        let MismatchedSectionUnderlineLength { name } = self;
         format!("Adjust underline length to match \"{name}\"")
     }
 }
@@ -777,8 +782,8 @@ impl AlwaysFixableViolation for SectionUnderlineMatchesSectionLength {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct NoBlankLineAfterSection {
+#[derive(ViolationMetadata)]
+pub(crate) struct NoBlankLineAfterSection {
     name: String,
 }
 
@@ -870,8 +875,8 @@ impl AlwaysFixableViolation for NoBlankLineAfterSection {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct NoBlankLineBeforeSection {
+#[derive(ViolationMetadata)]
+pub(crate) struct NoBlankLineBeforeSection {
     name: String,
 }
 
@@ -965,20 +970,20 @@ impl AlwaysFixableViolation for NoBlankLineBeforeSection {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
-#[violation]
-pub struct BlankLineAfterLastSection {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingBlankLineAfterLastSection {
     name: String,
 }
 
-impl AlwaysFixableViolation for BlankLineAfterLastSection {
+impl AlwaysFixableViolation for MissingBlankLineAfterLastSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineAfterLastSection { name } = self;
+        let MissingBlankLineAfterLastSection { name } = self;
         format!("Missing blank line after last section (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let BlankLineAfterLastSection { name } = self;
+        let MissingBlankLineAfterLastSection { name } = self;
         format!("Add blank line after \"{name}\"")
     }
 }
@@ -1049,16 +1054,13 @@ impl AlwaysFixableViolation for BlankLineAfterLastSection {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
-/// ## Options
-/// - `lint.pydocstyle.convention`
-///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct EmptyDocstringSection {
+#[derive(ViolationMetadata)]
+pub(crate) struct EmptyDocstringSection {
     name: String,
 }
 
@@ -1134,20 +1136,20 @@ impl Violation for EmptyDocstringSection {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct SectionNameEndsInColon {
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingSectionNameColon {
     name: String,
 }
 
-impl AlwaysFixableViolation for SectionNameEndsInColon {
+impl AlwaysFixableViolation for MissingSectionNameColon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SectionNameEndsInColon { name } = self;
+        let MissingSectionNameColon { name } = self;
         format!("Section name should end with a colon (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let SectionNameEndsInColon { name } = self;
+        let MissingSectionNameColon { name } = self;
         format!("Add colon to \"{name}\"")
     }
 }
@@ -1165,6 +1167,7 @@ impl AlwaysFixableViolation for SectionNameEndsInColon {
 /// a blank line, followed by a series of sections, each with a section header
 /// and a section body. Function docstrings often include a section for
 /// function arguments; this rule is concerned with that section only.
+/// Note that this rule only checks docstrings with an arguments (e.g. `Args`) section.
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
@@ -1212,13 +1215,14 @@ impl AlwaysFixableViolation for SectionNameEndsInColon {
 ///
 /// ## Options
 /// - `lint.pydocstyle.convention`
+/// - `lint.pydocstyle.ignore-var-parameters`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct UndocumentedParam {
+#[derive(ViolationMetadata)]
+pub(crate) struct UndocumentedParam {
     /// The name of the function being documented.
     definition: String,
     /// The names of the undocumented parameters.
@@ -1294,16 +1298,13 @@ impl Violation for UndocumentedParam {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
-/// ## Options
-/// - `lint.pydocstyle.convention`
-///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-#[violation]
-pub struct BlankLinesBetweenHeaderAndContent {
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLinesBetweenHeaderAndContent {
     name: String,
 }
 
@@ -1322,7 +1323,7 @@ impl AlwaysFixableViolation for BlankLinesBetweenHeaderAndContent {
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
 /// D414, D416, D417
 pub(crate) fn sections(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
@@ -1338,9 +1339,10 @@ pub(crate) fn sections(
 }
 
 fn blanks_and_section_underline(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
+    style: SectionStyle,
 ) {
     let mut num_blank_lines_after_header = 0u32;
     let mut blank_lines_end = context.following_range().start();
@@ -1359,9 +1361,9 @@ fn blanks_and_section_underline(
     if let Some(non_blank_line) = following_lines.next() {
         if let Some(dashed_line) = find_underline(&non_blank_line, '-') {
             if num_blank_lines_after_header > 0 {
-                if checker.enabled(Rule::SectionUnderlineAfterName) {
-                    let mut diagnostic = Diagnostic::new(
-                        SectionUnderlineAfterName {
+                if checker.is_rule_enabled(Rule::MissingSectionUnderlineAfterName) {
+                    let mut diagnostic = checker.report_diagnostic(
+                        MissingSectionUnderlineAfterName {
                             name: context.section_name().to_string(),
                         },
                         dashed_line,
@@ -1372,15 +1374,13 @@ fn blanks_and_section_underline(
                         context.following_range().start(),
                         blank_lines_end,
                     )));
-
-                    checker.diagnostics.push(diagnostic);
                 }
             }
 
             if dashed_line.len().to_usize() != context.section_name().len() {
-                if checker.enabled(Rule::SectionUnderlineMatchesSectionLength) {
-                    let mut diagnostic = Diagnostic::new(
-                        SectionUnderlineMatchesSectionLength {
+                if checker.is_rule_enabled(Rule::MismatchedSectionUnderlineLength) {
+                    let mut diagnostic = checker.report_diagnostic(
+                        MismatchedSectionUnderlineLength {
                             name: context.section_name().to_string(),
                         },
                         dashed_line,
@@ -1391,16 +1391,15 @@ fn blanks_and_section_underline(
                         "-".repeat(context.section_name().len()),
                         dashed_line,
                     )));
-
-                    checker.diagnostics.push(diagnostic);
                 }
             }
 
-            if checker.enabled(Rule::SectionUnderlineNotOverIndented) {
+            if checker.is_rule_enabled(Rule::OverindentedSectionUnderline) {
                 let leading_space = leading_space(&non_blank_line);
-                if leading_space.len() > docstring.indentation.len() {
-                    let mut diagnostic = Diagnostic::new(
-                        SectionUnderlineNotOverIndented {
+                let docstring_indentation = docstring.compute_indentation();
+                if leading_space.len() > docstring_indentation.len() {
+                    let mut diagnostic = checker.report_diagnostic(
+                        OverindentedSectionUnderline {
                             name: context.section_name().to_string(),
                         },
                         dashed_line,
@@ -1411,14 +1410,12 @@ fn blanks_and_section_underline(
                         blank_lines_end,
                         leading_space.text_len() + TextSize::from(1),
                     );
-                    let contents = clean_space(docstring.indentation);
+                    let contents = clean_space(docstring_indentation);
                     diagnostic.set_fix(Fix::safe_edit(if contents.is_empty() {
                         Edit::range_deletion(range)
                     } else {
                         Edit::range_replacement(contents, range)
                     }));
-
-                    checker.diagnostics.push(diagnostic);
                 }
             }
 
@@ -1437,15 +1434,13 @@ fn blanks_and_section_underline(
                     }
 
                     if following_lines.peek().is_none() {
-                        if checker.enabled(Rule::EmptyDocstringSection) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                EmptyDocstringSection {
-                                    name: context.section_name().to_string(),
-                                },
-                                context.section_name_range(),
-                            ));
-                        }
-                    } else if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
+                        checker.report_diagnostic_if_enabled(
+                            EmptyDocstringSection {
+                                name: context.section_name().to_string(),
+                            },
+                            context.section_name_range(),
+                        );
+                    } else if checker.is_rule_enabled(Rule::BlankLinesBetweenHeaderAndContent) {
                         // If the section is followed by exactly one line, and then a
                         // reStructuredText directive, the blank lines should be preserved, as in:
                         //
@@ -1463,13 +1458,13 @@ fn blanks_and_section_underline(
                         // Otherwise, documentation generators will not recognize the directive.
                         let is_sphinx = checker
                             .locator()
-                            .line(blank_lines_after_dashes_end)
+                            .line_str(blank_lines_after_dashes_end)
                             .trim_start()
                             .starts_with(".. ");
 
                         if is_sphinx {
                             if num_blank_lines_dashes_end > 1 {
-                                let mut diagnostic = Diagnostic::new(
+                                let mut diagnostic = checker.report_diagnostic(
                                     BlankLinesBetweenHeaderAndContent {
                                         name: context.section_name().to_string(),
                                     },
@@ -1481,10 +1476,9 @@ fn blanks_and_section_underline(
                                     line_after_dashes.start(),
                                     blank_lines_after_dashes_end,
                                 )));
-                                checker.diagnostics.push(diagnostic);
                             }
                         } else {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = checker.report_diagnostic(
                                 BlankLinesBetweenHeaderAndContent {
                                     name: context.section_name().to_string(),
                                 },
@@ -1495,25 +1489,23 @@ fn blanks_and_section_underline(
                                 line_after_dashes.start(),
                                 blank_lines_after_dashes_end,
                             )));
-                            checker.diagnostics.push(diagnostic);
                         }
                     }
                 }
             } else {
-                if checker.enabled(Rule::EmptyDocstringSection) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        EmptyDocstringSection {
-                            name: context.section_name().to_string(),
-                        },
-                        context.section_name_range(),
-                    ));
-                }
+                checker.report_diagnostic_if_enabled(
+                    EmptyDocstringSection {
+                        name: context.section_name().to_string(),
+                    },
+                    context.section_name_range(),
+                );
             }
         } else {
-            if checker.enabled(Rule::DashedUnderlineAfterSection) {
+            if style.is_numpy() && checker.is_rule_enabled(Rule::MissingDashedUnderlineAfterSection)
+            {
                 if let Some(equal_line) = find_underline(&non_blank_line, '=') {
-                    let mut diagnostic = Diagnostic::new(
-                        DashedUnderlineAfterSection {
+                    let mut diagnostic = checker.report_diagnostic(
+                        MissingDashedUnderlineAfterSection {
                             name: context.section_name().to_string(),
                         },
                         equal_line,
@@ -1525,11 +1517,9 @@ fn blanks_and_section_underline(
                         "-".repeat(context.section_name().len()),
                         equal_line,
                     )));
-
-                    checker.diagnostics.push(diagnostic);
                 } else {
-                    let mut diagnostic = Diagnostic::new(
-                        DashedUnderlineAfterSection {
+                    let mut diagnostic = checker.report_diagnostic(
+                        MissingDashedUnderlineAfterSection {
                             name: context.section_name().to_string(),
                         },
                         context.section_name_range(),
@@ -1539,19 +1529,17 @@ fn blanks_and_section_underline(
                     let content = format!(
                         "{}{}{}",
                         checker.stylist().line_ending().as_str(),
-                        clean_space(docstring.indentation),
+                        clean_space(docstring.compute_indentation()),
                         "-".repeat(context.section_name().len()),
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                         content,
                         context.summary_range().end(),
                     )));
-
-                    checker.diagnostics.push(diagnostic);
                 }
             }
             if num_blank_lines_after_header > 0 {
-                if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
+                if checker.is_rule_enabled(Rule::BlankLinesBetweenHeaderAndContent) {
                     // If the section is followed by exactly one line, and then a
                     // reStructuredText directive, the blank lines should be preserved, as in:
                     //
@@ -1568,13 +1556,13 @@ fn blanks_and_section_underline(
                     // Otherwise, documentation generators will not recognize the directive.
                     let is_sphinx = checker
                         .locator()
-                        .line(blank_lines_end)
+                        .line_str(blank_lines_end)
                         .trim_start()
                         .starts_with(".. ");
 
                     if is_sphinx {
                         if num_blank_lines_after_header > 1 {
-                            let mut diagnostic = Diagnostic::new(
+                            let mut diagnostic = checker.report_diagnostic(
                                 BlankLinesBetweenHeaderAndContent {
                                     name: context.section_name().to_string(),
                                 },
@@ -1587,10 +1575,9 @@ fn blanks_and_section_underline(
                                 context.following_range().start(),
                                 blank_lines_end,
                             )));
-                            checker.diagnostics.push(diagnostic);
                         }
                     } else {
-                        let mut diagnostic = Diagnostic::new(
+                        let mut diagnostic = checker.report_diagnostic(
                             BlankLinesBetweenHeaderAndContent {
                                 name: context.section_name().to_string(),
                             },
@@ -1601,16 +1588,15 @@ fn blanks_and_section_underline(
                             TextRange::new(context.following_range().start(), blank_lines_end);
                         // Delete any blank lines between the header and content.
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }
         }
     } else {
         // Nothing but blank lines after the section header.
-        if checker.enabled(Rule::DashedUnderlineAfterSection) {
-            let mut diagnostic = Diagnostic::new(
-                DashedUnderlineAfterSection {
+        if style.is_numpy() && checker.is_rule_enabled(Rule::MissingDashedUnderlineAfterSection) {
+            let mut diagnostic = checker.report_diagnostic(
+                MissingDashedUnderlineAfterSection {
                     name: context.section_name().to_string(),
                 },
                 context.section_name_range(),
@@ -1620,39 +1606,36 @@ fn blanks_and_section_underline(
             let content = format!(
                 "{}{}{}",
                 checker.stylist().line_ending().as_str(),
-                clean_space(docstring.indentation),
+                clean_space(docstring.compute_indentation()),
                 "-".repeat(context.section_name().len()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 content,
                 context.summary_range().end(),
             )));
-
-            checker.diagnostics.push(diagnostic);
         }
-        if checker.enabled(Rule::EmptyDocstringSection) {
-            checker.diagnostics.push(Diagnostic::new(
-                EmptyDocstringSection {
-                    name: context.section_name().to_string(),
-                },
-                context.section_name_range(),
-            ));
-        }
+        checker.report_diagnostic_if_enabled(
+            EmptyDocstringSection {
+                name: context.section_name().to_string(),
+            },
+            context.section_name_range(),
+        );
     }
 }
 
 fn common_section(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
     next: Option<&SectionContext>,
+    style: SectionStyle,
 ) {
-    if checker.enabled(Rule::CapitalizeSectionName) {
+    if checker.is_rule_enabled(Rule::NonCapitalizedSectionName) {
         let capitalized_section_name = context.kind().as_str();
         if context.section_name() != capitalized_section_name {
             let section_range = context.section_name_range();
-            let mut diagnostic = Diagnostic::new(
-                CapitalizeSectionName {
+            let mut diagnostic = checker.report_diagnostic(
+                NonCapitalizedSectionName {
                     name: context.section_name().to_string(),
                 },
                 section_range,
@@ -1663,37 +1646,36 @@ fn common_section(
                 capitalized_section_name.to_string(),
                 section_range,
             )));
-            checker.diagnostics.push(diagnostic);
         }
     }
 
-    if checker.enabled(Rule::SectionNotOverIndented) {
+    if checker.is_rule_enabled(Rule::OverindentedSection) {
         let leading_space = leading_space(context.summary_line());
-        if leading_space.len() > docstring.indentation.len() {
+        let docstring_indentation = docstring.compute_indentation();
+        if leading_space.len() > docstring_indentation.len() {
             let section_range = context.section_name_range();
-            let mut diagnostic = Diagnostic::new(
-                SectionNotOverIndented {
+            let mut diagnostic = checker.report_diagnostic(
+                OverindentedSection {
                     name: context.section_name().to_string(),
                 },
                 section_range,
             );
 
             // Replace the existing indentation with whitespace of the appropriate length.
-            let content = clean_space(docstring.indentation);
+            let content = clean_space(docstring_indentation);
             let fix_range = TextRange::at(context.start(), leading_space.text_len());
             diagnostic.set_fix(Fix::safe_edit(if content.is_empty() {
                 Edit::range_deletion(fix_range)
             } else {
                 Edit::range_replacement(content, fix_range)
             }));
-            checker.diagnostics.push(diagnostic);
         }
     }
 
     let line_end = checker.stylist().line_ending().as_str();
 
     if let Some(next) = next {
-        if checker.enabled(Rule::NoBlankLineAfterSection) {
+        if checker.is_rule_enabled(Rule::NoBlankLineAfterSection) {
             let num_blank_lines = context
                 .following_lines()
                 .rev()
@@ -1701,7 +1683,7 @@ fn common_section(
                 .count();
             if num_blank_lines < 2 {
                 let section_range = context.section_name_range();
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     NoBlankLineAfterSection {
                         name: context.section_name().to_string(),
                     },
@@ -1712,13 +1694,12 @@ fn common_section(
                     line_end.to_string(),
                     next.start(),
                 )));
-                checker.diagnostics.push(diagnostic);
             }
         }
     } else {
         // The first blank line is the line containing the closing triple quotes, so we need at
         // least two.
-        if checker.enabled(Rule::BlankLineAfterLastSection) {
+        if checker.is_rule_enabled(Rule::MissingBlankLineAfterLastSection) {
             let num_blank_lines = context
                 .following_lines()
                 .rev()
@@ -1736,32 +1717,31 @@ fn common_section(
                     format!(
                         "{}{}",
                         line_end.repeat(2 - num_blank_lines),
-                        docstring.indentation
+                        docstring.compute_indentation()
                     ),
                     context.end() - del_len,
                     context.end(),
                 );
 
                 let section_range = context.section_name_range();
-                let mut diagnostic = Diagnostic::new(
-                    BlankLineAfterLastSection {
+                let mut diagnostic = checker.report_diagnostic(
+                    MissingBlankLineAfterLastSection {
                         name: context.section_name().to_string(),
                     },
                     section_range,
                 );
                 diagnostic.set_fix(Fix::safe_edit(edit));
-                checker.diagnostics.push(diagnostic);
             }
         }
     }
 
-    if checker.enabled(Rule::NoBlankLineBeforeSection) {
+    if checker.is_rule_enabled(Rule::NoBlankLineBeforeSection) {
         if !context
             .previous_line()
             .is_some_and(|line| line.trim().is_empty())
         {
             let section_range = context.section_name_range();
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 NoBlankLineBeforeSection {
                     name: context.section_name().to_string(),
                 },
@@ -1772,14 +1752,13 @@ fn common_section(
                 line_end.to_string(),
                 context.start(),
             )));
-            checker.diagnostics.push(diagnostic);
         }
     }
 
-    blanks_and_section_underline(checker, docstring, context);
+    blanks_and_section_underline(checker, docstring, context, style);
 }
 
-fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
+fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
@@ -1788,11 +1767,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
 
     // If this is a non-static method, skip `cls` or `self`.
-    for ParameterWithDefault {
-        parameter,
-        default: _,
-        range: _,
-    } in function
+    for parameter in function
         .parameters
         .iter_non_variadic_params()
         .skip(usize::from(
@@ -1800,7 +1775,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
                 && !is_staticmethod(&function.decorator_list, checker.semantic()),
         ))
     {
-        let arg_name = parameter.name.as_str();
+        let arg_name = parameter.name().as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
@@ -1808,47 +1783,49 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
-    if let Some(arg) = function.parameters.vararg.as_ref() {
-        let arg_name = arg.name.as_str();
-        let starred_arg_name = format!("*{arg_name}");
-        if !arg_name.starts_with('_')
-            && !docstrings_args.contains(arg_name)
-            && !docstrings_args.contains(&starred_arg_name)
-        {
-            missing_arg_names.insert(starred_arg_name);
+    if !checker.settings().pydocstyle.ignore_var_parameters() {
+        if let Some(arg) = function.parameters.vararg.as_ref() {
+            let arg_name = arg.name.as_str();
+            let starred_arg_name = format!("*{arg_name}");
+            if !arg_name.starts_with('_')
+                && !docstrings_args.contains(arg_name)
+                && !docstrings_args.contains(&starred_arg_name)
+            {
+                missing_arg_names.insert(starred_arg_name);
+            }
         }
-    }
-    if let Some(arg) = function.parameters.kwarg.as_ref() {
-        let arg_name = arg.name.as_str();
-        let starred_arg_name = format!("**{arg_name}");
-        if !arg_name.starts_with('_')
-            && !docstrings_args.contains(arg_name)
-            && !docstrings_args.contains(&starred_arg_name)
-        {
-            missing_arg_names.insert(starred_arg_name);
+        if let Some(arg) = function.parameters.kwarg.as_ref() {
+            let arg_name = arg.name.as_str();
+            let starred_arg_name = format!("**{arg_name}");
+            if !arg_name.starts_with('_')
+                && !docstrings_args.contains(arg_name)
+                && !docstrings_args.contains(&starred_arg_name)
+            {
+                missing_arg_names.insert(starred_arg_name);
+            }
         }
     }
 
     if !missing_arg_names.is_empty() {
         if let Some(definition) = docstring.definition.name() {
             let names = missing_arg_names.into_iter().sorted().collect();
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(
                 UndocumentedParam {
                     definition: definition.to_string(),
                     names,
                 },
                 function.identifier(),
-            ));
+            );
         }
     }
 }
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
-static GOOGLE_ARGS_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
+static GOOGLE_ARGS_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
 
 fn args_section(context: &SectionContext) -> FxHashSet<String> {
-    let mut following_lines = context.following_lines().peekable();
+    let mut following_lines = context.following_lines();
     let Some(first_line) = following_lines.next() else {
         return FxHashSet::default();
     };
@@ -1869,7 +1846,7 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
     // Reformat each section.
     let mut args_sections: Vec<String> = vec![];
     for line in args_content.trim().lines() {
-        if line.chars().next().map_or(true, char::is_whitespace) {
+        if line.chars().next().is_none_or(char::is_whitespace) {
             // This is a continuation of the documentation for the previous parameter,
             // because it starts with whitespace.
             if let Some(last) = args_sections.last_mut() {
@@ -1899,7 +1876,7 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
         .collect::<FxHashSet<String>>()
 }
 
-fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
+fn parameters_section(checker: &Checker, docstring: &Docstring, context: &SectionContext) {
     // Collect the list of arguments documented in the docstring.
     let mut docstring_args: FxHashSet<String> = FxHashSet::default();
     let section_level_indent = leading_space(context.summary_line());
@@ -1941,19 +1918,19 @@ fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &Se
 }
 
 fn numpy_section(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
     next: Option<&SectionContext>,
 ) {
-    common_section(checker, docstring, context, next);
+    common_section(checker, docstring, context, next, SectionStyle::Numpy);
 
-    if checker.enabled(Rule::NewLineAfterSectionName) {
+    if checker.is_rule_enabled(Rule::MissingNewLineAfterSectionName) {
         let suffix = context.summary_after_section_name();
 
         if !suffix.is_empty() {
-            let mut diagnostic = Diagnostic::new(
-                NewLineAfterSectionName {
+            let mut diagnostic = checker.report_diagnostic(
+                MissingNewLineAfterSectionName {
                     name: context.section_name().to_string(),
                 },
                 context.section_name_range(),
@@ -1963,12 +1940,10 @@ fn numpy_section(
                 section_range.end(),
                 suffix.text_len(),
             ))));
-
-            checker.diagnostics.push(diagnostic);
         }
     }
 
-    if checker.enabled(Rule::UndocumentedParam) {
+    if checker.is_rule_enabled(Rule::UndocumentedParam) {
         if matches!(context.kind(), SectionKind::Parameters) {
             parameters_section(checker, docstring, context);
         }
@@ -1976,18 +1951,18 @@ fn numpy_section(
 }
 
 fn google_section(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
     next: Option<&SectionContext>,
 ) {
-    common_section(checker, docstring, context, next);
+    common_section(checker, docstring, context, next, SectionStyle::Google);
 
-    if checker.enabled(Rule::SectionNameEndsInColon) {
+    if checker.is_rule_enabled(Rule::MissingSectionNameColon) {
         let suffix = context.summary_after_section_name();
         if suffix != ":" {
-            let mut diagnostic = Diagnostic::new(
-                SectionNameEndsInColon {
+            let mut diagnostic = checker.report_diagnostic(
+                MissingSectionNameColon {
                     name: context.section_name().to_string(),
                 },
                 context.section_name_range(),
@@ -1998,13 +1973,12 @@ fn google_section(
                 ":".to_string(),
                 TextRange::at(section_name_range.end(), suffix.text_len()),
             )));
-            checker.diagnostics.push(diagnostic);
         }
     }
 }
 
 fn parse_numpy_sections(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
 ) {
@@ -2015,7 +1989,7 @@ fn parse_numpy_sections(
 }
 
 fn parse_google_sections(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
 ) {
@@ -2024,7 +1998,7 @@ fn parse_google_sections(
         google_section(checker, docstring, &context, iterator.peek());
     }
 
-    if checker.enabled(Rule::UndocumentedParam) {
+    if checker.is_rule_enabled(Rule::UndocumentedParam) {
         let mut has_args = false;
         let mut documented_args: FxHashSet<String> = FxHashSet::default();
         for section_context in section_contexts {
@@ -2048,37 +2022,4 @@ fn parse_google_sections(
             missing_args(checker, docstring, &documented_args);
         }
     }
-}
-
-/// Returns the [`TextRange`] of the underline, if a line consists of only dashes.
-fn find_underline(line: &Line, dash: char) -> Option<TextRange> {
-    let mut cursor = Cursor::new(line.as_str());
-
-    // Eat leading whitespace.
-    cursor.eat_while(char::is_whitespace);
-
-    // Determine the start of the dashes.
-    let offset = cursor.token_len();
-
-    // Consume the dashes.
-    cursor.start_token();
-    cursor.eat_while(|c| c == dash);
-
-    // Determine the end of the dashes.
-    let len = cursor.token_len();
-
-    // If there are no dashes, return None.
-    if len == TextSize::new(0) {
-        return None;
-    }
-
-    // Eat trailing whitespace.
-    cursor.eat_while(char::is_whitespace);
-
-    // If there are any characters after the dashes, return None.
-    if !cursor.is_eof() {
-        return None;
-    }
-
-    Some(TextRange::at(offset, len).add(line.start()))
 }

@@ -1,16 +1,16 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, ModModule, PySourceType, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::Parsed;
 use ruff_python_semantic::{FutureImport, NameImport};
-use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::Locator;
+use crate::checkers::ast::LintContext;
 use crate::importer::Importer;
-
 use crate::settings::LinterSettings;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Adds any required imports, as specified by the user, to the top of the
@@ -35,8 +35,11 @@ use crate::settings::LinterSettings;
 ///
 /// import typing
 /// ```
-#[violation]
-pub struct MissingRequiredImport(pub String);
+///
+/// ## Options
+/// - `lint.isort.required-imports`
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingRequiredImport(pub String);
 
 impl AlwaysFixableViolation for MissingRequiredImport {
     #[derive_message_formats]
@@ -55,7 +58,12 @@ impl AlwaysFixableViolation for MissingRequiredImport {
 fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
     match target {
         NameImport::Import(target) => {
-            let Stmt::Import(ast::StmtImport { names, range: _ }) = &stmt else {
+            let Stmt::Import(ast::StmtImport {
+                names,
+                range: _,
+                node_index: _,
+            }) = &stmt
+            else {
                 return false;
             };
             names.iter().any(|alias| {
@@ -69,6 +77,7 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
                 names,
                 level,
                 range: _,
+                node_index: _,
             }) = &stmt
             else {
                 return false;
@@ -83,22 +92,22 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn add_required_import(
     required_import: &NameImport,
     parsed: &Parsed<ModModule>,
     locator: &Locator,
     stylist: &Stylist,
     source_type: PySourceType,
-) -> Option<Diagnostic> {
+    context: &LintContext,
+) {
     // Don't add imports to semantically-empty files.
     if parsed.suite().iter().all(is_docstring_stmt) {
-        return None;
+        return;
     }
 
     // We don't need to add `__future__` imports to stubs.
     if source_type.is_stub() && required_import.is_future_import() {
-        return None;
+        return;
     }
 
     // If the import is already present in a top-level block, don't add it.
@@ -107,18 +116,17 @@ fn add_required_import(
         .iter()
         .any(|stmt| includes_import(stmt, required_import))
     {
-        return None;
+        return;
     }
 
     // Always insert the diagnostic at top-of-file.
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = context.report_diagnostic(
         MissingRequiredImport(required_import.to_string()),
         TextRange::default(),
     );
     diagnostic.set_fix(Fix::safe_edit(
         Importer::new(parsed, locator, stylist).add_import(required_import, TextSize::default()),
     ));
-    Some(diagnostic)
 }
 
 /// I002
@@ -128,13 +136,16 @@ pub(crate) fn add_required_imports(
     stylist: &Stylist,
     settings: &LinterSettings,
     source_type: PySourceType,
-) -> Vec<Diagnostic> {
-    settings
-        .isort
-        .required_imports
-        .iter()
-        .filter_map(|required_import| {
-            add_required_import(required_import, parsed, locator, stylist, source_type)
-        })
-        .collect()
+    context: &LintContext,
+) {
+    for required_import in &settings.isort.required_imports {
+        add_required_import(
+            required_import,
+            parsed,
+            locator,
+            stylist,
+            source_type,
+            context,
+        );
+    }
 }

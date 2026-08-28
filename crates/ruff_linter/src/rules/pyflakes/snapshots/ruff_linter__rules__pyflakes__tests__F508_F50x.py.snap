@@ -7,6 +7,6 @@ F50x.py:11:1: F508 (percent-format-star-requires-sequence) `%`-format string `*`
 10 | '%s %s' % {'k': 'v'}  # F503
 11 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ F508 (percent-format-star-requires-sequence)
-12 | 
+12 |
 13 | # ok: single %s with mapping
    |

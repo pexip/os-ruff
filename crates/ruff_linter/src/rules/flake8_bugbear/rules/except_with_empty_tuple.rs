@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast};
 use ruff_python_ast::{ExceptHandler, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -33,18 +33,24 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
-#[violation]
-pub struct ExceptWithEmptyTuple;
+#[derive(ViolationMetadata)]
+pub(crate) struct ExceptWithEmptyTuple {
+    is_star: bool,
+}
 
 impl Violation for ExceptWithEmptyTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `except ():` with an empty tuple does not catch anything; add exceptions to handle")
+        if self.is_star {
+            "Using `except* ():` with an empty tuple does not catch anything; add exceptions to handle".to_string()
+        } else {
+            "Using `except ():` with an empty tuple does not catch anything; add exceptions to handle".to_string()
+        }
     }
 }
 
 /// B029
-pub(crate) fn except_with_empty_tuple(checker: &mut Checker, except_handler: &ExceptHandler) {
+pub(crate) fn except_with_empty_tuple(checker: &Checker, except_handler: &ExceptHandler) {
     let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
         except_handler;
     let Some(type_) = type_ else {
@@ -53,10 +59,13 @@ pub(crate) fn except_with_empty_tuple(checker: &mut Checker, except_handler: &Ex
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = type_.as_ref() else {
         return;
     };
+
     if elts.is_empty() {
-        checker.diagnostics.push(Diagnostic::new(
-            ExceptWithEmptyTuple,
-            except_handler.range(),
-        ));
+        let is_star = checker
+            .semantic()
+            .current_statement()
+            .as_try_stmt()
+            .is_some_and(|try_stmt| try_stmt.is_star);
+        checker.report_diagnostic(ExceptWithEmptyTuple { is_star }, except_handler.range());
     }
 }

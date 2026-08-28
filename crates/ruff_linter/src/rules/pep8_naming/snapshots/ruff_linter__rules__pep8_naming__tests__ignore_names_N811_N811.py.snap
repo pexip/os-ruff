@@ -6,7 +6,7 @@ N811.py:2:8: N811 (constant-imported-as-non-constant) Constant `STILL_BAD` impor
 1 | import mod.BAD_ALLOWED as badAllowed
 2 | import mod.STILL_BAD as stillBad
   |        ^^^^^^^^^^^^^^^^^^^^^^^^^ N811 (constant-imported-as-non-constant)
-3 | 
+3 |
 4 | from mod import BAD_ALLOWED as badAllowed
   |
 

@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/trailing_commas_in_leading_parts.py
+snapshot_kind: text
 ---
 ## Input
 
@@ -63,11 +64,9 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 -assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 -    xxxxxxxxx
 -).xxxxxxxxxxxxxxxxxx(), (
--    "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--)
-+assert (
-+    xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx()
-+), "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx(), (
+     "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+ )
 ```
 
 ## Ruff Output
@@ -116,9 +115,9 @@ assert (
 )
 
 # Regression test for https://github.com/psf/black/issues/3414.
-assert (
-    xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx()
-), "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx(), (
+    "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+)
 ```
 
 ## Black Output
@@ -175,5 +174,3 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
     "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 )
 ```
-
-

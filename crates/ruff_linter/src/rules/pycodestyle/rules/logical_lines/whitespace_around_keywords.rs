@@ -1,8 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::{LogicalLine, Whitespace};
 
@@ -21,17 +21,17 @@ use super::{LogicalLine, Whitespace};
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct MultipleSpacesAfterKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleSpacesAfterKeyword;
 
 impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multiple spaces after keyword")
+        "Multiple spaces after keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 
@@ -50,17 +50,17 @@ impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct MultipleSpacesBeforeKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleSpacesBeforeKeyword;
 
 impl AlwaysFixableViolation for MultipleSpacesBeforeKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Multiple spaces before keyword")
+        "Multiple spaces before keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 
@@ -79,17 +79,17 @@ impl AlwaysFixableViolation for MultipleSpacesBeforeKeyword {
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct TabAfterKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct TabAfterKeyword;
 
 impl AlwaysFixableViolation for TabAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Tab after keyword")
+        "Tab after keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 
@@ -108,22 +108,22 @@ impl AlwaysFixableViolation for TabAfterKeyword {
 /// ```python
 /// True and False
 /// ```
-#[violation]
-pub struct TabBeforeKeyword;
+#[derive(ViolationMetadata)]
+pub(crate) struct TabBeforeKeyword;
 
 impl AlwaysFixableViolation for TabBeforeKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Tab before keyword")
+        "Tab before keyword".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with single space")
+        "Replace with single space".to_string()
     }
 }
 
 /// E271, E272, E273, E274
-pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut LogicalLinesContext) {
+pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &LintContext) {
     let mut after_keyword = false;
 
     for token in line.tokens() {
@@ -133,27 +133,27 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                 match line.leading_whitespace(token) {
                     (Whitespace::Tab, offset) => {
                         let start = token.start();
-                        let mut diagnostic = Diagnostic::new(
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                             TabBeforeKeyword,
                             TextRange::at(start - offset, offset),
-                        );
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            " ".to_string(),
-                            TextRange::at(start - offset, offset),
-                        )));
-                        context.push_diagnostic(diagnostic);
+                        ) {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                " ".to_string(),
+                                TextRange::at(start - offset, offset),
+                            )));
+                        }
                     }
                     (Whitespace::Many, offset) => {
                         let start = token.start();
-                        let mut diagnostic = Diagnostic::new(
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                             MultipleSpacesBeforeKeyword,
                             TextRange::at(start - offset, offset),
-                        );
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            " ".to_string(),
-                            TextRange::at(start - offset, offset),
-                        )));
-                        context.push_diagnostic(diagnostic);
+                        ) {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                " ".to_string(),
+                                TextRange::at(start - offset, offset),
+                            )));
+                        }
                     }
                     _ => {}
                 }
@@ -161,24 +161,26 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
 
             match line.trailing_whitespace(token) {
                 (Whitespace::Tab, len) => {
-                    let mut diagnostic =
-                        Diagnostic::new(TabAfterKeyword, TextRange::at(token.end(), len));
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        " ".to_string(),
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                        TabAfterKeyword,
                         TextRange::at(token.end(), len),
-                    )));
-                    context.push_diagnostic(diagnostic);
+                    ) {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            " ".to_string(),
+                            TextRange::at(token.end(), len),
+                        )));
+                    }
                 }
                 (Whitespace::Many, len) => {
-                    let mut diagnostic = Diagnostic::new(
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                         MultipleSpacesAfterKeyword,
                         TextRange::at(token.end(), len),
-                    );
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        " ".to_string(),
-                        TextRange::at(token.end(), len),
-                    )));
-                    context.push_diagnostic(diagnostic);
+                    ) {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            " ".to_string(),
+                            TextRange::at(token.end(), len),
+                        )));
+                    }
                 }
                 _ => {}
             }

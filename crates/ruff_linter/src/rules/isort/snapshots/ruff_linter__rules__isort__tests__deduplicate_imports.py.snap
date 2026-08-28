@@ -7,6 +7,7 @@ deduplicate_imports.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorte
 2 | | import os
 3 | | import os as os1
 4 | | import os as os2
+  | |________________^ I001 (unsorted-imports)
   |
   = help: Organize imports
 

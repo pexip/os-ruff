@@ -8,6 +8,7 @@ separate_first_party_imports.py:1:1: I001 (unsorted-imports) [*] Import block is
 3 | | import numpy as np
 4 | | import os
 5 | | from leading_prefix import Class
+  | |________________________________^ I001 (unsorted-imports)
   |
   = help: Organize imports
 

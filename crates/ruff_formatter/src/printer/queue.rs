@@ -145,7 +145,7 @@ impl<'a, 'print> FitsQueue<'a, 'print> {
     }
 }
 
-impl<'a, 'print> Queue<'a> for FitsQueue<'a, 'print> {
+impl<'a> Queue<'a> for FitsQueue<'a, '_> {
     fn pop(&mut self) -> Option<&'a FormatElement> {
         self.queue.pop().or_else(
             #[cold]
@@ -325,10 +325,10 @@ impl FitsEndPredicate for SingleEntryPredicate {
 
 #[cfg(test)]
 mod tests {
+    use crate::FormatElement;
     use crate::format_element::LineMode;
     use crate::prelude::Tag;
     use crate::printer::queue::{PrintQueue, Queue};
-    use crate::FormatElement;
 
     #[test]
     fn extend_back_pop_last() {

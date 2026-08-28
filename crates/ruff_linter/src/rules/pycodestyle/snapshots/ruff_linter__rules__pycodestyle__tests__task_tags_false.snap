@@ -3,74 +3,74 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
 E501_1.py:1:89: E501 (line-too-long) Line too long (149 > 88)
   |
-1 | # TODO: comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-  |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
-2 | # TODO(charlie): comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-3 | # TODO comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+1 | … sometimes are longer than line-length so that you can easily find them with `git grep`
+  |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
+2 | …task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+3 | …sometimes are longer than line-length so that you can easily find them with `git grep`
   |
 
 E501_1.py:2:89: E501 (line-too-long) Line too long (158 > 88)
   |
-1 | # TODO: comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-2 | # TODO(charlie): comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-  |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
-3 | # TODO comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-4 | #     TODO    comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+1 | …times are longer than line-length so that you can easily find them with `git grep`
+2 | …tags sometimes are longer than line-length so that you can easily find them with `git grep`
+  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
+3 | …imes are longer than line-length so that you can easily find them with `git grep`
+4 | …s sometimes are longer than line-length so that you can easily find them with `git grep`
   |
 
 E501_1.py:3:89: E501 (line-too-long) Line too long (148 > 88)
   |
-1 | # TODO: comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-2 | # TODO(charlie): comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-3 | # TODO comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-  |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
-4 | #     TODO    comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-5 | # FIXME: comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+1 | … sometimes are longer than line-length so that you can easily find them with `git grep`
+2 | …task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+3 | …sometimes are longer than line-length so that you can easily find them with `git grep`
+  |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
+4 | …k-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+5 | …s sometimes are longer than line-length so that you can easily find them with `git grep`
   |
 
 E501_1.py:4:89: E501 (line-too-long) Line too long (155 > 88)
   |
-2 | # TODO(charlie): comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-3 | # TODO comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-4 | #     TODO    comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-  |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
-5 | # FIXME: comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-6 | # FIXME comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+2 | …k-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+3 | …etimes are longer than line-length so that you can easily find them with `git grep`
+4 | …ags sometimes are longer than line-length so that you can easily find them with `git grep`
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
+5 | …ometimes are longer than line-length so that you can easily find them with `git grep`
+6 | …metimes are longer than line-length so that you can easily find them with `git grep`
   |
 
 E501_1.py:5:89: E501 (line-too-long) Line too long (150 > 88)
   |
-3 | # TODO comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-4 | #     TODO    comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-5 | # FIXME: comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-  |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
-6 | # FIXME comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-7 | #     FIXME    comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+3 | …ometimes are longer than line-length so that you can easily find them with `git grep`
+4 | …-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+5 | … sometimes are longer than line-length so that you can easily find them with `git grep`
+  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
+6 | …sometimes are longer than line-length so that you can easily find them with `git grep`
+7 | …k-tags sometimes are longer than line-length so that you can easily find them with `git grep`
   |
 
 E501_1.py:6:89: E501 (line-too-long) Line too long (149 > 88)
   |
-4 | #     TODO    comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-5 | # FIXME: comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-6 | # FIXME comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-  |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
-7 | #     FIXME    comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-8 | # FIXME(charlie): comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+4 | …k-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+5 | …s sometimes are longer than line-length so that you can easily find them with `git grep`
+6 | … sometimes are longer than line-length so that you can easily find them with `git grep`
+  |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
+7 | …sk-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+8 | … task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
   |
 
 E501_1.py:7:89: E501 (line-too-long) Line too long (156 > 88)
   |
-5 | # FIXME: comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-6 | # FIXME comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-7 | #     FIXME    comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-  |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
-8 | # FIXME(charlie): comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+5 | …metimes are longer than line-length so that you can easily find them with `git grep`
+6 | …etimes are longer than line-length so that you can easily find them with `git grep`
+7 | …ags sometimes are longer than line-length so that you can easily find them with `git grep`
+  |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
+8 | …k-tags sometimes are longer than line-length so that you can easily find them with `git grep`
   |
 
 E501_1.py:8:89: E501 (line-too-long) Line too long (159 > 88)
   |
-6 | # FIXME comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-7 | #     FIXME    comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-8 | # FIXME(charlie): comments starting with one of the configured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
-  |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
+6 | …times are longer than line-length so that you can easily find them with `git grep`
+7 | …gs sometimes are longer than line-length so that you can easily find them with `git grep`
+8 | …-tags sometimes are longer than line-length so that you can easily find them with `git grep`
+  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501 (line-too-long)
   |

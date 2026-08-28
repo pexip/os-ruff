@@ -1,6 +1,6 @@
-use ruff_formatter::{format_args, write, FormatContext, FormatError};
-use ruff_python_ast::StmtWith;
-use ruff_python_ast::{AstNode, WithItem};
+use ruff_formatter::{FormatContext, FormatError, format_args, write};
+use ruff_python_ast::PythonVersion;
+use ruff_python_ast::{StmtWith, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -13,9 +13,8 @@ use crate::expression::parentheses::{
 use crate::other::commas;
 use crate::other::with_item::WithItemLayout;
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
 use crate::statement::suite::SuiteKind;
-use crate::PythonVersion;
 
 #[derive(Default)]
 pub struct FormatStmtWith;
@@ -36,7 +35,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
         //     ...
         // ```
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling(with_stmt.as_any_node_ref());
+        let dangling_comments = comments.dangling(with_stmt);
         let partition_point = dangling_comments.partition_point(|comment| {
             with_stmt
                 .items
@@ -71,7 +70,10 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
 
                         match layout {
                             WithItemsLayout::SingleWithTarget(single) => {
-                                optional_parentheses(&single.format()).fmt(f)
+                                optional_parentheses(&single.format().with_options(
+                                    WithItemLayout::ParenthesizedContextManagers { single: true },
+                                ))
+                                .fmt(f)
                             }
 
                             WithItemsLayout::SingleWithoutTarget(single) => single
@@ -93,7 +95,11 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                                     for item in &with_stmt.items {
                                         joiner.entry_with_line_separator(
                                             item,
-                                            &item.format(),
+                                            &item.format().with_options(
+                                                WithItemLayout::ParenthesizedContextManagers {
+                                                    single: with_stmt.items.len() == 1,
+                                                },
+                                            ),
                                             soft_line_break_or_space(),
                                         );
                                     }
@@ -114,9 +120,22 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                             WithItemsLayout::Parenthesized => parenthesized(
                                 "(",
                                 &format_with(|f: &mut PyFormatter| {
-                                    f.join_comma_separated(with_stmt.body.first().unwrap().start())
-                                        .nodes(&with_stmt.items)
-                                        .finish()
+                                    let mut joiner = f.join_comma_separated(
+                                        with_stmt.body.first().unwrap().start(),
+                                    );
+
+                                    for item in &with_stmt.items {
+                                        joiner.entry(
+                                            item,
+                                            &item.format().with_options(
+                                                WithItemLayout::ParenthesizedContextManagers {
+                                                    single: with_stmt.items.len() == 1,
+                                                },
+                                            ),
+                                        );
+                                    }
+
+                                    joiner.finish()
                                 }),
                                 ")",
                             )
@@ -283,7 +302,7 @@ impl<'a> WithItemsLayout<'a> {
             }
         }
 
-        let can_parenthesize = context.options().target_version() >= PythonVersion::Py39
+        let can_parenthesize = context.options().target_version() >= PythonVersion::PY39
             || are_with_items_parenthesized(with, context)?;
 
         // If the target version doesn't support parenthesized context managers and they aren't

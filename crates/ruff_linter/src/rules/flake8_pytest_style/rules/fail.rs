@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers::{is_empty_or_null_string, is_pytest_fail};
+use crate::rules::flake8_pytest_style::helpers::{is_empty_or_null_string, is_pytest_fail};
 
 /// ## What it does
 /// Checks for `pytest.fail` calls without a message.
@@ -45,35 +45,28 @@ use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
-#[violation]
-pub struct PytestFailWithoutMessage;
+#[derive(ViolationMetadata)]
+pub(crate) struct PytestFailWithoutMessage;
 
 impl Violation for PytestFailWithoutMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("No message passed to `pytest.fail()`")
+        "No message passed to `pytest.fail()`".to_string()
     }
 }
 
-pub(crate) fn fail_call(checker: &mut Checker, call: &ast::ExprCall) {
+/// PT016
+pub(crate) fn fail_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_fail(&call.func, checker.semantic()) {
         // Allow either `pytest.fail(reason="...")` (introduced in pytest 7.0) or
         // `pytest.fail(msg="...")` (deprecated in pytest 7.0)
-        let msg = call
+        if call
             .arguments
-            .find_argument("reason", 0)
-            .or_else(|| call.arguments.find_argument("msg", 0));
-
-        if let Some(msg) = msg {
-            if is_empty_or_null_string(msg) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
-            }
-        } else {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
+            .find_argument_value("reason", 0)
+            .or_else(|| call.arguments.find_argument_value("msg", 0))
+            .is_none_or(is_empty_or_null_string)
+        {
+            checker.report_diagnostic(PytestFailWithoutMessage, call.func.range());
         }
     }
 }

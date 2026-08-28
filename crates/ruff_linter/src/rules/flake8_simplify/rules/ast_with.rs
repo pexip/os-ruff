@@ -1,17 +1,17 @@
+use anyhow::bail;
 use ast::Expr;
-use log::error;
 
-use ruff_diagnostics::{Diagnostic, Fix};
-use ruff_diagnostics::{FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
+use super::fix_with;
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-
-use super::fix_with;
+use crate::preview::is_multiple_with_statements_fix_safe_enabled;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the unnecessary nesting of multiple consecutive context
@@ -45,20 +45,26 @@ use super::fix_with;
 ///     pass
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is marked as always unsafe unless [preview] mode is enabled, in which case it is always
+/// marked as safe. Note that the fix is unavailable if it would remove comments (in either case).
+///
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
-#[violation]
-pub struct MultipleWithStatements;
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
+#[derive(ViolationMetadata)]
+pub(crate) struct MultipleWithStatements;
 
 impl Violation for MultipleWithStatements {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Use a single `with` statement with multiple contexts instead of nested `with` \
-             statements"
-        )
+        "Use a single `with` statement with multiple contexts instead of nested `with` \
+            statements"
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -69,12 +75,14 @@ impl Violation for MultipleWithStatements {
 /// Returns a boolean indicating whether it's an async with statement, the items
 /// and body.
 fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
-    let [Stmt::With(ast::StmtWith {
-        is_async,
-        items,
-        body,
-        ..
-    })] = body
+    let [
+        Stmt::With(ast::StmtWith {
+            is_async,
+            items,
+            body,
+            ..
+        }),
+    ] = body
     else {
         return None;
     };
@@ -90,7 +98,7 @@ fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
 ///     with resource1(), resource2():
 ///         ...
 /// ```
-fn explicit_with_items(checker: &mut Checker, with_items: &[WithItem]) -> bool {
+fn explicit_with_items(checker: &Checker, with_items: &[WithItem]) -> bool {
     let [with_item] = with_items else {
         return false;
     };
@@ -115,7 +123,7 @@ fn explicit_with_items(checker: &mut Checker, with_items: &[WithItem]) -> bool {
 
 /// SIM117
 pub(crate) fn multiple_with_statements(
-    checker: &mut Checker,
+    checker: &Checker,
     with_stmt: &ast::StmtWith,
     with_parent: Option<&Stmt>,
 ) {
@@ -163,7 +171,7 @@ pub(crate) fn multiple_with_statements(
             return;
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             MultipleWithStatements,
             TextRange::new(with_stmt.start(), colon.end()),
         );
@@ -171,27 +179,34 @@ pub(crate) fn multiple_with_statements(
             .comment_ranges()
             .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
         {
-            match fix_with::fix_multiple_with_statements(
-                checker.locator(),
-                checker.stylist(),
-                with_stmt,
-            ) {
-                Ok(edit) => {
-                    if edit.content().map_or(true, |content| {
-                        fits(
-                            content,
-                            with_stmt.into(),
-                            checker.locator(),
-                            checker.settings.pycodestyle.max_line_length,
-                            checker.settings.tab_size,
-                        )
-                    }) {
-                        diagnostic.set_fix(Fix::unsafe_edit(edit));
+            diagnostic.try_set_optional_fix(|| {
+                match fix_with::fix_multiple_with_statements(
+                    checker.locator(),
+                    checker.stylist(),
+                    with_stmt,
+                ) {
+                    Ok(edit) => {
+                        if edit.content().is_none_or(|content| {
+                            fits(
+                                content,
+                                with_stmt.into(),
+                                checker.locator(),
+                                checker.settings().pycodestyle.max_line_length,
+                                checker.settings().tab_size,
+                            )
+                        }) {
+                            if is_multiple_with_statements_fix_safe_enabled(checker.settings()) {
+                                Ok(Some(Fix::safe_edit(edit)))
+                            } else {
+                                Ok(Some(Fix::unsafe_edit(edit)))
+                            }
+                        } else {
+                            Ok(None)
+                        }
                     }
+                    Err(err) => bail!("Failed to collapse `with`: {err}"),
                 }
-                Err(err) => error!("Failed to fix nested with: {err}"),
-            }
+            });
         }
-        checker.diagnostics.push(diagnostic);
     }
 }

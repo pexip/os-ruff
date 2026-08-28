@@ -186,7 +186,7 @@ E731.py:86:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, 
 E731.py:94:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
    |
 92 |     from typing import Callable
-93 | 
+93 |
 94 |     f: Callable[[], None] = lambda: None
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731 (lambda-assignment)
    |
@@ -206,7 +206,7 @@ E731.py:94:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, 
 E731.py:102:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
     |
 100 |     from typing import Callable
-101 | 
+101 |
 102 |     f: Callable[..., None] = lambda a, b: None
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731 (lambda-assignment)
     |
@@ -226,7 +226,7 @@ E731.py:102:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression,
 E731.py:110:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
     |
 108 |     from typing import Callable
-109 | 
+109 |
 110 |     f: Callable[[int], int] = lambda x: 2 * x
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731 (lambda-assignment)
     |
@@ -246,7 +246,7 @@ E731.py:110:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression,
 E731.py:119:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
     |
 117 |     from collections.abc import Callable
-118 | 
+118 |
 119 |     f: Callable[[str, int], str] = lambda a, b: a * b
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731 (lambda-assignment)
     |
@@ -266,7 +266,7 @@ E731.py:119:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression,
 E731.py:127:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
     |
 125 |     from collections.abc import Callable
-126 | 
+126 |
 127 |     f: Callable[[str, int], tuple[str, int]] = lambda a, b: (a, b)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731 (lambda-assignment)
     |
@@ -278,7 +278,7 @@ E731.py:127:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression,
 126 126 | 
 127     |-    f: Callable[[str, int], tuple[str, int]] = lambda a, b: (a, b)
     127 |+    def f(a: str, b: int) -> tuple[str, int]:
-    128 |+        return a, b
+    128 |+        return (a, b)
 128 129 | 
 129 130 | 
 130 131 | def scope():
@@ -286,7 +286,7 @@ E731.py:127:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression,
 E731.py:135:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
     |
 133 |     from collections.abc import Callable
-134 | 
+134 |
 135 |     f: Callable[[str, int, list[str]], list[str]] = lambda a, b, /, c: [*c, a * b]
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731 (lambda-assignment)
     |
@@ -318,7 +318,7 @@ E731.py:139:5: E731 (lambda-assignment) Do not assign a `lambda` expression, use
 138 138 | class TemperatureScales(Enum):
 139     |-    CELSIUS = (lambda deg_c: deg_c)
     139 |+    def CELSIUS(deg_c):
-    140 |+        return deg_c
+    140 |+        return (deg_c)
 140 141 |     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
 141 142 | 
 142 143 | 
@@ -338,7 +338,7 @@ E731.py:140:5: E731 (lambda-assignment) Do not assign a `lambda` expression, use
 139 139 |     CELSIUS = (lambda deg_c: deg_c)
 140     |-    FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
     140 |+    def FAHRENHEIT(deg_c):
-    141 |+        return deg_c * 9 / 5 + 32
+    141 |+        return (deg_c * 9 / 5 + 32)
 141 142 | 
 142 143 | 
 143 144 | # Regression test for: https://github.com/astral-sh/ruff/issues/7141
@@ -346,9 +346,8 @@ E731.py:140:5: E731 (lambda-assignment) Do not assign a `lambda` expression, use
 E731.py:147:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
     |
 145 |       # E731
-146 |   
-147 |       f = lambda: (
-    |  _____^
+146 |
+147 | /     f = lambda: (
 148 | |         i := 1,
 149 | |     )
     | |_____^ E731 (lambda-assignment)
@@ -363,7 +362,161 @@ E731.py:147:5: E731 (lambda-assignment) [*] Do not assign a `lambda` expression,
 148     |-        i := 1,
 149     |-    )
     147 |+    def f():
-    148 |+        return (i := 1),
-150 149 | 
-151 150 | 
-152 151 | from dataclasses import dataclass
+    148 |+        return (
+    149 |+            i := 1,
+    150 |+        )
+150 151 | 
+151 152 | 
+152 153 | from dataclasses import dataclass
+
+E731.py:163:1: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
+    |
+161 |   # Regression tests for:
+162 |   # * https://github.com/astral-sh/ruff/issues/7720
+163 | / x = lambda: """
+164 | |         a
+165 | |     b
+166 | | """
+    | |___^ E731 (lambda-assignment)
+167 |
+168 |   # * https://github.com/astral-sh/ruff/issues/10277
+    |
+    = help: Rewrite `x` as a `def`
+
+ℹ Unsafe fix
+160 160 | 
+161 161 | # Regression tests for:
+162 162 | # * https://github.com/astral-sh/ruff/issues/7720
+163     |-x = lambda: """
+    163 |+def x():
+    164 |+    return """
+164 165 |         a
+165 166 |     b
+166 167 | """
+
+E731.py:169:1: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
+    |
+168 | # * https://github.com/astral-sh/ruff/issues/10277
+169 | at_least_one_million = lambda _: _ >= 1_000_000
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731 (lambda-assignment)
+170 |
+171 | x = lambda: (
+    |
+    = help: Rewrite `at_least_one_million` as a `def`
+
+ℹ Unsafe fix
+166 166 | """
+167 167 | 
+168 168 | # * https://github.com/astral-sh/ruff/issues/10277
+169     |-at_least_one_million = lambda _: _ >= 1_000_000
+    169 |+def at_least_one_million(_):
+    170 |+    return _ >= 1_000_000
+170 171 | 
+171 172 | x = lambda: (
+172 173 |     # comment
+
+E731.py:171:1: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
+    |
+169 |   at_least_one_million = lambda _: _ >= 1_000_000
+170 |
+171 | / x = lambda: (
+172 | |     # comment
+173 | |     5 + 10
+174 | | )
+    | |_^ E731 (lambda-assignment)
+175 |
+176 |   x = lambda: (
+    |
+    = help: Rewrite `x` as a `def`
+
+ℹ Unsafe fix
+168 168 | # * https://github.com/astral-sh/ruff/issues/10277
+169 169 | at_least_one_million = lambda _: _ >= 1_000_000
+170 170 | 
+171     |-x = lambda: (
+    171 |+def x():
+    172 |+    return (
+172 173 |     # comment
+173 174 |     5 + 10
+174 175 | )
+
+E731.py:176:1: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
+    |
+174 |   )
+175 |
+176 | / x = lambda: (
+177 | |     # comment
+178 | |     y := 10
+179 | | )
+    | |_^ E731 (lambda-assignment)
+180 |
+181 |   # https://github.com/astral-sh/ruff/issues/18475
+    |
+    = help: Rewrite `x` as a `def`
+
+ℹ Unsafe fix
+173 173 |     5 + 10
+174 174 | )
+175 175 | 
+176     |-x = lambda: (
+    176 |+def x():
+    177 |+    return (
+177 178 |     # comment
+178 179 |     y := 10
+179 180 | )
+
+E731.py:182:1: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
+    |
+181 |   # https://github.com/astral-sh/ruff/issues/18475
+182 | / foo_tooltip = (
+183 | |     lambda x, data: f"\nfoo: {data['foo'][int(x)]}"
+184 | |     if data["foo"] is not None
+185 | |     else ""
+186 | | )
+    | |_^ E731 (lambda-assignment)
+187 |
+188 |   foo_tooltip = (
+    |
+    = help: Rewrite `foo_tooltip` as a `def`
+
+ℹ Unsafe fix
+179 179 | )
+180 180 | 
+181 181 | # https://github.com/astral-sh/ruff/issues/18475
+182     |-foo_tooltip = (
+183     |-    lambda x, data: f"\nfoo: {data['foo'][int(x)]}"
+    182 |+def foo_tooltip(x, data):
+    183 |+    return (f"\nfoo: {data['foo'][int(x)]}"
+184 184 |     if data["foo"] is not None
+185     |-    else ""
+186     |-)
+    185 |+    else "")
+187 186 | 
+188 187 | foo_tooltip = (
+189 188 |     lambda x, data: f"\nfoo: {data['foo'][int(x)]}" +
+
+E731.py:188:1: E731 (lambda-assignment) [*] Do not assign a `lambda` expression, use a `def`
+    |
+186 |   )
+187 |
+188 | / foo_tooltip = (
+189 | |     lambda x, data: f"\nfoo: {data['foo'][int(x)]}" +
+190 | |     more
+191 | |
+192 | | )
+    | |_^ E731 (lambda-assignment)
+    |
+    = help: Rewrite `foo_tooltip` as a `def`
+
+ℹ Unsafe fix
+185 185 |     else ""
+186 186 | )
+187 187 | 
+188     |-foo_tooltip = (
+189     |-    lambda x, data: f"\nfoo: {data['foo'][int(x)]}" +
+190     |-    more
+191     |-
+192     |-)
+    188 |+def foo_tooltip(x, data):
+    189 |+    return (f"\nfoo: {data['foo'][int(x)]}" +
+    190 |+    more)

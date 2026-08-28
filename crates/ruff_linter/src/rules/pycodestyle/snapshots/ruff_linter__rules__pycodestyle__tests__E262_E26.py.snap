@@ -91,7 +91,7 @@ E26.py:66:9: E262 (no-space-after-inline-comment) [*] Inline comment should star
 65 | #  (Two spaces) Ok for block comment
 66 | a = 42  #  (Two spaces)
    |         ^^^^^^^^^^^^^^^ E262 (no-space-after-inline-comment)
-67 | 
+67 |
 68 | #: E265:5:1
    |
    = help: Format space
@@ -109,10 +109,10 @@ E26.py:66:9: E262 (no-space-after-inline-comment) [*] Inline comment should star
 E26.py:84:8: E262 (no-space-after-inline-comment) [*] Inline comment should start with `# `
    |
 82 | ##  Foo
-83 | 
+83 |
 84 | a = 1  ## Foo
    |        ^^^^^^ E262 (no-space-after-inline-comment)
-85 | 
+85 |
 86 | a = 1  #:Foo
    |
    = help: Format space
@@ -129,7 +129,7 @@ E26.py:84:8: E262 (no-space-after-inline-comment) [*] Inline comment should star
 E26.py:86:8: E262 (no-space-after-inline-comment) [*] Inline comment should start with `# `
    |
 84 | a = 1  ## Foo
-85 | 
+85 |
 86 | a = 1  #:Foo
    |        ^^^^^ E262 (no-space-after-inline-comment)
    |

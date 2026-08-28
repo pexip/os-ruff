@@ -1,8 +1,9 @@
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_parser::Tokens;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_source_file::Locator;
+use crate::Locator;
 
 use super::comments::Comment;
 use super::helpers::trailing_comma;
@@ -22,7 +23,11 @@ pub(crate) fn annotate_imports<'a>(
         .iter()
         .map(|import| {
             match import {
-                Stmt::Import(ast::StmtImport { names, range }) => {
+                Stmt::Import(ast::StmtImport {
+                    names,
+                    range,
+                    node_index: _,
+                }) => {
                     // Find comments above.
                     let mut atop = vec![];
                     while let Some(comment) =
@@ -58,6 +63,7 @@ pub(crate) fn annotate_imports<'a>(
                     names,
                     level,
                     range: _,
+                    node_index: _,
                 }) => {
                     // Find comments above.
                     let mut atop = vec![];

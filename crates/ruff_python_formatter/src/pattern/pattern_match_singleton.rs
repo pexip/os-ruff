@@ -23,6 +23,6 @@ impl NeedsParentheses for PatternMatchSingleton {
         _parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Never
+        OptionalParentheses::BestFit
     }
 }

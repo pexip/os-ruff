@@ -1,18 +1,19 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::TokenKind;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
-use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLine};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for missing whitespace around all operators.
 ///
 /// ## Why is this bad?
 /// According to [PEP 8], there should be one space before and after all
-/// operators.
+/// assignment (`=`), augmented assignment (`+=`, `-=`, etc.), comparison,
+/// and Booleans operators.
 ///
 /// ## Example
 /// ```python
@@ -28,17 +29,17 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E225
-#[violation]
-pub struct MissingWhitespaceAroundOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace around operator")
+        "Missing whitespace around operator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
 }
 
@@ -46,8 +47,14 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
 /// Checks for missing whitespace arithmetic operators.
 ///
 /// ## Why is this bad?
-/// According to [PEP 8], there should be one space before and after an
-/// arithmetic operator (+, -, /, and *).
+/// [PEP 8] recommends never using more than one space, and always having the
+/// same amount of whitespace on both sides of a binary operator.
+///
+/// For consistency, this rule enforces one space before and after an
+/// arithmetic operator (`+`, `-`, `/`, and `*`).
+///
+/// (Note that [PEP 8] suggests only adding whitespace around the operator with
+/// the lowest precedence, but that authors should "use [their] own judgment".)
 ///
 /// ## Example
 /// ```python
@@ -59,19 +66,19 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
 /// number = 40 + 2
 /// ```
 ///
-/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E226
-#[violation]
-pub struct MissingWhitespaceAroundArithmeticOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundArithmeticOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace around arithmetic operator")
+        "Missing whitespace around arithmetic operator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
 }
 
@@ -79,8 +86,14 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
 /// Checks for missing whitespace around bitwise and shift operators.
 ///
 /// ## Why is this bad?
-/// According to [PEP 8], there should be one space before and after bitwise and
-/// shift operators (<<, >>, &, |, ^).
+/// [PEP 8] recommends never using more than one space, and always having the
+/// same amount of whitespace on both sides of a binary operator.
+///
+/// For consistency, this rule enforces one space before and after bitwise and
+/// shift operators (`<<`, `>>`, `&`, `|`, `^`).
+///
+/// (Note that [PEP 8] suggests only adding whitespace around the operator with
+/// the lowest precedence, but that authors should "use [their] own judgment".)
 ///
 /// ## Example
 /// ```python
@@ -92,19 +105,19 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
 /// x = 128 << 1
 /// ```
 ///
-/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E227
-#[violation]
-pub struct MissingWhitespaceAroundBitwiseOrShiftOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundBitwiseOrShiftOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace around bitwise or shift operator")
+        "Missing whitespace around bitwise or shift operator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
 }
 
@@ -112,8 +125,14 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
 /// Checks for missing whitespace around the modulo operator.
 ///
 /// ## Why is this bad?
-/// According to [PEP 8], the modulo operator (%) should have whitespace on
-/// either side of it.
+/// [PEP 8] recommends never using more than one space, and always having the
+/// same amount of whitespace on both sides of a binary operator.
+///
+/// For consistency, this rule enforces one space before and after a modulo
+/// operator (`%`).
+///
+/// (Note that [PEP 8] suggests only adding whitespace around the operator with
+/// the lowest precedence, but that authors should "use [their] own judgment".)
 ///
 /// ## Example
 /// ```python
@@ -127,25 +146,23 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E228
-#[violation]
-pub struct MissingWhitespaceAroundModuloOperator;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingWhitespaceAroundModuloOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing whitespace around modulo operator")
+        "Missing whitespace around modulo operator".to_string()
     }
 
     fn fix_title(&self) -> String {
-        format!("Add missing whitespace")
+        "Add missing whitespace".to_string()
     }
 }
 
 /// E225, E226, E227, E228
-pub(crate) fn missing_whitespace_around_operator(
-    line: &LogicalLine,
-    context: &mut LogicalLinesContext,
-) {
+pub(crate) fn missing_whitespace_around_operator(line: &LogicalLine, context: &LintContext) {
+    let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut tokens = line.tokens().iter().peekable();
     let first_token = tokens
         .by_ref()
@@ -162,6 +179,8 @@ pub(crate) fn missing_whitespace_around_operator(
     while let Some(token) = tokens.next() {
         let kind = token.kind();
 
+        definition_state.visit_token_kind(kind);
+
         if is_non_logical_token(kind) {
             continue;
         }
@@ -172,10 +191,13 @@ pub(crate) fn missing_whitespace_around_operator(
             TokenKind::Lpar | TokenKind::Lambda => parens += 1,
             TokenKind::Rpar => parens = parens.saturating_sub(1),
             _ => {}
-        };
+        }
 
-        let needs_space = if kind == TokenKind::Equal && (parens > 0 || fstrings > 0) {
+        let needs_space = if kind == TokenKind::Equal
+            && (parens > 0 || fstrings > 0 || definition_state.in_type_params())
+        {
             // Allow keyword args, defaults: foo(bar=None) and f-strings: f'{foo=}'
+            // Also ignore `foo[T=int]`, which is handled by E251.
             NeedsSpace::No
         } else if kind == TokenKind::Slash {
             // Tolerate the "/" operator in function definition
@@ -239,41 +261,44 @@ pub(crate) fn missing_whitespace_around_operator(
             let has_leading_trivia =
                 prev_token.end() < token.start() || is_non_logical_token(prev_token.kind());
 
-            let has_trailing_trivia = tokens.peek().map_or(true, |next| {
-                token.end() < next.start() || is_non_logical_token(next.kind())
-            });
+            let has_trailing_trivia = tokens
+                .peek()
+                .is_none_or(|next| token.end() < next.start() || is_non_logical_token(next.kind()));
 
             match (has_leading_trivia, has_trailing_trivia) {
                 // Operator with trailing but no leading space, enforce consistent spacing.
                 (false, true) => {
-                    let mut diagnostic =
-                        Diagnostic::new(diagnostic_kind_for_operator(kind), token.range());
-                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                        " ".to_string(),
-                        token.start(),
-                    )));
-                    context.push_diagnostic(diagnostic);
+                    if let Some(mut diagnostic) =
+                        diagnostic_kind_for_operator(kind, token.range(), context)
+                    {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                            " ".to_string(),
+                            token.start(),
+                        )));
+                    }
                 }
                 // Operator with leading but no trailing space, enforce consistent spacing.
                 (true, false) => {
-                    let mut diagnostic =
-                        Diagnostic::new(diagnostic_kind_for_operator(kind), token.range());
-                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                        " ".to_string(),
-                        token.end(),
-                    )));
-                    context.push_diagnostic(diagnostic);
+                    if let Some(mut diagnostic) =
+                        diagnostic_kind_for_operator(kind, token.range(), context)
+                    {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                            " ".to_string(),
+                            token.end(),
+                        )));
+                    }
                 }
                 // Operator with no space, require spaces if it is required by the operator.
                 (false, false) => {
                     if needs_space == NeedsSpace::Yes {
-                        let mut diagnostic =
-                            Diagnostic::new(diagnostic_kind_for_operator(kind), token.range());
-                        diagnostic.set_fix(Fix::safe_edits(
-                            Edit::insertion(" ".to_string(), token.start()),
-                            [Edit::insertion(" ".to_string(), token.end())],
-                        ));
-                        context.push_diagnostic(diagnostic);
+                        if let Some(mut diagnostic) =
+                            diagnostic_kind_for_operator(kind, token.range(), context)
+                        {
+                            diagnostic.set_fix(Fix::safe_edits(
+                                Edit::insertion(" ".to_string(), token.start()),
+                                [Edit::insertion(" ".to_string(), token.end())],
+                            ));
+                        }
                     }
                 }
                 (true, true) => {
@@ -311,15 +336,19 @@ impl From<bool> for NeedsSpace {
     }
 }
 
-fn diagnostic_kind_for_operator(operator: TokenKind) -> DiagnosticKind {
+fn diagnostic_kind_for_operator<'a>(
+    operator: TokenKind,
+    range: TextRange,
+    context: &'a LintContext<'a>,
+) -> Option<crate::checkers::ast::DiagnosticGuard<'a, 'a>> {
     if operator == TokenKind::Percent {
-        DiagnosticKind::from(MissingWhitespaceAroundModuloOperator)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundModuloOperator, range)
     } else if operator.is_bitwise_or_shift() {
-        DiagnosticKind::from(MissingWhitespaceAroundBitwiseOrShiftOperator)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundBitwiseOrShiftOperator, range)
     } else if operator.is_arithmetic() {
-        DiagnosticKind::from(MissingWhitespaceAroundArithmeticOperator)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundArithmeticOperator, range)
     } else {
-        DiagnosticKind::from(MissingWhitespaceAroundOperator)
+        context.report_diagnostic_if_enabled(MissingWhitespaceAroundOperator, range)
     }
 }
 

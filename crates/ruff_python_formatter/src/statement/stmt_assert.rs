@@ -3,7 +3,6 @@ use ruff_formatter::write;
 use ruff_python_ast::StmtAssert;
 
 use crate::comments::SourceComment;
-
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::{has_skip_comment, prelude::*};
@@ -15,6 +14,7 @@ impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
     fn fmt_fields(&self, item: &StmtAssert, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtAssert {
             range: _,
+            node_index: _,
             test,
             msg,
         } = item;
@@ -34,7 +34,7 @@ impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
                 [
                     token(","),
                     space(),
-                    maybe_parenthesize_expression(msg, item, Parenthesize::IfBreaks),
+                    maybe_parenthesize_expression(msg, item, Parenthesize::IfBreaksParenthesized),
                 ]
             )?;
         }

@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-future_annotations.py:40:4: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
+future_annotations.py:40:4: UP045 (non-pep604-annotation-optional) [*] Use `X | None` for type annotations
    |
 40 | x: Optional[int] = None
-   |    ^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
-41 | 
+   |    ^^^^^^^^^^^^^ UP045 (non-pep604-annotation-optional)
+41 |
 42 | MyList: TypeAlias = Union[List[int], List[str]]
    |
-   = help: Convert to `X | Y`
+   = help: Convert to `X | None`
 
 ℹ Safe fix
 37 37 |     return y
@@ -19,12 +19,12 @@ future_annotations.py:40:4: UP007 (non-pep604-annotation) [*] Use `X | Y` for ty
 41 41 | 
 42 42 | MyList: TypeAlias = Union[List[int], List[str]]
 
-future_annotations.py:42:21: UP007 (non-pep604-annotation) [*] Use `X | Y` for type annotations
+future_annotations.py:42:21: UP007 (non-pep604-annotation-union) [*] Use `X | Y` for type annotations
    |
 40 | x: Optional[int] = None
-41 | 
+41 |
 42 | MyList: TypeAlias = Union[List[int], List[str]]
-   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation)
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007 (non-pep604-annotation-union)
    |
    = help: Convert to `X | Y`
 

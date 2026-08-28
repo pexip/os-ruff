@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:98:5: D408 (section-underline-after-name) [*] Section underline should be in the line following the section's name ("Returns")
+sections.py:98:5: D408 (missing-section-underline-after-name) [*] Section underline should be in the line following the section's name ("Returns")
    |
 96 |     Returns
-97 | 
+97 |
 98 |     -------
-   |     ^^^^^^^ D408 (section-underline-after-name)
+   |     ^^^^^^^ D408 (missing-section-underline-after-name)
 99 |     A value of some sort.
    |
    = help: Add underline to "Returns"

@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Int, Number, Operator, Stmt};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -34,8 +34,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `enumerate`](https://docs.python.org/3/library/functions.html#enumerate)
-#[violation]
-pub struct EnumerateForLoop {
+#[derive(ViolationMetadata)]
+pub(crate) struct EnumerateForLoop {
     index: String,
 }
 
@@ -48,7 +48,7 @@ impl Violation for EnumerateForLoop {
 }
 
 /// SIM113
-pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
     // If the loop is async, abort.
     if for_stmt.is_async {
         return;
@@ -139,13 +139,12 @@ pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor)
                 continue;
             }
 
-            let diagnostic = Diagnostic::new(
+            checker.report_diagnostic(
                 EnumerateForLoop {
                     index: index.id.to_string(),
                 },
                 stmt.range(),
             );
-            checker.diagnostics.push(diagnostic);
         }
     }
 }

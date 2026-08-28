@@ -87,7 +87,7 @@ UP036_4.py:24:10: UP036 (outdated-version-block) [*] Version block is outdated f
 UP036_4.py:27:8: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 25 |         cmd = [sys.executable, "-m", "test.regrtest"]
-26 | 
+26 |
 27 |     if sys.version_info < (3, 3):
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 28 |         cmd = [sys.executable, "-m", "test.regrtest"]
@@ -128,7 +128,7 @@ UP036_4.py:32:10: UP036 (outdated-version-block) [*] Version block is outdated f
 UP036_4.py:37:8: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 35 |         cmd = [sys.executable, "-m", "test", "-j0"]
-36 | 
+36 |
 37 |     if sys.version_info < (3, 3):
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 38 |         cmd = [sys.executable, "-m", "test.regrtest"]
@@ -152,7 +152,7 @@ UP036_4.py:37:8: UP036 (outdated-version-block) [*] Version block is outdated fo
 UP036_4.py:42:8: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 40 |         cmd = [sys.executable, "-m", "test", "-j0"]
-41 | 
+41 |
 42 |     if sys.version_info < (3, 3):
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 43 |         cmd = [sys.executable, "-m", "test.regrtest"]

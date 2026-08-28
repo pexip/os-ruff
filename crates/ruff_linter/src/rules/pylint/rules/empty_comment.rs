@@ -1,8 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_trivia::{is_python_whitespace, CommentRanges};
-use ruff_source_file::Locator;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_trivia::{CommentRanges, is_python_whitespace};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
+
+use crate::Locator;
+use crate::checkers::ast::LintContext;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for a # symbol appearing on a line not followed by an actual comment.
@@ -25,29 +28,29 @@ use ruff_text_size::{TextRange, TextSize};
 ///
 /// ## References
 /// - [Pylint documentation](https://pylint.pycqa.org/en/latest/user_guide/messages/refactor/empty-comment.html)
-#[violation]
-pub struct EmptyComment;
+#[derive(ViolationMetadata)]
+pub(crate) struct EmptyComment;
 
 impl Violation for EmptyComment {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line with empty comment")
+        "Line with empty comment".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Delete the empty comment"))
+        Some("Delete the empty comment".to_string())
     }
 }
 
 /// PLR2044
 pub(crate) fn empty_comments(
-    diagnostics: &mut Vec<Diagnostic>,
+    context: &LintContext,
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
-    let block_comments = comment_ranges.block_comments(locator);
+    let block_comments = comment_ranges.block_comments(locator.contents());
 
     for range in comment_ranges {
         // Ignore comments that are part of multi-line "comment blocks".
@@ -56,14 +59,12 @@ pub(crate) fn empty_comments(
         }
 
         // If the line contains an empty comment, add a diagnostic.
-        if let Some(diagnostic) = empty_comment(*range, locator) {
-            diagnostics.push(diagnostic);
-        }
+        empty_comment(context, range, locator);
     }
 }
 
 /// Return a [`Diagnostic`] if the comment at the given [`TextRange`] is empty.
-fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
+fn empty_comment(context: &LintContext, range: TextRange, locator: &Locator) {
     // Check: is the comment empty?
     if !locator
         .slice(range)
@@ -71,7 +72,7 @@ fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
         .skip(1)
         .all(is_python_whitespace)
     {
-        return None;
+        return;
     }
 
     // Find the location of the `#`.
@@ -94,13 +95,15 @@ fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
             }
         });
 
-    Some(
-        Diagnostic::new(EmptyComment, TextRange::new(first_hash_col, line.end())).with_fix(
-            Fix::safe_edit(if let Some(deletion_start_col) = deletion_start_col {
+    if let Some(mut diagnostic) = context
+        .report_diagnostic_if_enabled(EmptyComment, TextRange::new(first_hash_col, line.end()))
+    {
+        diagnostic.set_fix(Fix::safe_edit(
+            if let Some(deletion_start_col) = deletion_start_col {
                 Edit::deletion(line.start() + deletion_start_col, line.end())
             } else {
                 Edit::range_deletion(locator.full_line_range(first_hash_col))
-            }),
-        ),
-    )
+            },
+        ));
+    }
 }

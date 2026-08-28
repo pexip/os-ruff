@@ -6,16 +6,17 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
+use itertools::Itertools;
+
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_stdlib::str::is_cased_uppercase;
-use ruff_python_trivia::{first_non_trivia_token, leading_indentation, SimpleTokenKind};
-use ruff_source_file::Locator;
+use ruff_python_trivia::{SimpleTokenKind, first_non_trivia_token, leading_indentation};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use is_macro;
-use natord;
+use crate::Locator;
 
 /// An enumeration of the different sorting styles
 /// currently supported for displays of string literals
@@ -299,8 +300,10 @@ impl<'a> SortClassification<'a> {
                     let Some(string_node) = expr.as_string_literal_expr() else {
                         return Self::NotAListOfStringLiterals;
                     };
-                    any_implicit_concatenation |= string_node.value.is_implicit_concatenated();
-                    items.push(string_node.value.to_str());
+                    match string_node.as_single_part_string() {
+                        Some(literal) => items.push(&*literal.value),
+                        None => any_implicit_concatenation = true,
+                    }
                 }
                 if any_implicit_concatenation {
                     return Self::UnsortedButUnfixable;
@@ -312,6 +315,52 @@ impl<'a> SortClassification<'a> {
         // Looks like the sequence was already sorted -- hooray!
         // We won't be emitting a violation this time.
         Self::Sorted
+    }
+}
+
+/// The complexity of the comments in a multiline sequence.
+///
+/// A sequence like this has "simple" comments: it's unambiguous
+/// which item each comment refers to, so there's no "risk" in sorting it:
+///
+/// ```py
+/// __all__ = [
+///     "foo",  # comment1
+///     "bar",  # comment2
+/// ]
+/// ```
+///
+/// This sequence has complex comments: we can't safely autofix the sort here,
+/// as the own-line comments might be used to create sections in `__all__`:
+///
+/// ```py
+/// __all__ = [
+///     # fooey things
+///     "foo1",
+///     "foo2",
+///     # barey things
+///     "bar1",
+///     "foobar",
+/// ]
+/// ```
+///
+/// This sequence also has complex comments -- it's ambiguous which item
+/// each comment should belong to:
+///
+/// ```py
+/// __all__ = [
+///     "foo1", "foo", "barfoo",  # fooey things
+///     "baz", bazz2", "fbaz",  # barrey things
+/// ]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum CommentComplexity {
+    Simple,
+    Complex,
+}
+
+impl CommentComplexity {
+    pub(super) const fn is_complex(self) -> bool {
+        matches!(self, CommentComplexity::Complex)
     }
 }
 
@@ -327,6 +376,24 @@ pub(super) struct MultilineStringSequenceValue<'a> {
 impl<'a> MultilineStringSequenceValue<'a> {
     pub(super) fn len(&self) -> usize {
         self.items.len()
+    }
+
+    /// Determine the [`CommentComplexity`] of this multiline string sequence.
+    pub(super) fn comment_complexity(&self) -> CommentComplexity {
+        if self.items.iter().tuple_windows().any(|(first, second)| {
+            first.has_own_line_comments()
+                || first
+                    .end_of_line_comments
+                    .is_some_and(|end_line_comment| second.start() < end_line_comment.end())
+        }) || self
+            .items
+            .last()
+            .is_some_and(StringSequenceItem::has_own_line_comments)
+        {
+            CommentComplexity::Complex
+        } else {
+            CommentComplexity::Simple
+        }
     }
 
     /// Analyse the source range for a multiline Python tuple/list that
@@ -422,7 +489,7 @@ impl<'a> MultilineStringSequenceValue<'a> {
         //
         let newline = stylist.line_ending().as_str();
         let start_offset = self.start();
-        let leading_indent = leading_indentation(locator.full_line(start_offset));
+        let leading_indent = leading_indentation(locator.full_line_str(start_offset));
         let item_indent = format!("{}{}", leading_indent, stylist.indentation().as_str());
 
         let prelude =
@@ -446,7 +513,7 @@ impl<'a> MultilineStringSequenceValue<'a> {
         //     we'll end up with two commas after the final item, which would be invalid syntax)
         let needs_trailing_comma = self.ends_with_trailing_comma
             && first_non_trivia_token(TextSize::new(0), &postlude)
-                .map_or(true, |tok| tok.kind() != SimpleTokenKind::Comma);
+                .is_none_or(|tok| tok.kind() != SimpleTokenKind::Comma);
 
         self.items
             .sort_by(|a, b| sorting_style.compare(a.value, b.value));
@@ -520,7 +587,9 @@ fn collect_string_sequence_lines<'a>(
             }
             TokenKind::String => {
                 let Some(string_value) = string_items_iter.next() else {
-                    unreachable!("Expected the number of string tokens to be equal to the number of string items in the sequence");
+                    unreachable!(
+                        "Expected the number of string tokens to be equal to the number of string items in the sequence"
+                    );
                 };
                 line_state.visit_string_token(string_value, token.range());
                 ends_with_trailing_comma = false;
@@ -793,6 +862,10 @@ impl<'a> StringSequenceItem<'a> {
     fn with_no_comments(value: &'a str, element_range: TextRange) -> Self {
         Self::new(value, vec![], element_range, None)
     }
+
+    fn has_own_line_comments(&self) -> bool {
+        !self.preceding_comment_ranges.is_empty()
+    }
 }
 
 impl Ranged for StringSequenceItem<'_> {
@@ -908,7 +981,7 @@ fn multiline_string_sequence_postlude<'a>(
     if postlude.len() <= 2 {
         let mut reversed_postlude_chars = postlude.chars().rev();
         if let Some(closing_paren @ (')' | '}' | ']')) = reversed_postlude_chars.next() {
-            if reversed_postlude_chars.next().map_or(true, |c| c == ',') {
+            if reversed_postlude_chars.next().is_none_or(|c| c == ',') {
                 return Cow::Owned(format!(",{newline}{leading_indent}{closing_paren}"));
             }
         }

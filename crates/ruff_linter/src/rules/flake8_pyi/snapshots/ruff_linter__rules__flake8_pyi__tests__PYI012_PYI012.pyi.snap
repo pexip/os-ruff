@@ -7,7 +7,7 @@ PYI012.pyi:5:5: PYI012 (pass-in-class-body) [*] Class body must not contain `pas
 4 |     value: int
 5 |     pass  # PYI012 Class body must not contain `pass`
   |     ^^^^ PYI012 (pass-in-class-body)
-6 | 
+6 |
 7 | class OneAttributeClassRev:
   |
   = help: Remove unnecessary `pass`
@@ -42,10 +42,10 @@ PYI012.pyi:8:5: PYI012 (pass-in-class-body) [*] Class body must not contain `pas
 PYI012.pyi:16:5: PYI012 (pass-in-class-body) [*] Class body must not contain `pass`
    |
 14 |     """
-15 | 
+15 |
 16 |     pass  # PYI012 Class body must not contain `pass`
    |     ^^^^ PYI012 (pass-in-class-body)
-17 | 
+17 |
 18 | class NonEmptyChild(Exception):
    |
    = help: Remove unnecessary `pass`
@@ -65,7 +65,7 @@ PYI012.pyi:20:5: PYI012 (pass-in-class-body) [*] Class body must not contain `pa
 19 |     value: int
 20 |     pass  # PYI012 Class body must not contain `pass`
    |     ^^^^ PYI012 (pass-in-class-body)
-21 | 
+21 |
 22 | class NonEmptyChild2(Exception):
    |
    = help: Remove unnecessary `pass`
@@ -103,7 +103,7 @@ PYI012.pyi:28:5: PYI012 (pass-in-class-body) [*] Class body must not contain `pa
 27 |     value: int
 28 |     pass  # PYI012 Class body must not contain `pass`
    |     ^^^^ PYI012 (pass-in-class-body)
-29 | 
+29 |
 30 |     def __init__():
    |
    = help: Remove unnecessary `pass`

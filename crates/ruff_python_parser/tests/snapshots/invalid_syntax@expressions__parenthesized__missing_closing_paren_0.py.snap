@@ -7,13 +7,16 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesize
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..47,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 46..47,
                     value: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 47..47,
                             id: Name(""),
                             ctx: Invalid,
@@ -29,7 +32,7 @@ Module(
 
   |
 1 | # Missing closing parentheses 0: No elements
-2 | 
+2 |
 3 | (
-  |   Syntax Error: unexpected EOF while parsing
+  |  ^ Syntax Error: unexpected EOF while parsing
   |

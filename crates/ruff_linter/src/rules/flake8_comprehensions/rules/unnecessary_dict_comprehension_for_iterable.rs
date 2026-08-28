@@ -1,25 +1,26 @@
 use ast::ExprName;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for unnecessary `dict` comprehension when creating a dictionary from
+/// Checks for unnecessary dict comprehension when creating a dictionary from
 /// an iterable.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to use a `dict` comprehension to build a dictionary from
+/// It's unnecessary to use a dict comprehension to build a dictionary from
 /// an iterable when the value is static.
 ///
 /// Prefer `dict.fromkeys(iterable)` over `{value: None for value in iterable}`,
 /// as `dict.fromkeys` is more readable and efficient.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// {a: None for a in iterable}
 /// {a: 1 for a in iterable}
@@ -30,8 +31,24 @@ use crate::checkers::ast::Checker;
 /// dict.fromkeys(iterable)
 /// dict.fromkeys(iterable, 1)
 /// ```
-#[violation]
-pub struct UnnecessaryDictComprehensionForIterable {
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments inside the dict comprehension,
+/// as comments may be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// {  # comment 1
+///     a:  # comment 2
+///     None  # comment 3
+///     for a in iterable  # comment 4
+/// }
+/// ```
+///
+/// ## References
+/// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
+#[derive(ViolationMetadata)]
+pub(crate) struct UnnecessaryDictComprehensionForIterable {
     is_value_none_literal: bool,
 }
 
@@ -40,21 +57,22 @@ impl Violation for UnnecessaryDictComprehensionForIterable {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead")
+        "Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        if self.is_value_none_literal {
-            Some(format!("Replace with `dict.fromkeys(iterable, value)`)"))
+        let title = if self.is_value_none_literal {
+            "Replace with `dict.fromkeys(iterable, value)`)"
         } else {
-            Some(format!("Replace with `dict.fromkeys(iterable)`)"))
-        }
+            "Replace with `dict.fromkeys(iterable)`)"
+        };
+        Some(title.to_string())
     }
 }
 
-/// RUF025
+/// C420
 pub(crate) fn unnecessary_dict_comprehension_for_iterable(
-    checker: &mut Checker,
+    checker: &Checker,
     dict_comp: &ast::ExprDictComp,
 ) {
     let [generator] = dict_comp.generators.as_slice() else {
@@ -95,13 +113,21 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 
         let binding = checker.semantic().binding(id);
 
+        // Builtin bindings have a range of 0..0, and are never
+        // defined within the comprehension, so we abort before
+        // checking the range overlap below. Note this only matters
+        // if the comprehension appears at the top of the file!
+        if binding.kind.is_builtin() {
+            return false;
+        }
+
         dict_comp.range().contains_range(binding.range())
     });
     if self_referential {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryDictComprehensionForIterable {
             is_value_none_literal: dict_comp.value.is_none_literal_expr(),
         },
@@ -109,7 +135,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     );
 
     if checker.semantic().has_builtin_binding("dict") {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        let edit = Edit::range_replacement(
             checker
                 .generator()
                 .expr(&fix_unnecessary_dict_comprehension(
@@ -117,10 +143,16 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
                     generator,
                 )),
             dict_comp.range(),
-        )));
+        );
+        diagnostic.set_fix(Fix::applicable_edit(
+            edit,
+            if checker.comment_ranges().intersects(dict_comp.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ));
     }
-
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Returns `true` if the expression can be shared across multiple values.
@@ -151,7 +183,7 @@ fn is_constant_like(expr: &Expr) -> bool {
     })
 }
 
-/// Generate a [`Fix`] to replace `dict` comprehension with `dict.fromkeys`.
+/// Generate a [`Fix`] to replace a dict comprehension with `dict.fromkeys`.
 ///
 /// For example:
 /// - Given `{n: None for n in [1,2,3]}`, generate `dict.fromkeys([1,2,3])`.
@@ -166,14 +198,17 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         },
         keywords: Box::from([]),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     Expr::Call(ExprCall {
         func: Box::new(Expr::Name(ExprName {
             id: "dict.fromkeys".into(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         })),
         arguments: args,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     })
 }

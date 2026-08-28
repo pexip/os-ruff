@@ -1,11 +1,11 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::RaiseStatementVisitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -46,22 +46,29 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
-#[violation]
-pub struct RaiseWithoutFromInsideExcept;
+#[derive(ViolationMetadata)]
+pub(crate) struct RaiseWithoutFromInsideExcept {
+    is_star: bool,
+}
 
 impl Violation for RaiseWithoutFromInsideExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
+        if self.is_star {
+            "Within an `except*` clause, raise exceptions with `raise ... from err` or `raise ... \
+                 from None` to distinguish them from errors in exception handling"
+                .to_string()
+        } else {
             "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... \
-             from None` to distinguish them from errors in exception handling"
-        )
+                 from None` to distinguish them from errors in exception handling"
+                .to_string()
+        }
     }
 }
 
 /// B904
 pub(crate) fn raise_without_from_inside_except(
-    checker: &mut Checker,
+    checker: &Checker,
     name: Option<&str>,
     body: &[Stmt],
 ) {
@@ -93,9 +100,13 @@ pub(crate) fn raise_without_from_inside_except(
                     }
                 }
 
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(RaiseWithoutFromInsideExcept, range));
+                let is_star = checker
+                    .semantic()
+                    .current_statement()
+                    .as_try_stmt()
+                    .is_some_and(|try_stmt| try_stmt.is_star);
+
+                checker.report_diagnostic(RaiseWithoutFromInsideExcept { is_star }, range);
             }
         }
     }

@@ -1,14 +1,14 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, StringLiteralFlags};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for uses of `open` and related calls without an explicit `encoding`
@@ -24,9 +24,20 @@ use crate::fix::edits::add_argument;
 /// encoding. [PEP 597] recommends the use of `encoding="utf-8"` as a default,
 /// and suggests that it may become the default in future versions of Python.
 ///
-/// If a local-specific encoding is intended, use `encoding="local"`  on
+/// If a locale-specific encoding is intended, use `encoding="locale"`  on
 /// Python 3.10 and later, or `locale.getpreferredencoding()` on earlier versions,
 /// to make the encoding explicit.
+///
+/// ## Fix safety
+/// This fix is always unsafe and may change the program's behavior. It forces
+/// `encoding="utf-8"` as the default, regardless of the platform’s actual default
+/// encoding, which may cause `UnicodeDecodeError` on non-UTF-8 systems.
+/// ```python
+/// with open("test.txt") as f:
+///     print(f.read()) # before fix (on UTF-8 systems): 你好，世界！
+/// with open("test.txt", encoding="utf-8") as f:
+///     print(f.read()) # after fix (on Windows): UnicodeDecodeError
+/// ```
 ///
 /// ## Example
 /// ```python
@@ -42,8 +53,8 @@ use crate::fix::edits::add_argument;
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 ///
 /// [PEP 597]: https://peps.python.org/pep-0597/
-#[violation]
-pub struct UnspecifiedEncoding {
+#[derive(ViolationMetadata)]
+pub(crate) struct UnspecifiedEncoding {
     function_name: String,
     mode: ModeArgument,
 }
@@ -67,12 +78,12 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
     }
 
     fn fix_title(&self) -> String {
-        format!("Add explicit `encoding` argument")
+        "Add explicit `encoding` argument".to_string()
     }
 }
 
 /// PLW1514
-pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
     let Some((function_name, mode)) = Callee::try_from_call_expression(call, checker.semantic())
         .filter(|segments| is_violation(call, segments))
         .map(|segments| (segments.to_string(), segments.mode_argument()))
@@ -80,7 +91,7 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnspecifiedEncoding {
             function_name,
             mode,
@@ -88,7 +99,6 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
         call.func.range(),
     );
     diagnostic.set_fix(generate_keyword_fix(checker, call));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Represents the path of the function or method being called.
@@ -130,9 +140,10 @@ impl<'a> Callee<'a> {
         match self {
             Callee::Qualified(qualified_name) => match qualified_name.segments() {
                 ["" | "codecs" | "_io", "open"] => ModeArgument::Supported,
-                ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => {
-                    ModeArgument::Supported
-                }
+                [
+                    "tempfile",
+                    "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile",
+                ] => ModeArgument::Supported,
                 ["io" | "_io", "TextIOWrapper"] => ModeArgument::Unsupported,
                 _ => ModeArgument::Unsupported,
             },
@@ -158,16 +169,12 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
     Fix::unsafe_edit(add_argument(
         &format!(
             "encoding={}",
-            checker
-                .generator()
-                .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
-                    value: ast::StringLiteralValue::single(ast::StringLiteral {
-                        value: "utf-8".to_string().into_boxed_str(),
-                        flags: StringLiteralFlags::default(),
-                        range: TextRange::default(),
-                    }),
-                    range: TextRange::default(),
-                }))
+            checker.generator().expr(&Expr::from(ast::StringLiteral {
+                value: Box::from("utf-8"),
+                flags: checker.default_string_flags(),
+                range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            }))
         ),
         &call.arguments,
         checker.comment_ranges(),
@@ -203,19 +210,31 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
     match qualified_name {
         Callee::Qualified(qualified_name) => match qualified_name.segments() {
             ["" | "codecs" | "_io", "open"] => {
-                if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
+                if let Some(mode_arg) = call.arguments.find_argument_value("mode", 1) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
                     }
                 }
+
+                let encoding_param_pos = match qualified_name.segments() {
+                    // The `encoding` parameter position for `codecs.open`
+                    ["codecs", _] => 2,
+                    // The `encoding` parameter position for `_io.open` and the builtin `open`
+                    _ => 3,
+                };
+
                 // else mode not specified, defaults to text mode
-                call.arguments.find_argument("encoding", 3).is_none()
+                call.arguments
+                    .find_argument_value("encoding", encoding_param_pos)
+                    .is_none()
             }
-            ["tempfile", tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile")] =>
-            {
+            [
+                "tempfile",
+                tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"),
+            ] => {
                 let mode_pos = usize::from(*tempfile_class == "SpooledTemporaryFile");
-                if let Some(mode_arg) = call.arguments.find_argument("mode", mode_pos) {
+                if let Some(mode_arg) = call.arguments.find_argument_value("mode", mode_pos) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
@@ -225,27 +244,27 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
                     return false;
                 }
                 call.arguments
-                    .find_argument("encoding", mode_pos + 2)
+                    .find_argument_value("encoding", mode_pos + 2)
                     .is_none()
             }
             ["io" | "_io", "TextIOWrapper"] => {
-                call.arguments.find_argument("encoding", 1).is_none()
+                call.arguments.find_argument_value("encoding", 1).is_none()
             }
             _ => false,
         },
         Callee::Pathlib(attr) => match *attr {
             "open" => {
-                if let Some(mode_arg) = call.arguments.find_argument("mode", 0) {
+                if let Some(mode_arg) = call.arguments.find_argument_value("mode", 0) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
                     }
                 }
                 // else mode not specified, defaults to text mode
-                call.arguments.find_argument("encoding", 2).is_none()
+                call.arguments.find_argument_value("encoding", 2).is_none()
             }
-            "read_text" => call.arguments.find_argument("encoding", 0).is_none(),
-            "write_text" => call.arguments.find_argument("encoding", 1).is_none(),
+            "read_text" => call.arguments.find_argument_value("encoding", 0).is_none(),
+            "write_text" => call.arguments.find_argument_value("encoding", 1).is_none(),
             _ => false,
         },
     }

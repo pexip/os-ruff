@@ -1,15 +1,15 @@
 use ruff_formatter::prelude::tag::Condition;
-use ruff_formatter::{format_args, write, Argument, Arguments};
+use ruff_formatter::{Argument, Arguments, format_args, write};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExpressionRef;
+use ruff_python_ast::ExprRef;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
-    first_non_trivia_token, BackwardsTokenizer, SimpleToken, SimpleTokenKind,
+    BackwardsTokenizer, SimpleToken, SimpleTokenKind, first_non_trivia_token,
 };
 use ruff_text_size::Ranged;
 
 use crate::comments::{
-    dangling_comments, dangling_open_parenthesis_comments, trailing_comments, SourceComment,
+    SourceComment, dangling_comments, dangling_open_parenthesis_comments, trailing_comments,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
@@ -56,10 +56,19 @@ pub(crate) enum Parenthesize {
     /// Adding parentheses is desired to prevent the comments from wandering.
     IfRequired,
 
-    /// Parenthesizes the expression if the group doesn't fit on a line (e.g., even name expressions are parenthesized), or if
-    /// the expression doesn't break, but _does_ reports that it always requires parentheses in this position (e.g., walrus
-    /// operators in function return annotations).
-    IfBreaksOrIfRequired,
+    /// Same as [`Self::IfBreaks`] except that it uses [`parenthesize_if_expands`] for expressions
+    /// with the layout [`NeedsParentheses::BestFit`] which is used by non-splittable
+    /// expressions like literals, name, and strings.
+    ///
+    /// Use this layout over `IfBreaks` when there's a sequence of `maybe_parenthesize_expression`
+    /// in a single logical-line and you want to break from right-to-left. Use `IfBreaks` for the
+    /// first expression and `IfBreaksParenthesized` for the rest.
+    IfBreaksParenthesized,
+
+    /// Same as [`Self::IfBreaksParenthesized`] but uses [`parenthesize_if_expands`] for nested
+    /// [`maybe_parenthesized_expression`] calls unlike other layouts that always omit parentheses
+    /// when outer parentheses are present.
+    IfBreaksParenthesizedNested,
 }
 
 impl Parenthesize {
@@ -84,9 +93,9 @@ pub enum Parentheses {
     Never,
 }
 
-/// Returns `true` if the [`ExpressionRef`] is enclosed by parentheses in the source code.
+/// Returns `true` if the [`ExprRef`] is enclosed by parentheses in the source code.
 pub(crate) fn is_expression_parenthesized(
-    expr: ExpressionRef,
+    expr: ExprRef,
     comment_ranges: &CommentRanges,
     contents: &str,
 ) -> bool {
@@ -246,7 +255,7 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast>
                 soft_line_break(),
                 if_group_breaks(&token(")"))
             ])
-            .with_group_id(Some(parens_id))]
+            .with_id(Some(parens_id))]
         )
     }
 }
@@ -413,36 +422,36 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
         let end_of_line_split = self
             .comments
             .partition_point(|comment| comment.line_position().is_end_of_line());
-        debug_assert!(self.comments[end_of_line_split..]
-            .iter()
-            .all(|comment| comment.line_position().is_own_line()));
-        write!(
-            f,
-            [group(&format_args![
-                token(self.left),
-                // end-of-line comments
-                trailing_comments(&self.comments[..end_of_line_split]),
-                // Avoid unstable formatting with
-                // ```python
-                // x = () - (#
-                // )
-                // ```
-                // Without this the comment would go after the empty tuple first, but still expand
-                // the bin op. In the second formatting pass they are trailing bin op comments
-                // so the bin op collapse. Suboptimally we keep parentheses around the bin op in
-                // either case.
-                (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
-                // own line comments, which need to be indented
-                soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
-                token(self.right)
-            ])]
-        )
+        debug_assert!(
+            self.comments[end_of_line_split..]
+                .iter()
+                .all(|comment| comment.line_position().is_own_line())
+        );
+        group(&format_args![
+            token(self.left),
+            // end-of-line comments
+            trailing_comments(&self.comments[..end_of_line_split]),
+            // Avoid unstable formatting with
+            // ```python
+            // x = () - (#
+            // )
+            // ```
+            // Without this the comment would go after the empty tuple first, but still expand
+            // the bin op. In the second formatting pass they are trailing bin op comments
+            // so the bin op collapse. Suboptimally we keep parentheses around the bin op in
+            // either case.
+            (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
+            // own line comments, which need to be indented
+            soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
+            token(self.right)
+        ])
+        .fmt(f)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::ExpressionRef;
+    use ruff_python_ast::ExprRef;
     use ruff_python_parser::parse_expression;
     use ruff_python_trivia::CommentRanges;
 
@@ -453,7 +462,7 @@ mod tests {
         let expression = r#"(b().c("")).d()"#;
         let parsed = parse_expression(expression).unwrap();
         assert!(!is_expression_parenthesized(
-            ExpressionRef::from(parsed.expr()),
+            ExprRef::from(parsed.expr()),
             &CommentRanges::default(),
             expression
         ));

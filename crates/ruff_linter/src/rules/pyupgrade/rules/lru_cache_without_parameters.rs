@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary parentheses on `functools.lru_cache` decorators.
@@ -38,13 +38,13 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `@functools.lru_cache`](https://docs.python.org/3/library/functools.html#functools.lru_cache)
 /// - [Let lru_cache be used as a decorator with no arguments](https://github.com/python/cpython/issues/80953)
-#[violation]
-pub struct LRUCacheWithoutParameters;
+#[derive(ViolationMetadata)]
+pub(crate) struct LRUCacheWithoutParameters;
 
 impl AlwaysFixableViolation for LRUCacheWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary parentheses to `functools.lru_cache`")
+        "Unnecessary parentheses to `functools.lru_cache`".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -53,12 +53,13 @@ impl AlwaysFixableViolation for LRUCacheWithoutParameters {
 }
 
 /// UP011
-pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Decorator]) {
+pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[Decorator]) {
     for decorator in decorator_list {
         let Expr::Call(ast::ExprCall {
             func,
             arguments,
             range: _,
+            node_index: _,
         }) = &decorator.expression
         else {
             continue;
@@ -74,12 +75,11 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
                     matches!(qualified_name.segments(), ["functools", "lru_cache"])
                 })
         {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 LRUCacheWithoutParameters,
                 TextRange::new(func.end(), decorator.end()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(arguments.range())));
-            checker.diagnostics.push(diagnostic);
         }
     }
 }

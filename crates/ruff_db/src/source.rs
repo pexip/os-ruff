@@ -1,42 +1,37 @@
-use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
 use countme::Count;
-use salsa::Accumulator;
 
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
 use ruff_source_file::LineIndex;
 
-use crate::files::{File, FilePath};
 use crate::Db;
+use crate::files::{File, FilePath};
 
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
 #[salsa::tracked]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
-    let mut has_read_error = false;
+    let mut read_error = None;
 
     let kind = if is_notebook(file.path(db)) {
         file.read_to_notebook(db)
             .unwrap_or_else(|error| {
-                tracing::debug!("Failed to read notebook {path}: {error}");
+                tracing::debug!("Failed to read notebook '{path}': {error}");
 
-                has_read_error = true;
-                SourceDiagnostic(Arc::new(SourceTextError::FailedToReadNotebook(error)))
-                    .accumulate(db);
+                read_error = Some(SourceTextError::FailedToReadNotebook(error.to_string()));
                 Notebook::empty()
             })
             .into()
     } else {
         file.read_to_string(db)
             .unwrap_or_else(|error| {
-                tracing::debug!("Failed to read file {path}: {error}");
+                tracing::debug!("Failed to read file '{path}': {error}");
 
-                has_read_error = true;
-                SourceDiagnostic(Arc::new(SourceTextError::FailedToReadFile(error))).accumulate(db);
+                read_error = Some(SourceTextError::FailedToReadFile(error.to_string()));
                 String::new()
             })
             .into()
@@ -45,7 +40,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     SourceText {
         inner: Arc::new(SourceTextInner {
             kind,
-            has_read_error,
+            read_error,
             count: Count::new(),
         }),
     }
@@ -98,8 +93,8 @@ impl SourceText {
     }
 
     /// Returns `true` if there was an error when reading the content of the file.
-    pub fn has_read_error(&self) -> bool {
-        self.inner.has_read_error
+    pub fn read_error(&self) -> Option<&SourceTextError> {
+        self.inner.read_error.as_ref()
     }
 }
 
@@ -132,13 +127,13 @@ impl std::fmt::Debug for SourceText {
 struct SourceTextInner {
     count: Count<SourceText>,
     kind: SourceTextKind,
-    has_read_error: bool,
+    read_error: Option<SourceTextError>,
 }
 
 #[derive(Eq, PartialEq)]
 enum SourceTextKind {
     Text(String),
-    Notebook(Notebook),
+    Notebook(Box<Notebook>),
 }
 
 impl From<String> for SourceTextKind {
@@ -149,31 +144,22 @@ impl From<String> for SourceTextKind {
 
 impl From<Notebook> for SourceTextKind {
     fn from(notebook: Notebook) -> Self {
-        SourceTextKind::Notebook(notebook)
+        SourceTextKind::Notebook(Box::new(notebook))
     }
 }
 
-#[salsa::accumulator]
-pub struct SourceDiagnostic(Arc<SourceTextError>);
-
-impl std::fmt::Display for SourceDiagnostic {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.0, f)
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
 pub enum SourceTextError {
     #[error("Failed to read notebook: {0}`")]
-    FailedToReadNotebook(#[from] ruff_notebook::NotebookError),
+    FailedToReadNotebook(String),
     #[error("Failed to read file: {0}")]
-    FailedToReadFile(#[from] std::io::Error),
+    FailedToReadFile(String),
 }
 
 /// Computes the [`LineIndex`] for `file`.
 #[salsa::tracked]
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
-    let _span = tracing::trace_span!("line_index", file = ?file).entered();
+    let _span = tracing::trace_span!("line_index", ?file).entered();
 
     let source = source_text(db, file);
 
@@ -190,7 +176,7 @@ mod tests {
 
     use crate::files::system_path_to_file;
     use crate::source::{line_index, source_text};
-    use crate::system::{DbWithTestSystem, SystemPath};
+    use crate::system::{DbWithWritableSystem as _, SystemPath};
     use crate::tests::TestDb;
 
     #[test]
@@ -198,13 +184,13 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
         assert_eq!(source_text(&db, file).as_str(), "x = 10");
 
-        db.write_file(path, "x = 20".to_string()).unwrap();
+        db.write_file(path, "x = 20").unwrap();
 
         assert_eq!(source_text(&db, file).as_str(), "x = 20");
 
@@ -216,7 +202,7 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
@@ -230,9 +216,11 @@ mod tests {
 
         let events = db.take_salsa_events();
 
-        assert!(!events
-            .iter()
-            .any(|event| matches!(event.kind, EventKind::WillExecute { .. })));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event.kind, EventKind::WillExecute { .. }))
+        );
 
         Ok(())
     }
@@ -242,7 +230,7 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.write_file(path, "x = 10\ny = 20".to_string())?;
+        db.write_file(path, "x = 10\ny = 20")?;
 
         let file = system_path_to_file(&db, path).unwrap();
         let index = line_index(&db, file);

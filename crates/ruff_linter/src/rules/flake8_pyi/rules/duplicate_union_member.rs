@@ -2,14 +2,16 @@ use std::collections::HashSet;
 
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprBinOp, Operator, PythonVersion};
 use ruff_python_semantic::analyze::typing::traverse_union;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+
+use super::generate_union_fix;
 
 /// ## What it does
 /// Checks for duplicate union members.
@@ -27,10 +29,16 @@ use crate::checkers::ast::Checker;
 /// foo: str
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe unless the union contains comments.
+///
+/// For nested union, the fix will flatten type expressions into a single
+/// top-level union.
+///
 /// ## References
 /// - [Python documentation: `typing.Union`](https://docs.python.org/3/library/typing.html#typing.Union)
-#[violation]
-pub struct DuplicateUnionMember {
+#[derive(ViolationMetadata)]
+pub(crate) struct DuplicateUnionMember {
     duplicate_name: String,
 }
 
@@ -51,39 +59,122 @@ impl Violation for DuplicateUnionMember {
 }
 
 /// PYI016
-pub(crate) fn duplicate_union_member<'a>(checker: &mut Checker, expr: &'a Expr) {
+pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    let mut unique_nodes: Vec<&Expr> = Vec::new();
+    let mut diagnostics = Vec::new();
 
+    let mut union_type = UnionKind::TypingUnion;
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
     let mut check_for_duplicate_members = |expr: &'a Expr, parent: &'a Expr| {
+        if matches!(parent, Expr::BinOp(_)) {
+            union_type = UnionKind::PEP604;
+        }
+
         // If we've already seen this union member, raise a violation.
-        if !seen_nodes.insert(expr.into()) {
-            let mut diagnostic = Diagnostic::new(
+        if seen_nodes.insert(expr.into()) {
+            unique_nodes.push(expr);
+        } else {
+            diagnostics.push(checker.report_diagnostic(
                 DuplicateUnionMember {
                     duplicate_name: checker.generator().expr(expr),
                 },
                 expr.range(),
-            );
-            // Delete the "|" character as well as the duplicate value by reconstructing the
-            // parent without the duplicate.
-
-            // If the parent node is not a `BinOp` we will not perform a fix
-            if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = parent {
-                // Replace the parent with its non-duplicate child.
-                let child = if expr == left.as_ref() { right } else { left };
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    checker.locator().slice(child.as_ref()).to_string(),
-                    parent.range(),
-                )));
-            }
-            diagnostics.push(diagnostic);
+            ));
         }
     };
 
     // Traverse the union, collect all diagnostic members
     traverse_union(&mut check_for_duplicate_members, checker.semantic(), expr);
 
-    // Add all diagnostics to the checker
-    checker.diagnostics.append(&mut diagnostics);
+    if diagnostics.is_empty() {
+        return;
+    }
+
+    // Mark [`Fix`] as unsafe when comments are in range.
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    // Generate the flattened fix once.
+    let fix = if let &[edit_expr] = unique_nodes.as_slice() {
+        // Generate a [`Fix`] for a single type expression, e.g. `int`.
+        Some(Fix::applicable_edit(
+            Edit::range_replacement(checker.generator().expr(edit_expr), expr.range()),
+            applicability,
+        ))
+    } else {
+        match union_type {
+            // See redundant numeric union
+            UnionKind::PEP604 => Some(generate_pep604_fix(
+                checker,
+                unique_nodes,
+                expr,
+                applicability,
+            )),
+            UnionKind::TypingUnion => {
+                // Request `typing.Union`
+                let Some(importer) = checker.typing_importer("Union", PythonVersion::lowest())
+                else {
+                    return;
+                };
+                generate_union_fix(
+                    checker.generator(),
+                    &importer,
+                    unique_nodes,
+                    expr,
+                    applicability,
+                )
+                .ok()
+            }
+        }
+    };
+
+    if let Some(fix) = fix {
+        for diagnostic in &mut diagnostics {
+            diagnostic.set_fix(fix.clone());
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UnionKind {
+    /// E.g., `typing.Union[int, str]`
+    TypingUnion,
+    /// E.g., `int | str`
+    PEP604,
+}
+
+/// Generate a [`Fix`] for two or more type expressions, e.g. `int | float | complex`.
+fn generate_pep604_fix(
+    checker: &Checker,
+    nodes: Vec<&Expr>,
+    annotation: &Expr,
+    applicability: Applicability,
+) -> Fix {
+    debug_assert!(nodes.len() >= 2, "At least two nodes required");
+
+    let new_expr = nodes
+        .into_iter()
+        .fold(None, |acc: Option<Expr>, right: &Expr| {
+            if let Some(left) = acc {
+                Some(Expr::BinOp(ExprBinOp {
+                    left: Box::new(left),
+                    op: Operator::BitOr,
+                    right: Box::new(right.clone()),
+                    range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                }))
+            } else {
+                Some(right.clone())
+            }
+        })
+        .unwrap();
+
+    Fix::applicable_edit(
+        Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
+        applicability,
+    )
 }

@@ -1,11 +1,12 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_index::Indexer;
-use ruff_source_file::{Line, Locator};
+use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
+use crate::Locator;
+use crate::checkers::ast::LintContext;
 use crate::registry::Rule;
-use crate::settings::LinterSettings;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for superfluous trailing whitespace.
@@ -24,14 +25,19 @@ use crate::settings::LinterSettings;
 /// spam(1)\n#
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is marked unsafe if the whitespace is inside a multiline string,
+/// as removing it changes the string's content.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
-#[violation]
-pub struct TrailingWhitespace;
+#[derive(ViolationMetadata)]
+pub(crate) struct TrailingWhitespace;
 
 impl AlwaysFixableViolation for TrailingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Trailing whitespace")
+        "Trailing whitespace".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -56,14 +62,19 @@ impl AlwaysFixableViolation for TrailingWhitespace {
 /// class Foo(object):\n\n    bang = 12
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is marked unsafe if the whitespace is inside a multiline string,
+/// as removing it changes the string's content.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
-#[violation]
-pub struct BlankLineWithWhitespace;
+#[derive(ViolationMetadata)]
+pub(crate) struct BlankLineWithWhitespace;
 
 impl AlwaysFixableViolation for BlankLineWithWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Blank line contains whitespace")
+        "Blank line contains whitespace".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -76,8 +87,8 @@ pub(crate) fn trailing_whitespace(
     line: &Line,
     locator: &Locator,
     indexer: &Indexer,
-    settings: &LinterSettings,
-) -> Option<Diagnostic> {
+    context: &LintContext,
+) {
     let whitespace_len: TextSize = line
         .chars()
         .rev()
@@ -93,29 +104,26 @@ pub(crate) fn trailing_whitespace(
             Applicability::Safe
         };
         if range == line.range() {
-            if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
-                let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
+            if context.is_rule_enabled(Rule::BlankLineWithWhitespace) {
+                let mut diagnostic = context.report_diagnostic(BlankLineWithWhitespace, range);
                 // Remove any preceding continuations, to avoid introducing a potential
                 // syntax error.
                 diagnostic.set_fix(Fix::applicable_edit(
                     Edit::range_deletion(TextRange::new(
                         indexer
-                            .preceded_by_continuations(line.start(), locator)
+                            .preceded_by_continuations(line.start(), locator.contents())
                             .unwrap_or(range.start()),
                         range.end(),
                     )),
                     applicability,
                 ));
-                return Some(diagnostic);
             }
-        } else if settings.rules.enabled(Rule::TrailingWhitespace) {
-            let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
+        } else if context.is_rule_enabled(Rule::TrailingWhitespace) {
+            let mut diagnostic = context.report_diagnostic(TrailingWhitespace, range);
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(range),
                 applicability,
             ));
-            return Some(diagnostic);
         }
     }
-    None
 }

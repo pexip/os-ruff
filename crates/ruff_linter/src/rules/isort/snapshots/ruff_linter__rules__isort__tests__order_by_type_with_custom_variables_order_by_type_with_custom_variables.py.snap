@@ -5,6 +5,7 @@ order_by_type_with_custom_variables.py:1:1: I001 (unsorted-imports) [*] Import b
   |
 1 | / from sklearn.svm import VAR, Class, MyVar, CONST, abc
 2 | | from subprocess import utils, var_ABC, Variable, Klass, CONSTANT, exe
+  | |_____________________________________________________________________^ I001 (unsorted-imports)
   |
   = help: Organize imports
 

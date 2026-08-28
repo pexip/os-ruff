@@ -1,10 +1,10 @@
 use ruff_python_ast::Decorator;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -40,18 +40,18 @@ use crate::checkers::ast::Checker;
 /// def my_handler(sender, instance, created, **kwargs):
 ///     pass
 /// ```
-#[violation]
-pub struct DjangoNonLeadingReceiverDecorator;
+#[derive(ViolationMetadata)]
+pub(crate) struct DjangoNonLeadingReceiverDecorator;
 
 impl Violation for DjangoNonLeadingReceiverDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`@receiver` decorator must be on top of all the other decorators")
+        "`@receiver` decorator must be on top of all the other decorators".to_string()
     }
 }
 
 /// DJ013
-pub(crate) fn non_leading_receiver_decorator(checker: &mut Checker, decorator_list: &[Decorator]) {
+pub(crate) fn non_leading_receiver_decorator(checker: &Checker, decorator_list: &[Decorator]) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -70,10 +70,7 @@ pub(crate) fn non_leading_receiver_decorator(checker: &mut Checker, decorator_li
                 })
         });
         if i > 0 && is_receiver && !seen_receiver {
-            checker.diagnostics.push(Diagnostic::new(
-                DjangoNonLeadingReceiverDecorator,
-                decorator.range(),
-            ));
+            checker.report_diagnostic(DjangoNonLeadingReceiverDecorator, decorator.range());
         }
         if !is_receiver && seen_receiver {
             seen_receiver = false;

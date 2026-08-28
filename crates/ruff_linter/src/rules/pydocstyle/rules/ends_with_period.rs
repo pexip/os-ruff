@@ -1,14 +1,14 @@
 use ruff_text_size::TextLen;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::sections::SectionKind;
 use crate::docstrings::Docstring;
+use crate::docstrings::sections::SectionKind;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::pydocstyle::helpers::logical_line;
 
@@ -44,22 +44,26 @@ use crate::rules::pydocstyle::helpers::logical_line;
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
-#[violation]
-pub struct EndsInPeriod;
+#[derive(ViolationMetadata)]
+pub(crate) struct MissingTrailingPeriod;
 
-impl AlwaysFixableViolation for EndsInPeriod {
+impl Violation for MissingTrailingPeriod {
+    /// `None` in the case a fix is never available or otherwise Some
+    /// [`FixAvailability`] describing the available fix.
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("First line should end with a period")
+        "First line should end with a period".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Add period".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Add period".to_string())
     }
 }
 
 /// D400
-pub(crate) fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn ends_with_period(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     if let Some(first_line) = body.trim().universal_newlines().next() {
@@ -102,15 +106,15 @@ pub(crate) fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
         }
 
         if !trimmed.ends_with('.') {
-            let mut diagnostic = Diagnostic::new(EndsInPeriod, docstring.range());
+            let mut diagnostic =
+                checker.report_diagnostic(MissingTrailingPeriod, docstring.range());
             // Best-effort fix: avoid adding a period after other punctuation marks.
-            if !trimmed.ends_with([':', ';']) {
+            if !trimmed.ends_with([':', ';', '?', '!']) {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                     ".".to_string(),
                     line.start() + trimmed.text_len(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
-        };
+        }
     }
 }

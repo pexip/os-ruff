@@ -51,7 +51,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = 3.9
 source_type                = Python
 ```
 
@@ -109,7 +109,7 @@ magic-trailing-comma       = Ignore
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py38
+target_version             = 3.9
 source_type                = Python
 ```
 
@@ -146,6 +146,3 @@ x2 = lambda y,: 1
 with a:  # magic trailing comma
     ...
 ```
-
-
-

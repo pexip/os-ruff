@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 UP036_2.py:4:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
   |
 2 | from sys import version_info
-3 | 
+3 |
 4 | if sys.version_info > (3, 5):
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 5 |     3+6
@@ -28,7 +28,7 @@ UP036_2.py:4:4: UP036 (outdated-version-block) [*] Version block is outdated for
 UP036_2.py:9:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
  7 |     3-5
- 8 | 
+ 8 |
  9 | if version_info > (3, 5):
    |    ^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 10 |     3+6
@@ -52,7 +52,7 @@ UP036_2.py:9:4: UP036 (outdated-version-block) [*] Version block is outdated for
 UP036_2.py:14:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 12 |     3-5
-13 | 
+13 |
 14 | if sys.version_info >= (3,6):
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 15 |     3+6
@@ -76,7 +76,7 @@ UP036_2.py:14:4: UP036 (outdated-version-block) [*] Version block is outdated fo
 UP036_2.py:19:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 17 |     3-5
-18 | 
+18 |
 19 | if version_info >= (3,6):
    |    ^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 20 |     3+6
@@ -100,7 +100,7 @@ UP036_2.py:19:4: UP036 (outdated-version-block) [*] Version block is outdated fo
 UP036_2.py:24:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 22 |     3-5
-23 | 
+23 |
 24 | if sys.version_info < (3,6):
    |    ^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 25 |     3-5
@@ -124,7 +124,7 @@ UP036_2.py:24:4: UP036 (outdated-version-block) [*] Version block is outdated fo
 UP036_2.py:29:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 27 |     3+6
-28 | 
+28 |
 29 | if sys.version_info <= (3,5):
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 30 |     3-5
@@ -148,7 +148,7 @@ UP036_2.py:29:4: UP036 (outdated-version-block) [*] Version block is outdated fo
 UP036_2.py:34:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 32 |     3+6
-33 | 
+33 |
 34 | if sys.version_info <= (3, 5):
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 35 |     3-5
@@ -172,7 +172,7 @@ UP036_2.py:34:4: UP036 (outdated-version-block) [*] Version block is outdated fo
 UP036_2.py:39:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 37 |     3+6
-38 | 
+38 |
 39 | if sys.version_info >= (3, 5):
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 40 |     pass
@@ -193,7 +193,7 @@ UP036_2.py:39:4: UP036 (outdated-version-block) [*] Version block is outdated fo
 UP036_2.py:42:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 40 |     pass
-41 | 
+41 |
 42 | if sys.version_info < (3,0):
    |    ^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 43 |     pass
@@ -233,7 +233,7 @@ UP036_2.py:46:8: UP036 (outdated-version-block) [*] Version block is outdated fo
 UP036_2.py:49:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 47 |         pass
-48 | 
+48 |
 49 | if sys.version_info < (3,0):
    |    ^^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 50 |     pass
@@ -256,7 +256,7 @@ UP036_2.py:49:4: UP036 (outdated-version-block) [*] Version block is outdated fo
 UP036_2.py:54:4: UP036 (outdated-version-block) [*] Version block is outdated for minimum Python version
    |
 52 |     pass
-53 | 
+53 |
 54 | if sys.version_info > (3,):
    |    ^^^^^^^^^^^^^^^^^^^^^^^ UP036 (outdated-version-block)
 55 |     pass

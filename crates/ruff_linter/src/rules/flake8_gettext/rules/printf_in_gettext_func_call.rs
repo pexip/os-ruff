@@ -1,9 +1,9 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
-
-use crate::checkers::ast::Checker;
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
+
+use crate::Violation;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for printf-style formatted strings in `gettext` function calls.
@@ -26,7 +26,7 @@ use ruff_text_size::Ranged;
 /// from gettext import gettext as _
 ///
 /// name = "Maria"
-/// _("Hello, {}!".format(name))  # Looks for "Hello, Maria!".
+/// _("Hello, %s!" % name)  # Looks for "Hello, Maria!".
 /// ```
 ///
 /// Use instead:
@@ -38,30 +38,29 @@ use ruff_text_size::Ranged;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: gettext](https://docs.python.org/3/library/gettext.html)
-#[violation]
-pub struct PrintfInGetTextFuncCall;
+/// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
+#[derive(ViolationMetadata)]
+pub(crate) struct PrintfInGetTextFuncCall;
 
 impl Violation for PrintfInGetTextFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("printf-style format is resolved before function call; consider `_(\"string %s\") % arg`")
+        "printf-style format is resolved before function call; consider `_(\"string %s\") % arg`"
+            .to_string()
     }
 }
 
 /// INT003
-pub(crate) fn printf_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) {
+pub(crate) fn printf_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
     if let Some(first) = args.first() {
         if let Expr::BinOp(ast::ExprBinOp {
-            op: Operator::Mod { .. },
+            op: Operator::Mod,
             left,
             ..
         }) = &first
         {
             if left.is_string_literal_expr() {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
+                checker.report_diagnostic(PrintfInGetTextFuncCall {}, first.range());
             }
         }
     }

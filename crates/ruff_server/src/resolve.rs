@@ -4,6 +4,40 @@ use ruff_linter::settings::LinterSettings;
 use ruff_workspace::resolver::{match_any_exclusion, match_any_inclusion};
 use ruff_workspace::{FileResolverSettings, FormatterSettings};
 
+use crate::edit::LanguageId;
+
+/// Return `true` if the document at the given [`Path`] should be excluded from linting.
+pub(crate) fn is_document_excluded_for_linting(
+    path: &Path,
+    resolver_settings: &FileResolverSettings,
+    linter_settings: &LinterSettings,
+    language_id: Option<LanguageId>,
+) -> bool {
+    is_document_excluded(
+        path,
+        resolver_settings,
+        Some(linter_settings),
+        None,
+        language_id,
+    )
+}
+
+/// Return `true` if the document at the given [`Path`] should be excluded from formatting.
+pub(crate) fn is_document_excluded_for_formatting(
+    path: &Path,
+    resolver_settings: &FileResolverSettings,
+    formatter_settings: &FormatterSettings,
+    language_id: Option<LanguageId>,
+) -> bool {
+    is_document_excluded(
+        path,
+        resolver_settings,
+        None,
+        Some(formatter_settings),
+        language_id,
+    )
+}
+
 /// Return `true` if the document at the given [`Path`] should be excluded.
 ///
 /// The tool-specific settings should be provided if the request for the document is specific to
@@ -14,16 +48,18 @@ use ruff_workspace::{FileResolverSettings, FormatterSettings};
 /// 1. Check for global `exclude` and `extend-exclude` options along with tool specific `exclude`
 ///    option (`lint.exclude`, `format.exclude`).
 /// 2. Check for global `include` and `extend-include` options.
-pub(crate) fn is_document_excluded(
+/// 3. Check if the language ID is Python, in which case the document is included.
+/// 4. If none of the above conditions are met, the document is excluded.
+fn is_document_excluded(
     path: &Path,
     resolver_settings: &FileResolverSettings,
     linter_settings: Option<&LinterSettings>,
     formatter_settings: Option<&FormatterSettings>,
+    language_id: Option<LanguageId>,
 ) -> bool {
     if let Some(exclusion) = match_any_exclusion(
         path,
-        &resolver_settings.exclude,
-        &resolver_settings.extend_exclude,
+        resolver_settings,
         linter_settings.map(|s| &*s.exclude),
         formatter_settings.map(|s| &*s.exclude),
     ) {
@@ -31,15 +67,17 @@ pub(crate) fn is_document_excluded(
         return true;
     }
 
-    if let Some(inclusion) = match_any_inclusion(
-        path,
-        &resolver_settings.include,
-        &resolver_settings.extend_include,
-    ) {
+    if let Some(inclusion) = match_any_inclusion(path, resolver_settings) {
         tracing::debug!("Included path via `{}`: {}", inclusion, path.display());
         false
+    } else if let Some(LanguageId::Python) = language_id {
+        tracing::debug!("Included path via Python language ID: {}", path.display());
+        false
     } else {
-        // Path is excluded by not being in the inclusion set.
+        tracing::debug!(
+            "Ignored path as it's not in the inclusion set: {}",
+            path.display()
+        );
         true
     }
 }

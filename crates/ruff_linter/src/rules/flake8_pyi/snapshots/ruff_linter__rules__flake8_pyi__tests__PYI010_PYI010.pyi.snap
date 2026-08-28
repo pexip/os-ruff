@@ -6,7 +6,7 @@ PYI010.pyi:6:5: PYI010 (non-empty-stub-body) [*] Function body must contain only
 5 | def buzz():
 6 |     print("buzz")  # ERROR PYI010
   |     ^^^^^^^^^^^^^ PYI010 (non-empty-stub-body)
-7 | 
+7 |
 8 | def foo2():
   |
   = help: Replace function body with `...`
@@ -26,7 +26,7 @@ PYI010.pyi:9:5: PYI010 (non-empty-stub-body) [*] Function body must contain only
  8 | def foo2():
  9 |     123  # ERROR PYI010
    |     ^^^ PYI010 (non-empty-stub-body)
-10 | 
+10 |
 11 | def bizz():
    |
    = help: Replace function body with `...`
@@ -46,7 +46,7 @@ PYI010.pyi:12:5: PYI010 (non-empty-stub-body) [*] Function body must contain onl
 11 | def bizz():
 12 |     x = 123  # ERROR PYI010
    |     ^^^^^^^ PYI010 (non-empty-stub-body)
-13 | 
+13 |
 14 | def foo3():
    |
    = help: Replace function body with `...`

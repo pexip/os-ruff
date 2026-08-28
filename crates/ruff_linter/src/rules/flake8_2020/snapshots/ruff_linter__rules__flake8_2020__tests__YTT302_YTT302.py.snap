@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
 YTT302.py:4:1: YTT302 (sys-version-cmp-str10) `sys.version` compared to string (python10), use `sys.version_info`
   |
 2 | from sys import version
-3 | 
+3 |
 4 | version < "3"
   | ^^^^^^^ YTT302 (sys-version-cmp-str10)
 5 | sys.version < "3"

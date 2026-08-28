@@ -34,8 +34,7 @@ An extremely fast Python linter and code formatter, written in Rust.
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
 - 📏 Over [800 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
     of popular Flake8 plugins, like flake8-bugbear
-- ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/integrations/) for
-    [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://docs.astral.sh/ruff/editors/setup)
+- ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/editors) for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://docs.astral.sh/ruff/editors/setup)
 - 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#config-file-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
@@ -110,15 +109,28 @@ For more, see the [documentation](https://docs.astral.sh/ruff/).
 1. [Who's Using Ruff?](#whos-using-ruff)
 1. [License](#license)
 
-## Getting Started
+## Getting Started<a id="getting-started"></a>
 
 For more, see the [documentation](https://docs.astral.sh/ruff/).
 
 ### Installation
 
-Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
+Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI.
+
+Invoke Ruff directly with [`uvx`](https://docs.astral.sh/uv/):
 
 ```shell
+uvx ruff check   # Lint all files in the current directory.
+uvx ruff format  # Format all files in the current directory.
+```
+
+Or install Ruff with `uv` (recommended), `pip`, or `pipx`:
+
+```shell
+# With uv.
+uv tool install ruff@latest  # Install Ruff globally.
+uv add --dev ruff            # Or add Ruff to your project.
+
 # With pip.
 pip install ruff
 
@@ -136,8 +148,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.6.1/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.6.1/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.12.1/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.12.1/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -170,10 +182,10 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.6.1
+  rev: v0.12.1
   hooks:
     # Run the linter.
-    - id: ruff
+    - id: ruff-check
       args: [ --fix ]
     # Run the formatter.
     - id: ruff-format
@@ -182,7 +194,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 Ruff can also be used as a [VS Code extension](https://github.com/astral-sh/ruff-vscode) or with [various other editors](https://docs.astral.sh/ruff/editors/setup).
 
 Ruff can also be used as a [GitHub Action](https://github.com/features/actions) via
-[`ruff-action`](https://github.com/chartboost/ruff-action):
+[`ruff-action`](https://github.com/astral-sh/ruff-action):
 
 ```yaml
 name: Ruff
@@ -192,10 +204,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: chartboost/ruff-action@v1
+      - uses: astral-sh/ruff-action@v3
 ```
 
-### Configuration
+### Configuration<a id="configuration"></a>
 
 Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (see:
 [_Configuration_](https://docs.astral.sh/ruff/configuration/), or [_Settings_](https://docs.astral.sh/ruff/settings/)
@@ -238,11 +250,11 @@ exclude = [
 line-length = 88
 indent-width = 4
 
-# Assume Python 3.8
-target-version = "py38"
+# Assume Python 3.9
+target-version = "py39"
 
 [lint]
-# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
 select = ["E4", "E7", "E9", "F"]
 ignore = []
 
@@ -291,7 +303,7 @@ features that may change prior to stabilization.
 See `ruff help` for more on Ruff's top-level commands, or `ruff help check` and `ruff help format`
 for more on the linting and formatting commands, respectively.
 
-## Rules
+## Rules<a id="rules"></a>
 
 <!-- Begin section: Rules -->
 
@@ -367,21 +379,21 @@ quality tools, including:
 
 For a complete enumeration of the supported rules, see [_Rules_](https://docs.astral.sh/ruff/rules/).
 
-## Contributing
+## Contributing<a id="contributing"></a>
 
 Contributions are welcome and highly appreciated. To get started, check out the
 [**contributing guidelines**](https://docs.astral.sh/ruff/contributing/).
 
 You can also join us on [**Discord**](https://discord.com/invite/astral-sh).
 
-## Support
+## Support<a id="support"></a>
 
 Having trouble? Check out the existing issues on [**GitHub**](https://github.com/astral-sh/ruff/issues),
 or feel free to [**open a new one**](https://github.com/astral-sh/ruff/issues/new).
 
 You can also ask for help on [**Discord**](https://discord.com/invite/astral-sh).
 
-## Acknowledgements
+## Acknowledgements<a id="acknowledgements"></a>
 
 Ruff's linter draws on both the APIs and implementation details of many other
 tools in the Python ecosystem, especially [Flake8](https://github.com/PyCQA/flake8), [Pyflakes](https://github.com/PyCQA/pyflakes),
@@ -405,7 +417,7 @@ Ruff is the beneficiary of a large number of [contributors](https://github.com/a
 
 Ruff is released under the MIT license.
 
-## Who's Using Ruff?
+## Who's Using Ruff?<a id="whos-using-ruff"></a>
 
 Ruff is used by a number of major open-source projects and companies, including:
 
@@ -417,6 +429,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Babel](https://github.com/python-babel/babel)
 - Benchling ([Refac](https://github.com/benchling/refac))
 - [Bokeh](https://github.com/bokeh/bokeh)
+- CrowdCent ([NumerBlox](https://github.com/crowdcent/numerblox)) <!-- typos: ignore -->
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
 - CERN ([Indico](https://getindico.io/))
 - [DVC](https://github.com/iterative/dvc)
@@ -438,6 +451,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Ibis](https://github.com/ibis-project/ibis)
 - [ivy](https://github.com/unifyai/ivy)
+- [JAX](https://github.com/jax-ml/jax)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [Kraken Tech](https://kraken.tech/)
 - [LangChain](https://github.com/hwchase17/langchain)
@@ -524,7 +538,7 @@ If you're using Ruff, consider adding the Ruff badge to your project's `README.m
 <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff" style="max-width:100%;"></a>
 ```
 
-## License
+## License<a id="license"></a>
 
 This repository is licensed under the [MIT License](https://github.com/astral-sh/ruff/blob/main/LICENSE)
 

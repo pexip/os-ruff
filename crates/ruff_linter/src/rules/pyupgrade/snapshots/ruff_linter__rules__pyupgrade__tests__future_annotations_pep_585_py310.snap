@@ -43,7 +43,7 @@ future_annotations.py:35:9: UP006 (non-pep585-annotation) [*] Use `list` instead
 future_annotations.py:42:27: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 40 | x: Optional[int] = None
-41 | 
+41 |
 42 | MyList: TypeAlias = Union[List[int], List[str]]
    |                           ^^^^ UP006 (non-pep585-annotation)
    |
@@ -59,7 +59,7 @@ future_annotations.py:42:27: UP006 (non-pep585-annotation) [*] Use `list` instea
 future_annotations.py:42:38: UP006 (non-pep585-annotation) [*] Use `list` instead of `List` for type annotation
    |
 40 | x: Optional[int] = None
-41 | 
+41 |
 42 | MyList: TypeAlias = Union[List[int], List[str]]
    |                                      ^^^^ UP006 (non-pep585-annotation)
    |

@@ -24,7 +24,7 @@ assert_on_string_literal.py:14:12: PLW0129 (assert-on-string-literal) Asserting 
 13 | except:
 14 |     assert "bad again"  # [assert-on-string-literal]
    |            ^^^^^^^^^^^ PLW0129 (assert-on-string-literal)
-15 | 
+15 |
 16 | a = 12
    |
 

@@ -81,7 +81,7 @@ UP003.py:5:1: UP003 (type-of-primitive) [*] Use `complex` instead of `type(...)`
 4 | type(0.0)
 5 | type(0j)
   | ^^^^^^^^ UP003 (type-of-primitive)
-6 | 
+6 |
 7 | # OK
   |
   = help: Replace `type(...)` with `complex`

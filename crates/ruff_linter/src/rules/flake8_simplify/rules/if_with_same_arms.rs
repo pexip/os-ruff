@@ -2,17 +2,18 @@ use std::borrow::Cow;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
+use ruff_python_ast::stmt_if::{IfElifBranch, if_elif_branches};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` branches with identical arm bodies.
@@ -34,15 +35,15 @@ use crate::checkers::ast::Checker;
 /// if x == 1 or x == 2:
 ///     print("Hello")
 /// ```
-#[violation]
-pub struct IfWithSameArms;
+#[derive(ViolationMetadata)]
+pub(crate) struct IfWithSameArms;
 
 impl Violation for IfWithSameArms {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Combine `if` branches using logical `or` operator")
+        "Combine `if` branches using logical `or` operator".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -51,7 +52,7 @@ impl Violation for IfWithSameArms {
 }
 
 /// SIM114
-pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
     let mut branches_iter = if_elif_branches(stmt_if).peekable();
     while let Some(current_branch) = branches_iter.next() {
         let Some(following_branch) = branches_iter.peek() else {
@@ -65,7 +66,7 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         if !current_branch
             .body
             .iter()
-            .zip(following_branch.body.iter())
+            .zip(following_branch.body)
             .all(|(stmt1, stmt2)| ComparableStmt::from(stmt1) == ComparableStmt::from(stmt2))
         {
             continue;
@@ -86,7 +87,7 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             IfWithSameArms,
             TextRange::new(current_branch.start(), following_branch.end()),
         );
@@ -100,8 +101,6 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
                 checker.comment_ranges(),
             )
         });
-
-        checker.diagnostics.push(diagnostic);
     }
 }
 

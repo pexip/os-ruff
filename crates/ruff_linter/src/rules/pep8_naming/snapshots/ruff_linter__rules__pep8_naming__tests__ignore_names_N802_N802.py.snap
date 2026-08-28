@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 N802.py:6:5: N802 (invalid-function-name) Function name `stillBad` should be lowercase
   |
 4 |     pass
-5 | 
+5 |
 6 | def stillBad():
   |     ^^^^^^^^ N802 (invalid-function-name)
 7 |     pass
@@ -13,7 +13,7 @@ N802.py:6:5: N802 (invalid-function-name) Function name `stillBad` should be low
 N802.py:13:9: N802 (invalid-function-name) Function name `stillBad` should be lowercase
    |
 11 |         return super().tearDown()
-12 | 
+12 |
 13 |     def stillBad(self):
    |         ^^^^^^^^ N802 (invalid-function-name)
 14 |         return super().tearDown()

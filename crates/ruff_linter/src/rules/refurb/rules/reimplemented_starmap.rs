@@ -1,6 +1,5 @@
-use anyhow::{bail, Result};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use anyhow::{Result, bail};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for generator expressions, list and set comprehensions that can
@@ -29,18 +29,7 @@ use crate::importer::ImportRequest;
 ///
 /// ## Example
 /// ```python
-/// scores = [85, 100, 60]
-/// passing_scores = [60, 80, 70]
-///
-///
-/// def passed_test(score: int, passing_score: int) -> bool:
-///     return score >= passing_score
-///
-///
-/// passed_all_tests = all(
-///     passed_test(score, passing_score)
-///     for score, passing_score in zip(scores, passing_scores)
-/// )
+/// all(predicate(a, b) for a, b in some_iterable)
 /// ```
 ///
 /// Use instead:
@@ -48,15 +37,7 @@ use crate::importer::ImportRequest;
 /// from itertools import starmap
 ///
 ///
-/// scores = [85, 100, 60]
-/// passing_scores = [60, 80, 70]
-///
-///
-/// def passed_test(score: int, passing_score: int) -> bool:
-///     return score >= passing_score
-///
-///
-/// passed_all_tests = all(starmap(passed_test, zip(scores, passing_scores)))
+/// all(starmap(predicate, some_iterable))
 /// ```
 ///
 /// ## References
@@ -64,26 +45,26 @@ use crate::importer::ImportRequest;
 ///
 /// [PEP 709]: https://peps.python.org/pep-0709/
 /// [#7771]: https://github.com/astral-sh/ruff/issues/7771
-#[violation]
-pub struct ReimplementedStarmap;
+#[derive(ViolationMetadata)]
+pub(crate) struct ReimplementedStarmap;
 
 impl Violation for ReimplementedStarmap {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `itertools.starmap` instead of the generator")
+        "Use `itertools.starmap` instead of the generator".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `itertools.starmap`"))
+        Some("Replace with `itertools.starmap`".to_string())
     }
 }
 
 /// FURB140
-pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandidate) {
+pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate) {
     // Generator should have exactly one comprehension.
-    let [comprehension @ ast::Comprehension { .. }] = target.generators() else {
+    let [comprehension] = target.generators() else {
         return;
     };
 
@@ -152,7 +133,7 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
         }
     }
 
-    let mut diagnostic = Diagnostic::new(ReimplementedStarmap, target.range());
+    let mut diagnostic = checker.report_diagnostic(ReimplementedStarmap, target.range());
     diagnostic.try_set_fix(|| {
         // Import `starmap` from `itertools`.
         let (import_edit, starmap_name) = checker.importer().get_or_import_symbol(
@@ -175,7 +156,6 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
         );
         Ok(Fix::safe_edits(import_edit, [main_edit]))
     });
-    checker.diagnostics.push(diagnostic);
 }
 
 /// An enum for a node that can be considered a candidate for replacement with `starmap`.
@@ -318,6 +298,7 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
         id: starmap_binding,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     ast::ExprCall {
         func: Box::new(starmap.into()),
@@ -325,8 +306,10 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
             args: Box::from([func.clone(), iter.clone()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     }
 }
 
@@ -336,6 +319,7 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
         id: func_name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     ast::ExprCall {
         func: Box::new(name.into()),
@@ -343,8 +327,10 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
             args: Box::from([call.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     }
 }
 

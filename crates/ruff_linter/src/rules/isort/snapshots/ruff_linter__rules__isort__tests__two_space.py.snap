@@ -11,9 +11,9 @@ two_space.py:2:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-fo
  6 | |   nan,
  7 | |   pi,
  8 | | )
- 9 | | 
-10 | | del sin, cos, tan, pi, nan
    | |_^ I001 (unsorted-imports)
+ 9 |
+10 |   del sin, cos, tan, pi, nan
    |
    = help: Organize imports
 

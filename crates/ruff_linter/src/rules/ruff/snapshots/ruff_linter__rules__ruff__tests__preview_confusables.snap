@@ -39,7 +39,7 @@ confusables.py:26:10: RUF001 (ambiguous-unicode-character-string) String contain
 25 | # contains ASCII.
 26 | x = "βα Bαd"
    |          ^ RUF001 (ambiguous-unicode-character-string)
-27 | 
+27 |
 28 | # The two characters should be flagged here. The first character is a "word"
    |
 
@@ -49,7 +49,7 @@ confusables.py:31:6: RUF001 (ambiguous-unicode-character-string) String contains
 30 | # boundary" (whitespace) that it itself ambiguous.
 31 | x = "Р усский"
    |      ^ RUF001 (ambiguous-unicode-character-string)
-32 | 
+32 |
 33 | # Same test cases as above but using f-strings instead:
    |
 
@@ -59,7 +59,7 @@ confusables.py:31:7: RUF001 (ambiguous-unicode-character-string) String contains
 30 | # boundary" (whitespace) that it itself ambiguous.
 31 | x = "Р усский"
    |       ^ RUF001 (ambiguous-unicode-character-string)
-32 | 
+32 |
 33 | # Same test cases as above but using f-strings instead:
    |
 
@@ -87,7 +87,7 @@ confusables.py:38:7: RUF001 (ambiguous-unicode-character-string) String contains
 37 | x = f"βα Bαd"
 38 | x = f"Р усский"
    |       ^ RUF001 (ambiguous-unicode-character-string)
-39 | 
+39 |
 40 | # Nested f-strings
    |
 
@@ -97,7 +97,7 @@ confusables.py:38:8: RUF001 (ambiguous-unicode-character-string) String contains
 37 | x = f"βα Bαd"
 38 | x = f"Р усский"
    |        ^ RUF001 (ambiguous-unicode-character-string)
-39 | 
+39 |
 40 | # Nested f-strings
    |
 
@@ -106,7 +106,7 @@ confusables.py:41:7: RUF001 (ambiguous-unicode-character-string) String contains
 40 | # Nested f-strings
 41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
    |       ^ RUF001 (ambiguous-unicode-character-string)
-42 | 
+42 |
 43 | # Comments inside f-strings
    |
 
@@ -115,7 +115,7 @@ confusables.py:41:21: RUF001 (ambiguous-unicode-character-string) String contain
 40 | # Nested f-strings
 41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
    |                     ^ RUF001 (ambiguous-unicode-character-string)
-42 | 
+42 |
 43 | # Comments inside f-strings
    |
 
@@ -124,7 +124,7 @@ confusables.py:41:25: RUF001 (ambiguous-unicode-character-string) String contain
 40 | # Nested f-strings
 41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
    |                         ^ RUF001 (ambiguous-unicode-character-string)
-42 | 
+42 |
 43 | # Comments inside f-strings
    |
 
@@ -133,7 +133,7 @@ confusables.py:41:26: RUF001 (ambiguous-unicode-character-string) String contain
 40 | # Nested f-strings
 41 | x = f"𝐁ad string {f" {f"Р усский"}"}"
    |                          ^ RUF001 (ambiguous-unicode-character-string)
-42 | 
+42 |
 43 | # Comments inside f-strings
    |
 
@@ -159,7 +159,7 @@ confusables.py:55:28: RUF001 (ambiguous-unicode-character-string) String contain
    |
 55 | assert getattr(Labware(), "µL") == 1.5
    |                            ^ RUF001 (ambiguous-unicode-character-string)
-56 | 
+56 |
 57 | # Implicit string concatenation
    |
 
@@ -168,6 +168,8 @@ confusables.py:58:6: RUF001 (ambiguous-unicode-character-string) String contains
 57 | # Implicit string concatenation
 58 | x = "𝐁ad" f"𝐁ad string"
    |      ^ RUF001 (ambiguous-unicode-character-string)
+59 |
+60 | from typing import Literal
    |
 
 confusables.py:58:13: RUF001 (ambiguous-unicode-character-string) String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
@@ -175,4 +177,13 @@ confusables.py:58:13: RUF001 (ambiguous-unicode-character-string) String contain
 57 | # Implicit string concatenation
 58 | x = "𝐁ad" f"𝐁ad string"
    |             ^ RUF001 (ambiguous-unicode-character-string)
+59 |
+60 | from typing import Literal
+   |
+
+confusables.py:61:20: RUF001 (ambiguous-unicode-character-string) String contains ambiguous `ﮨ` (ARABIC LETTER HEH GOAL INITIAL FORM). Did you mean `o` (LATIN SMALL LETTER O)?
+   |
+60 | from typing import Literal
+61 | x: '''"""'Literal["ﮨ"]'"""'''
+   |                    ^ RUF001 (ambiguous-unicode-character-string)
    |

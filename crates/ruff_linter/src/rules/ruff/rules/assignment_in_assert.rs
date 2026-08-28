@@ -1,9 +1,8 @@
-use ruff_python_ast::Expr;
-
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -20,34 +19,65 @@ use crate::checkers::ast::Checker;
 /// which may result in unexpected behavior (e.g., undefined variable
 /// accesses).
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// assert (x := 0) == 0
+/// print(x)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// x = 0
 /// assert x == 0
+/// print(x)
+/// ```
+///
+/// The rule avoids flagging named expressions that define variables which are
+/// only referenced from inside `assert` statements; the following will not
+/// trigger the rule:
+/// ```python
+/// assert (x := y**2) > 42, f"Expected >42 but got {x}"
+/// ```
+///
+/// Nor will this:
+/// ```python
+/// assert (x := y**2) > 42
+/// assert x < 1_000_000
 /// ```
 ///
 /// ## References
 /// - [Python documentation: `-O`](https://docs.python.org/3/using/cmdline.html#cmdoption-O)
-#[violation]
-pub struct AssignmentInAssert;
+#[derive(ViolationMetadata)]
+pub(crate) struct AssignmentInAssert;
 
 impl Violation for AssignmentInAssert {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid assignment expressions in `assert` statements")
+        "Avoid assignment expressions in `assert` statements".to_string()
     }
 }
 
 /// RUF018
-pub(crate) fn assignment_in_assert(checker: &mut Checker, value: &Expr) {
-    if checker.semantic().current_statement().is_assert_stmt() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(AssignmentInAssert, value.range()));
+pub(crate) fn assignment_in_assert(checker: &Checker, binding: &Binding) {
+    if !binding.in_assert_statement() {
+        return;
     }
+
+    let semantic = checker.semantic();
+
+    let Some(parent_expression) = binding
+        .expression(semantic)
+        .and_then(|expr| expr.as_named_expr())
+    else {
+        return;
+    };
+
+    if binding
+        .references()
+        .all(|reference| semantic.reference(reference).in_assert_statement())
+    {
+        return;
+    }
+
+    checker.report_diagnostic(AssignmentInAssert, parent_expression.range());
 }

@@ -23,7 +23,7 @@ E30.py:644:5: E303 (too-many-blank-lines) [*] Too many blank lines (2)
     |
 644 |     # arbitrary comment
     |     ^^^^^^^^^^^^^^^^^^^ E303 (too-many-blank-lines)
-645 | 
+645 |
 646 |     def inner():  # E306 not expected (pycodestyle detects E306)
     |
     = help: Remove extraneous blank line(s)
@@ -76,7 +76,7 @@ E30.py:676:1: E303 (too-many-blank-lines) [*] Too many blank lines (3)
     |
 676 | # comment
     | ^^^^^^^^^ E303 (too-many-blank-lines)
-677 | 
+677 |
 678 | print()
     |
     = help: Remove extraneous blank line(s)
@@ -110,7 +110,7 @@ E30.py:690:5: E303 (too-many-blank-lines) [*] Too many blank lines (2)
     |
 690 |     # another comment
     |     ^^^^^^^^^^^^^^^^^ E303 (too-many-blank-lines)
-691 | 
+691 |
 692 |     print()
     |
     = help: Remove extraneous blank line(s)
@@ -198,7 +198,7 @@ E30.py:734:5: E303 (too-many-blank-lines) [*] Too many blank lines (2)
     |
 734 |     # another comment
     |     ^^^^^^^^^^^^^^^^^ E303 (too-many-blank-lines)
-735 | 
+735 |
 736 |     def test(self): pass
     |
     = help: Remove extraneous blank line(s)

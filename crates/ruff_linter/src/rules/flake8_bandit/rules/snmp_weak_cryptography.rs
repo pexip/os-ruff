@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -28,20 +28,19 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-319](https://cwe.mitre.org/data/definitions/319.html)
-#[violation]
-pub struct SnmpWeakCryptography;
+#[derive(ViolationMetadata)]
+pub(crate) struct SnmpWeakCryptography;
 
 impl Violation for SnmpWeakCryptography {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure."
-        )
+        "You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure."
+            .to_string()
     }
 }
 
 /// S509
-pub(crate) fn snmp_weak_cryptography(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn snmp_weak_cryptography(checker: &Checker, call: &ast::ExprCall) {
     if call.arguments.len() < 3 {
         if checker
             .semantic()
@@ -53,9 +52,7 @@ pub(crate) fn snmp_weak_cryptography(checker: &mut Checker, call: &ast::ExprCall
                 )
             })
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(SnmpWeakCryptography, call.func.range()));
+            checker.report_diagnostic(SnmpWeakCryptography, call.func.range());
         }
     }
 }

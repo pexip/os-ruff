@@ -15,6 +15,6 @@ S506.py:24:24: S506 (unsafe-yaml-load) Probable use of unsafe loader `Loader` wi
    |
 24 | yaml.load("{}", Loader=yaml.Loader)
    |                        ^^^^^^^^^^^ S506 (unsafe-yaml-load)
-25 | 
+25 |
 26 | # no issue should be found
    |

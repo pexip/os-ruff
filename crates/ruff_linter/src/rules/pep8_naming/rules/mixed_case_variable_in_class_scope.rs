@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
 
@@ -14,12 +14,12 @@ use crate::rules::pep8_naming::helpers;
 /// by underscores (also known as `snake_case`).
 ///
 /// > Function names should be lowercase, with words separated by underscores
-/// as necessary to improve readability.
+/// > as necessary to improve readability.
 /// >
 /// > Variable names follow the same convention as function names.
 /// >
 /// > mixedCase is allowed only in contexts where that’s already the
-/// prevailing style (e.g. threading.py), to retain backwards compatibility.
+/// > prevailing style (e.g. threading.py), to retain backwards compatibility.
 ///
 /// ## Example
 /// ```python
@@ -35,9 +35,13 @@ use crate::rules::pep8_naming::helpers;
 ///     another_variable = "world"
 /// ```
 ///
+/// ## Options
+/// - `lint.pep8-naming.ignore-names`
+/// - `lint.pep8-naming.extend-ignore-names`
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
-#[violation]
-pub struct MixedCaseVariableInClassScope {
+#[derive(ViolationMetadata)]
+pub(crate) struct MixedCaseVariableInClassScope {
     name: String,
 }
 
@@ -51,7 +55,7 @@ impl Violation for MixedCaseVariableInClassScope {
 
 /// N815
 pub(crate) fn mixed_case_variable_in_class_scope(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     name: &str,
     class_def: &ast::StmtClassDef,
@@ -68,14 +72,14 @@ pub(crate) fn mixed_case_variable_in_class_scope(
         return;
     }
 
-    if checker.settings.pep8_naming.ignore_names.matches(name) {
+    if checker.settings().pep8_naming.ignore_names.matches(name) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(
         MixedCaseVariableInClassScope {
             name: name.to_string(),
         },
         expr.range(),
-    ));
+    );
 }

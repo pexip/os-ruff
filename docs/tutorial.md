@@ -5,21 +5,26 @@ your project. For a more detailed overview, see [_Configuring Ruff_](configurati
 
 ## Getting Started
 
-To start, we'll install Ruff through PyPI (or with your [preferred package manager](installation.md)):
+To start, we'll initialize a project using [uv](https://docs.astral.sh/uv/):
 
 ```console
-$ pip install ruff
+$ uv init --lib numbers
 ```
 
-Let's then assume that our project structure looks like:
+This command creates a Python project with the following structure:
 
 ```text
 numbers
-  ├── __init__.py
-  └── numbers.py
+  ├── README.md
+  ├── pyproject.toml
+  └── src
+      └── numbers
+          ├── __init__.py
+          └── py.typed
 ```
 
-...where `numbers.py` contains the following code:
+We'll then clear out the auto-generated content in `src/numbers/__init__.py`
+and create `src/numbers/calculate.py` with the following code:
 
 ```python
 from typing import Iterable
@@ -35,28 +40,40 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
     )
 ```
 
-We can run the Ruff linter over our project via `ruff check`:
+Next, we'll add Ruff to our project:
 
 ```console
-$ ruff check
-numbers/numbers.py:3:8: F401 [*] `os` imported but unused
+$ uv add --dev ruff
+```
+
+We can then run the Ruff linter over our project via `uv run ruff check`:
+
+```console
+$ uv run ruff check
+src/numbers/calculate.py:3:8: F401 [*] `os` imported but unused
 Found 1 error.
 [*] 1 fixable with the `--fix` option.
 ```
+
+!!! note
+
+    As an alternative to `uv run`, you can also run Ruff by activating the project's virtual
+    environment (`source .venv/bin/active` on Linux and macOS, or `.venv\Scripts\activate` on
+    Windows) and running `ruff check` directly.
 
 Ruff identified an unused import, which is a common error in Python code. Ruff considers this a
 "fixable" error, so we can resolve the issue automatically by running `ruff check --fix`:
 
 ```console
-$ ruff check --fix
+$ uv run ruff check --fix
 Found 1 error (1 fixed, 0 remaining).
 ```
 
 Running `git diff` shows the following:
 
 ```diff
---- a/numbers/numbers.py
-+++ b/numbers/numbers.py
+--- a/src/numbers/calculate.py
++++ b/src/numbers/calculate.py
 @@ -1,7 +1,5 @@
  from typing import Iterable
 
@@ -74,13 +91,13 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
 Note Ruff runs in the current directory by default, but you can pass specific paths to check:
 
 ```console
-$ ruff check numbers/numbers.py
+$ uv run ruff check src/numbers/calculate.py
 ```
 
 Now that our project is passing `ruff check`, we can run the Ruff formatter via `ruff format`:
 
 ```console
-$ ruff format
+$ uv run ruff format
 1 file reformatted
 ```
 
@@ -88,8 +105,8 @@ Running `git diff` shows that the `sum` call was reformatted to fit within the d
 line length limit:
 
 ```diff
---- a/numbers.py
-+++ b/numbers.py
+--- a/src/numbers/calculate.py
++++ b/src/numbers/calculate.py
 @@ -3,7 +3,4 @@ from typing import Iterable
 
  def sum_even_numbers(numbers: Iterable[int]) -> int:
@@ -109,7 +126,7 @@ Ruff's behavior.
 To determine the appropriate settings for each Python file, Ruff looks for the first
 `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file in the file's directory or any parent directory.
 
-To configure Ruff, let's create a configuration file in our project's root directory:
+To configure Ruff, we'll add the following to the configuration file in our project's root directory:
 
 === "pyproject.toml"
 
@@ -141,8 +158,8 @@ To configure Ruff, let's create a configuration file in our project's root direc
 Running Ruff again, we see that it now enforces a maximum line width, with a limit of 79:
 
 ```console
-$ ruff check
-numbers/numbers.py:5:80: E501 Line too long (90 > 79)
+$ uv run ruff check
+src/numbers/calculate.py:5:80: E501 Line too long (90 > 79)
 Found 1 error.
 ```
 
@@ -223,8 +240,8 @@ If we run Ruff again, we'll see that it now enforces the pyupgrade rules. In par
 the use of the deprecated `typing.Iterable` instead of `collections.abc.Iterable`:
 
 ```console
-$ ruff check
-numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
+$ uv run ruff check
+src/numbers/calculate.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
 Found 1 error.
 [*] 1 fixable with the `--fix` option.
 ```
@@ -266,10 +283,16 @@ all functions have docstrings:
 If we run Ruff again, we'll see that it now enforces the pydocstyle rules:
 
 ```console
-$ ruff check
-numbers/__init__.py:1:1: D104 Missing docstring in public package
-numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
-numbers/numbers.py:1:1: D100 Missing docstring in public module
+$ uv run ruff check
+src/numbers/__init__.py:1:1: D104 Missing docstring in public package
+src/numbers/calculate.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
+  |
+1 | from typing import Iterable
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+  |
+  = help: Import from `collections.abc`
+
+src/numbers/calculate.py:1:1: D100 Missing docstring in public module
 Found 3 errors.
 [*] 1 fixable with the `--fix` option.
 ```
@@ -291,10 +314,10 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
 Running `ruff check` again, we'll see that it no longer flags the `Iterable` import:
 
 ```console
-$ ruff check
-numbers/__init__.py:1:1: D104 Missing docstring in public package
-numbers/numbers.py:1:1: D100 Missing docstring in public module
-Found 3 errors.
+$ uv run ruff check
+src/numbers/__init__.py:1:1: D104 Missing docstring in public package
+src/numbers/calculate.py:1:1: D100 Missing docstring in public module
+Found 2 errors.
 ```
 
 If we want to ignore a rule for an entire file, we can add the line `# ruff: noqa: {code}` anywhere
@@ -322,23 +345,20 @@ line based on its existing violations. We can combine `--add-noqa` with the `--s
 flag to add `# noqa` directives to all existing `UP035` violations:
 
 ```console
-$ ruff check --select UP035 --add-noqa .
+$ uv run ruff check --select UP035 --add-noqa .
 Added 1 noqa directive.
 ```
 
 Running `git diff` shows the following:
 
 ```diff
-diff --git a/tutorial/src/main.py b/tutorial/src/main.py
-index b9291c5ca..b9f15b8c1 100644
---- a/numbers/numbers.py
-+++ b/numbers/numbers.py
+diff --git a/numbers/src/numbers/calculate.py b/numbers/src/numbers/calculate.py
+index 71fca60c8d..e92d839f1b 100644
+--- a/numbers/src/numbers/calculate.py
++++ b/numbers/src/numbers/calculate.py
 @@ -1,4 +1,4 @@
 -from typing import Iterable
 +from typing import Iterable  # noqa: UP035
-
-
- def sum_even_numbers(numbers: Iterable[int]) -> int:
 ```
 
 ## Integrations
@@ -349,7 +369,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.4
+  rev: v0.12.1
   hooks:
     # Run the linter.
     - id: ruff

@@ -8,7 +8,7 @@ B029.py:8:1: B029 (except-with-empty-tuple) Using `except ():` with an empty tup
  8 | / except ():
  9 | |     pass
    | |________^ B029 (except-with-empty-tuple)
-10 |   
+10 |
 11 |   try:
    |
 
@@ -18,5 +18,27 @@ B029.py:13:1: B029 (except-with-empty-tuple) Using `except ():` with an empty tu
 12 |       pass
 13 | / except () as e:
 14 | |     pass
+   | |________^ B029 (except-with-empty-tuple)
+15 |
+16 |   try:
+   |
+
+B029.py:18:1: B029 (except-with-empty-tuple) Using `except* ():` with an empty tuple does not catch anything; add exceptions to handle
+   |
+16 |   try:
+17 |       pass
+18 | / except* ():
+19 | |     pass
+   | |________^ B029 (except-with-empty-tuple)
+20 |
+21 |   try:
+   |
+
+B029.py:23:1: B029 (except-with-empty-tuple) Using `except* ():` with an empty tuple does not catch anything; add exceptions to handle
+   |
+21 |   try:
+22 |       pass
+23 | / except* () as e:
+24 | |     pass
    | |________^ B029 (except-with-empty-tuple)
    |

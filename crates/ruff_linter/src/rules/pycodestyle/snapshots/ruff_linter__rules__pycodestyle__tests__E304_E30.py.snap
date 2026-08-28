@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E30.py:765:1: E304 (blank-line-after-decorator) [*] Blank lines found after function decorator (1)
     |
 763 | @decorator
-764 | 
+764 |
 765 | def function():
     | ^^^ E304 (blank-line-after-decorator)
 766 |     pass

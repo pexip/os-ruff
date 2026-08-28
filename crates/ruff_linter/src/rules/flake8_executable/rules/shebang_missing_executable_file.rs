@@ -1,13 +1,9 @@
-#![allow(unused_imports)]
-
 use std::path::Path;
 
-use ruff_text_size::{Ranged, TextRange};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
-
-use crate::registry::AsRule;
+use crate::Violation;
+use crate::checkers::ast::LintContext;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
 
@@ -27,7 +23,8 @@ use crate::rules::flake8_executable::helpers::is_executable;
 /// #!/usr/bin/env python
 /// ```
 ///
-/// Otherwise, remove the executable bit from the file (e.g., `chmod -x __main__.py`).
+/// Otherwise, remove the executable bit from the file
+/// (e.g., `chmod -x __main__.py` or `git update-index --chmod=-x __main__.py`).
 ///
 /// A file is considered executable if it has the executable bit set (i.e., its
 /// permissions mode intersects with `0o111`). As such, _this rule is only
@@ -35,34 +32,33 @@ use crate::rules::flake8_executable::helpers::is_executable;
 ///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
-#[violation]
-pub struct ShebangMissingExecutableFile;
+/// - [Git documentation: `git update-index --chmod`](https://git-scm.com/docs/git-update-index#Documentation/git-update-index.txt---chmod-x)
+#[derive(ViolationMetadata)]
+pub(crate) struct ShebangMissingExecutableFile;
 
 impl Violation for ShebangMissingExecutableFile {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The file is executable but no shebang is present")
+        "The file is executable but no shebang is present".to_string()
     }
 }
 
 /// EXE002
 #[cfg(target_family = "unix")]
-pub(crate) fn shebang_missing_executable_file(filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing_executable_file(filepath: &Path, context: &LintContext) {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
+
     if is_wsl::is_wsl() {
-        return None;
+        return;
     }
     if let Ok(true) = is_executable(filepath) {
-        return Some(Diagnostic::new(
+        context.report_diagnostic_if_enabled(
             ShebangMissingExecutableFile,
-            TextRange::default(),
-        ));
+            ruff_text_size::TextRange::default(),
+        );
     }
-    None
 }
 
 #[cfg(not(target_family = "unix"))]
-pub(crate) fn shebang_missing_executable_file(_filepath: &Path) -> Option<Diagnostic> {
-    None
-}
+pub(crate) fn shebang_missing_executable_file(_filepath: &Path, _diagnostics: &LintContext) {}

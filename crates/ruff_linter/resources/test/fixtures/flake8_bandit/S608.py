@@ -95,18 +95,87 @@ cursor.execute('SELECT * FROM table WHERE id = 1')
 cursor.executemany('SELECT * FROM table WHERE id = %s', [var, var2])
 
 # # INSERT without INTO (e.g. MySQL and derivatives)
-query = "INSERT table VALUES (%s)" % (var,)
+query46 = "INSERT table VALUES (%s)" % (var,)
 
 # # REPLACE (e.g. MySQL and derivatives, SQLite)
-query = "REPLACE INTO table VALUES (%s)" % (var,)
-query = "REPLACE table VALUES (%s)" % (var,)
+query47 = "REPLACE INTO table VALUES (%s)" % (var,)
+query48 = "REPLACE table VALUES (%s)" % (var,)
 
-query = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
+query49 = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
 
 # # pass
 ["select colA from tableA"] + ["select colB from tableB"]
 "SELECT * FROM " + (["table1"] if x > 0 else ["table2"])
 
 # # errors
-"SELECT * FROM " + ("table1" if x > 0 else "table2")
-"SELECT * FROM " + ("table1" if x > 0 else ["table2"])
+"SELECT * FROM " + ("table1" if x > 0 else "table2") # query50
+"SELECT * FROM " + ("table1" if x > 0 else ["table2"]) # query51
+
+# test cases from #12044
+
+def query52():
+    return f"""
+SELECT {var}
+    FROM bar
+    """
+
+def query53():
+    return f"""
+    SELECT
+        {var}
+    FROM bar
+    """
+
+def query54():
+    return f"""
+    SELECT {var}
+    FROM
+        bar
+    """
+
+query55 = f"""SELECT * FROM
+{var}.table
+"""
+
+query56 = f"""SELECT *
+FROM {var}.table
+"""
+
+query57 = f"""
+SELECT *
+FROM {var}.table
+"""
+
+query57 = f"""
+PRESELECT *
+FROM {var}.table
+"""
+
+# to be handled separately
+# query58 = f"SELECT\
+#  * FROM {var}.table"
+
+
+# https://github.com/astral-sh/ruff/issues/15653
+query59 = f"""
+    SELECT *, foo
+    FROM ({user_input}) raw
+"""
+query60 = f"""
+    SELECT *,
+        foo
+    FROM ({user_input}) raw
+"""
+
+# https://github.com/astral-sh/ruff/issues/17967
+query61 = f"SELECT * FROM table" # skip expressionless f-strings
+
+# t-strings
+query62 = t"SELECT * FROM table"
+query63 = t"""
+    SELECT *,
+        foo
+    FROM ({user_input}) raw
+"""
+query64 = f"update {t"{table}"} set var = {t"{var}"}"
+query65 = t"update {f"{table}"} set var = {f"{var}"}"

@@ -5,10 +5,11 @@ W391_2.py:14:1: W391 (too-many-newlines-at-end-of-file) [*] Too many newlines at
    |
 12 |       foo()
 13 |       bar()
-14 | / 
-15 | | 
-16 | | 
-17 | | 
+14 | /
+15 | |
+16 | |
+17 | |
+   | |__^ W391 (too-many-newlines-at-end-of-file)
    |
    = help: Remove trailing newlines
 

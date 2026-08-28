@@ -1,9 +1,9 @@
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for quoted type annotations in stub (`.pyi`) files, which should be avoided.
@@ -16,25 +16,25 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// def function() -> "int": ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// def function() -> int: ...
 /// ```
 ///
 /// ## References
-/// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
-#[violation]
-pub struct QuotedAnnotationInStub;
+/// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.python.org/en/latest/guides/writing_stubs.html)
+#[derive(ViolationMetadata)]
+pub(crate) struct QuotedAnnotationInStub;
 
 impl AlwaysFixableViolation for QuotedAnnotationInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Quoted annotations should not be included in stubs")
+        "Quoted annotations should not be included in stubs".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -43,11 +43,10 @@ impl AlwaysFixableViolation for QuotedAnnotationInStub {
 }
 
 /// PYI020
-pub(crate) fn quoted_annotation_in_stub(checker: &mut Checker, annotation: &str, range: TextRange) {
-    let mut diagnostic = Diagnostic::new(QuotedAnnotationInStub, range);
+pub(crate) fn quoted_annotation_in_stub(checker: &Checker, annotation: &str, range: TextRange) {
+    let mut diagnostic = checker.report_diagnostic(QuotedAnnotationInStub, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         annotation.to_string(),
         range,
     )));
-    checker.diagnostics.push(diagnostic);
 }

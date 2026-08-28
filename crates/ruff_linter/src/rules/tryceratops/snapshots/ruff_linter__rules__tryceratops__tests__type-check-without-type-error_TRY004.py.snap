@@ -93,8 +93,7 @@ TRY004.py:95:9: TRY004 (type-check-without-type-error) Prefer `TypeError` except
    |
 93 |           # should be typeerror
 94 |           # not multiline is on purpose for fix
-95 |           raise MemoryError(
-   |  _________^
+95 | /         raise MemoryError(
 96 | |             "..."
 97 | |         )
    | |_________^ TRY004 (type-check-without-type-error)

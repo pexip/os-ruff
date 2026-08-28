@@ -1,16 +1,15 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{
-    self as ast,
+    self as ast, Expr, ExprContext,
     visitor::{self, Visitor},
-    Expr, ExprContext,
 };
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing::is_dict;
-use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -46,19 +45,18 @@ use crate::checkers::ast::Checker;
 /// for instrument, section in ORCHESTRA.items():
 ///     print(f"{instrument}: {section}")
 /// ```
-
-#[violation]
-pub struct DictIndexMissingItems;
+#[derive(ViolationMetadata)]
+pub(crate) struct DictIndexMissingItems;
 
 impl Violation for DictIndexMissingItems {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Extracting value from dictionary without calling `.items()`")
+        "Extracting value from dictionary without calling `.items()`".to_string()
     }
 }
 
 /// PLC0206
-pub(crate) fn dict_index_missing_items(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFor) {
     let ast::StmtFor {
         target, iter, body, ..
     } = stmt_for;
@@ -87,8 +85,7 @@ pub(crate) fn dict_index_missing_items(checker: &mut Checker, stmt_for: &ast::St
     };
 
     if has_violation {
-        let diagnostic = Diagnostic::new(DictIndexMissingItems, stmt_for.range());
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(DictIndexMissingItems, stmt_for.range());
     }
 }
 

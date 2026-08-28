@@ -7,7 +7,7 @@ invalid_return_type_bool.py:5:16: PLE0304 (invalid-bool-return-type) `__bool__` 
 4 |     def __bool__(self):
 5 |         return 3.05  # [invalid-bool-return]
   |                ^^^^ PLE0304 (invalid-bool-return-type)
-6 | 
+6 |
 7 | class Int:
   |
 

@@ -59,7 +59,7 @@ impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
     }
 }
 
-impl<'semantic, 'a> Visitor<'a> for ReturnVisitor<'semantic, 'a> {
+impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::ClassDef(ast::StmtClassDef { decorator_list, .. }) => {
@@ -95,8 +95,16 @@ impl<'semantic, 'a> Visitor<'a> for ReturnVisitor<'semantic, 'a> {
                 // But don't recurse into the body.
                 return;
             }
-            Stmt::Global(ast::StmtGlobal { names, range: _ })
-            | Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
+            Stmt::Global(ast::StmtGlobal {
+                names,
+                range: _,
+                node_index: _,
+            })
+            | Stmt::Nonlocal(ast::StmtNonlocal {
+                names,
+                range: _,
+                node_index: _,
+            }) => {
                 self.stack
                     .non_locals
                     .extend(names.iter().map(Identifier::as_str));

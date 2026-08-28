@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 N807.py:4:5: N807 (dunder-function-name) Function name should not start and end with `__`
   |
 2 |     pass
-3 | 
+3 |
 4 | def __stillBad__():
   |     ^^^^^^^^^^^^ N807 (dunder-function-name)
 5 |     pass
@@ -13,7 +13,7 @@ N807.py:4:5: N807 (dunder-function-name) Function name should not start and end 
 N807.py:12:9: N807 (dunder-function-name) Function name should not start and end with `__`
    |
 10 |         pass
-11 | 
+11 |
 12 |     def __stillBad__():
    |         ^^^^^^^^^^^^ N807 (dunder-function-name)
 13 |         pass

@@ -63,6 +63,6 @@ F521.py:9:1: F521 (string-dot-format-invalid-format) `.format` call has invalid 
  8 | "{foo..}".format(foo=1)
  9 | "{foo..bar}".format(foo=1)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ F521 (string-dot-format-invalid-format)
-10 | 
+10 |
 11 | # The following are all "good" uses of .format
    |

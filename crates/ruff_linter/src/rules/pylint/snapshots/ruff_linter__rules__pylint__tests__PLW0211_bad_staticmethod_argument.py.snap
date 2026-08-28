@@ -26,3 +26,12 @@ bad_staticmethod_argument.py:19:15: PLW0211 (bad-staticmethod-argument) First ar
    |               ^^^^ PLW0211 (bad-staticmethod-argument)
 20 |         pass
    |
+
+bad_staticmethod_argument.py:55:17: PLW0211 (bad-staticmethod-argument) First argument of a static method should not be named `self`
+   |
+53 | # `self` but not with `cls` as first argument - see above).
+54 | class Foo:
+55 |     def __new__(self, x, y, z):  # [bad-staticmethod-argument]
+   |                 ^^^^ PLW0211 (bad-staticmethod-argument)
+56 |         pass
+   |

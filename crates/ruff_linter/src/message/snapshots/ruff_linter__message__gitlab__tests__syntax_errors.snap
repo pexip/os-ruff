@@ -4,7 +4,8 @@ expression: redact_fingerprint(&content)
 ---
 [
   {
-    "description": "SyntaxError: Expected one or more symbol names after import",
+    "check_name": "syntax-error",
+    "description": "Expected one or more symbol names after import",
     "fingerprint": "<redacted>",
     "location": {
       "lines": {
@@ -16,7 +17,8 @@ expression: redact_fingerprint(&content)
     "severity": "major"
   },
   {
-    "description": "SyntaxError: Expected ')', found newline",
+    "check_name": "syntax-error",
+    "description": "Expected ')', found newline",
     "fingerprint": "<redacted>",
     "location": {
       "lines": {

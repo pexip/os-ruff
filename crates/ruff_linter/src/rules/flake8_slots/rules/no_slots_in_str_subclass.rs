@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{Arguments, Expr, Stmt, StmtClassDef};
-use ruff_python_semantic::{analyze::class::is_enumeration, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze::class::is_enumeration};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_slots::rules::helpers::has_slots;
+use crate::rules::flake8_slots::helpers::has_slots;
 
 /// ## What it does
 /// Checks for subclasses of `str` that lack a `__slots__` definition.
@@ -38,18 +38,22 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 ///
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
-#[violation]
-pub struct NoSlotsInStrSubclass;
+#[derive(ViolationMetadata)]
+pub(crate) struct NoSlotsInStrSubclass;
 
 impl Violation for NoSlotsInStrSubclass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Subclasses of `str` should define `__slots__`")
+        "Subclasses of `str` should define `__slots__`".to_string()
     }
 }
 
 /// SLOT000
-pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class: &StmtClassDef) {
+pub(crate) fn no_slots_in_str_subclass(checker: &Checker, stmt: &Stmt, class: &StmtClassDef) {
+    // https://github.com/astral-sh/ruff/issues/14535
+    if checker.source_type.is_stub() {
+        return;
+    }
     let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };
@@ -69,9 +73,7 @@ pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(NoSlotsInStrSubclass, stmt.identifier()));
+    checker.report_diagnostic(NoSlotsInStrSubclass, stmt.identifier());
 }
 
 /// Return `true` if the class is a subclass of `str`.

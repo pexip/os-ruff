@@ -1,11 +1,11 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
 
@@ -41,9 +41,9 @@ use crate::rules::pylint::helpers::type_param_name;
 /// - [PEP 483 – The Theory of Type Hints: Covariance and Contravariance](https://peps.python.org/pep-0483/#covariance-and-contravariance)
 /// - [PEP 484 – Type Hints: Covariance and contravariance](https://peps.python.org/pep-0484/#covariance-and-contravariance)
 ///
-/// [PEP 484]: https://www.python.org/dev/peps/pep-0484/
-#[violation]
-pub struct TypeNameIncorrectVariance {
+/// [PEP 484]: https://peps.python.org/pep-0484/
+#[derive(ViolationMetadata)]
+pub(crate) struct TypeNameIncorrectVariance {
     kind: VarKind,
     param_name: String,
     variance: VarVariance,
@@ -59,12 +59,14 @@ impl Violation for TypeNameIncorrectVariance {
             variance,
             replacement_name,
         } = self;
-        format!("`{kind}` name \"{param_name}\" does not reflect its {variance}; consider renaming it to \"{replacement_name}\"")
+        format!(
+            "`{kind}` name \"{param_name}\" does not reflect its {variance}; consider renaming it to \"{replacement_name}\""
+        )
     }
 }
 
 /// PLC0105
-pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) {
+pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;
@@ -126,7 +128,7 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
         VarVariance::Invariance => name_root.to_string(),
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(
         TypeNameIncorrectVariance {
             kind,
             param_name: param_name.to_string(),
@@ -134,15 +136,15 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
             replacement_name,
         },
         func.range(),
-    ));
+    );
 }
 
 /// Returns `true` if the parameter name does not match its type variance.
 fn mismatch(param_name: &str, covariant: Option<&Expr>, contravariant: Option<&Expr>) -> bool {
     if param_name.ends_with("_co") {
-        covariant.map_or(true, |covariant| !is_const_true(covariant))
+        covariant.is_none_or(|covariant| !is_const_true(covariant))
     } else if param_name.ends_with("_contra") {
-        contravariant.map_or(true, |contravariant| !is_const_true(contravariant))
+        contravariant.is_none_or(|contravariant| !is_const_true(contravariant))
     } else {
         covariant.is_some_and(is_const_true) || contravariant.is_some_and(is_const_true)
     }

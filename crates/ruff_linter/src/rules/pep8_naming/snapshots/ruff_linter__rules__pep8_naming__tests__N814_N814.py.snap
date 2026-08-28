@@ -23,4 +23,6 @@ N814.py:3:17: N814 (camelcase-imported-as-constant) Camelcase `AnotherCamelCase`
 2 | from mod import CamelCase as CAMELCASE
 3 | from mod import AnotherCamelCase as ANOTHER_CAMELCASE
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N814 (camelcase-imported-as-constant)
+4 |
+5 | # These are all OK:
   |

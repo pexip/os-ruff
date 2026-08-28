@@ -4,6 +4,7 @@ expression: parsed.expr()
 ---
 Name(
     ExprName {
+        node_index: AtomicNodeIndex(..),
         range: 0..5,
         id: Name("first"),
         ctx: Load,

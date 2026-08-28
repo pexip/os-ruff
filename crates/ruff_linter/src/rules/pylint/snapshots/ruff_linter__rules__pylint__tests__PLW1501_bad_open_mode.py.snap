@@ -106,7 +106,7 @@ bad_open_mode.py:34:25: PLW1501 (bad-open-mode) `rwx` is not a valid mode for `o
 33 | pathlib.Path(NAME).open(mode="rwx")  # [bad-open-mode]
 34 | pathlib.Path(NAME).open("rwx", encoding="utf-8")  # [bad-open-mode]
    |                         ^^^^^ PLW1501 (bad-open-mode)
-35 | 
+35 |
 36 | import builtins
    |
 

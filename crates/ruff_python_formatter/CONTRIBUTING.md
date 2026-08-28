@@ -204,7 +204,7 @@ impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
     fn fmt_fields(&self, item: &StmtReturn, f: &mut PyFormatter) -> FormatResult<()> {
         // Here we destructure item and make sure each field is listed.
         // We generally don't need range if it's underscore-ignored
-        let StmtReturn { range: _, value } = item;
+        let StmtReturn { range: _, node_index: _, value } = item;
         // Implement some formatting logic, in this case no space (and no value) after a return with
         // no value
         if let Some(value) = value {
@@ -297,7 +297,7 @@ in `placement.rs`, which this section is about.
 ```
 
 Here, the comment is dangling because it is preceded by `[`, which is a non-trivia token but not a
-node, and  followed by `]`, which is also a non-trivia token but not a node. In the `FormatExprList`
+node, and followed by `]`, which is also a non-trivia token but not a node. In the `FormatExprList`
 implementation, we have to call `dangling_comments` manually and stub out the
 `fmt_dangling_comments` default from `FormatNodeRule`.
 

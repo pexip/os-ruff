@@ -11,6 +11,7 @@ fit_line_length_comment.py:1:1: I001 (unsorted-imports) [*] Import block is un-s
 6 | | from f import g  # 012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ
 7 | | # The next import doesn't fit on one line.
 8 | | from h import i  # 012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9
+  | |_______________^ I001 (unsorted-imports)
   |
   = help: Organize imports
 

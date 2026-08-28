@@ -2,14 +2,13 @@ use std::fmt::Debug;
 use std::iter::Peekable;
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{AnyNodeRef, Identifier};
 use ruff_python_ast::{Mod, Stmt};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::source_order::*;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::node_key::NodeRefEqualityKey;
@@ -54,7 +53,7 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
 
     pub(super) fn visit(mut self, root: AnyNodeRef<'a>) {
         if self.enter_node(root).is_traverse() {
-            root.visit_preorder(&mut self);
+            root.visit_source_order(&mut self);
         }
 
         self.leave_node(root);
@@ -66,7 +65,7 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
     fn can_skip(&mut self, node_end: TextSize) -> bool {
         self.comment_ranges
             .peek()
-            .map_or(true, |next_comment| next_comment.start() >= node_end)
+            .is_none_or(|next_comment| next_comment.start() >= node_end)
     }
 }
 
@@ -166,6 +165,10 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 }
             }
         }
+    }
+
+    fn visit_identifier(&mut self, _identifier: &'ast Identifier) {
+        // TODO: Visit and associate comments with identifiers
     }
 }
 
@@ -360,7 +363,7 @@ pub(super) enum CommentPlacement<'a> {
     /// Makes the comment a...
     ///
     /// * [trailing comment] of the [`preceding_node`] if both the [`following_node`] and [`preceding_node`] are not [None]
-    ///     and the comment and [`preceding_node`] are only separated by a space (there's no token between the comment and [`preceding_node`]).
+    ///   and the comment and [`preceding_node`] are only separated by a space (there's no token between the comment and [`preceding_node`]).
     /// * [leading comment] of the [`following_node`] if the [`following_node`] is not [None]
     /// * [trailing comment] of the [`preceding_node`] if the [`preceding_node`] is not [None]
     /// * [dangling comment] of the [`enclosing_node`].
@@ -531,12 +534,12 @@ pub(super) struct CommentsMapBuilder<'a> {
     comments: CommentsMap<'a>,
     /// We need those for backwards lexing
     comment_ranges: &'a CommentRanges,
-    locator: Locator<'a>,
+    source: &'a str,
 }
 
 impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
     fn push_comment(&mut self, placement: DecoratedComment<'a>) {
-        let placement = place_comment(placement, self.comment_ranges, &self.locator);
+        let placement = place_comment(placement, self.comment_ranges, self.source);
         match placement {
             CommentPlacement::Leading { node, comment } => {
                 self.push_leading_comment(node, comment);
@@ -598,11 +601,11 @@ impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
 }
 
 impl<'a> CommentsMapBuilder<'a> {
-    pub(crate) fn new(locator: Locator<'a>, comment_ranges: &'a CommentRanges) -> Self {
+    pub(crate) fn new(source: &'a str, comment_ranges: &'a CommentRanges) -> Self {
         Self {
             comments: CommentsMap::default(),
             comment_ranges,
-            locator,
+            source,
         }
     }
 

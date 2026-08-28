@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -37,22 +37,22 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [PEP 535](https://peps.python.org/pep-0563/)
-/// - [PEP 604](https://peps.python.org/pep-0604/)
+/// - [PEP 563 - Postponed Evaluation of Annotations](https://peps.python.org/pep-0563/)
+/// - [PEP 604 – Allow writing union types as `X | Y`](https://peps.python.org/pep-0604/)
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
-#[violation]
-pub struct RuntimeStringUnion;
+#[derive(ViolationMetadata)]
+pub(crate) struct RuntimeStringUnion;
 
 impl Violation for RuntimeStringUnion {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid string member in `X | Y`-style union type")
+        "Invalid string member in `X | Y`-style union type".to_string()
     }
 }
 
-/// TCH006
-pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
+/// TC010
+pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
     if !checker.semantic().in_type_definition() {
         return;
     }
@@ -66,9 +66,7 @@ pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
     traverse_op(expr, &mut strings);
 
     for string in strings {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(RuntimeStringUnion, string.range()));
+        checker.report_diagnostic(RuntimeStringUnion, string.range());
     }
 }
 

@@ -6,7 +6,7 @@ N812.py:2:8: N812 (lowercase-imported-as-non-lowercase) Lowercase `stillbad` imp
 1 | import mod.badallowed as badAllowed
 2 | import mod.stillbad as stillBad
   |        ^^^^^^^^^^^^^^^^^^^^^^^^ N812 (lowercase-imported-as-non-lowercase)
-3 | 
+3 |
 4 | from mod import badallowed as BadAllowed
   |
 

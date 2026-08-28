@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 PYI002.pyi:3:4: PYI002 (complex-if-statement-in-stub) `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
   |
 1 | import sys
-2 | 
+2 |
 3 | if sys.version == 'Python 2.7.10': ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI002 (complex-if-statement-in-stub)
 4 | if 'linux' == sys.platform: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info

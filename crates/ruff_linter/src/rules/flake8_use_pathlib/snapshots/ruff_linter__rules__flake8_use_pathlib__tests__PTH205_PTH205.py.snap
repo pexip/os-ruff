@@ -23,14 +23,14 @@ PTH205.py:8:1: PTH205 (os-path-getctime) `os.path.getctime` should be replaced b
  7 | os.path.getctime(b"filename")
  8 | os.path.getctime(Path("filename"))
    | ^^^^^^^^^^^^^^^^ PTH205 (os-path-getctime)
- 9 | 
+ 9 |
 10 | getctime("filename")
    |
 
 PTH205.py:10:1: PTH205 (os-path-getctime) `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    |
  8 | os.path.getctime(Path("filename"))
- 9 | 
+ 9 |
 10 | getctime("filename")
    | ^^^^^^^^ PTH205 (os-path-getctime)
 11 | getctime(b"filename")

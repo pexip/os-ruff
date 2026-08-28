@@ -58,7 +58,7 @@ ERA001.py:5:1: ERA001 (commented-out-code) Found commented-out code
 4 | a = 4
 5 | #foo(1, 2, 3)
   | ^^^^^^^^^^^^^ ERA001 (commented-out-code)
-6 | 
+6 |
 7 | def foo(x, y, z):
   |
   = help: Remove commented-out code
@@ -151,7 +151,7 @@ ERA001.py:27:5: ERA001 (commented-out-code) Found commented-out code
 ERA001.py:32:1: ERA001 (commented-out-code) Found commented-out code
    |
 30 | #import os  # noqa
-31 | 
+31 |
 32 | # case 1:
    | ^^^^^^^^^ ERA001 (commented-out-code)
 33 | # try:
@@ -321,3 +321,43 @@ ERA001.py:47:1: ERA001 (commented-out-code) Found commented-out code
 48 47 | # ///
 49 48 | 
 50 49 | # Script tag (OK)
+
+ERA001.py:75:1: ERA001 (commented-out-code) Found commented-out code
+   |
+73 | # /// script
+74 | # requires-python = ">=3.11"
+75 | # dependencies = [
+   | ^^^^^^^^^^^^^^^^^^ ERA001 (commented-out-code)
+76 | #   "requests<3",
+77 | #   "rich",
+   |
+   = help: Remove commented-out code
+
+ℹ Display-only fix
+72 72 | 
+73 73 | # /// script
+74 74 | # requires-python = ">=3.11"
+75    |-# dependencies = [
+76 75 | #   "requests<3",
+77 76 | #   "rich",
+78 77 | # ]
+
+ERA001.py:78:1: ERA001 (commented-out-code) Found commented-out code
+   |
+76 | #   "requests<3",
+77 | #   "rich",
+78 | # ]
+   | ^^^ ERA001 (commented-out-code)
+79 |
+80 | # Script tag block followed by normal block (Ok)
+   |
+   = help: Remove commented-out code
+
+ℹ Display-only fix
+75 75 | # dependencies = [
+76 76 | #   "requests<3",
+77 77 | #   "rich",
+78    |-# ]
+79 78 | 
+80 79 | # Script tag block followed by normal block (Ok)
+81 80 |

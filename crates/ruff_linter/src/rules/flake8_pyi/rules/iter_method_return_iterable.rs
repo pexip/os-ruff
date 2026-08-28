@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_text_size::Ranged;
 
 use ruff_python_semantic::{Definition, Member, MemberKind};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -68,25 +68,25 @@ use crate::checkers::ast::Checker;
 /// class Klass:
 ///     def __iter__(self) -> collections.abc.Iterator[str]: ...
 /// ```
-#[violation]
-pub struct IterMethodReturnIterable {
+#[derive(ViolationMetadata)]
+pub(crate) struct IterMethodReturnIterable {
     is_async: bool,
 }
 
 impl Violation for IterMethodReturnIterable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IterMethodReturnIterable { is_async } = self;
-        if *is_async {
-            format!("`__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`")
+        if self.is_async {
+            "`__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`"
+                .to_string()
         } else {
-            format!("`__iter__` methods should return an `Iterator`, not an `Iterable`")
+            "`__iter__` methods should return an `Iterator`, not an `Iterable`".to_string()
         }
     }
 }
 
 /// PYI045
-pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &Definition) {
+pub(crate) fn iter_method_return_iterable(checker: &Checker, definition: &Definition) {
     let Definition::Member(Member {
         kind: MemberKind::Method(function),
         ..
@@ -125,9 +125,6 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
             }
         })
     {
-        checker.diagnostics.push(Diagnostic::new(
-            IterMethodReturnIterable { is_async },
-            returns.range(),
-        ));
+        checker.report_diagnostic(IterMethodReturnIterable { is_async }, returns.range());
     }
 }

@@ -62,7 +62,7 @@ import_outside_top_level.py:19:5: PLC0415 (import-outside-top-level) `import` sh
 18 | class ClassWithImports:
 19 |     import tokenize  # [import-outside-toplevel]
    |     ^^^^^^^^^^^^^^^ PLC0415 (import-outside-top-level)
-20 | 
+20 |
 21 |     def __init__(self):
    |
 

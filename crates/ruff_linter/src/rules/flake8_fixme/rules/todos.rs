@@ -1,6 +1,7 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
+use crate::checkers::ast::LintContext;
 use crate::directives::{TodoComment, TodoDirectiveKind};
 
 /// ## What it does
@@ -21,12 +22,12 @@ use crate::directives::{TodoComment, TodoDirectiveKind};
 /// def greet(name):
 ///     return f"Hello, {name}!"  # TODO: Add support for custom greetings.
 /// ```
-#[violation]
-pub struct LineContainsTodo;
+#[derive(ViolationMetadata)]
+pub(crate) struct LineContainsTodo;
 impl Violation for LineContainsTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains TODO, consider resolving the issue")
+        "Line contains TODO, consider resolving the issue".to_string()
     }
 }
 
@@ -47,12 +48,12 @@ impl Violation for LineContainsTodo {
 /// def speed(distance, time):
 ///     return distance / time  # FIXME: Raises ZeroDivisionError for time = 0.
 /// ```
-#[violation]
-pub struct LineContainsFixme;
+#[derive(ViolationMetadata)]
+pub(crate) struct LineContainsFixme;
 impl Violation for LineContainsFixme {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains FIXME, consider resolving the issue")
+        "Line contains FIXME, consider resolving the issue".to_string()
     }
 }
 
@@ -70,12 +71,12 @@ impl Violation for LineContainsFixme {
 /// def speed(distance, time):
 ///     return distance / time  # XXX: Raises ZeroDivisionError for time = 0.
 /// ```
-#[violation]
-pub struct LineContainsXxx;
+#[derive(ViolationMetadata)]
+pub(crate) struct LineContainsXxx;
 impl Violation for LineContainsXxx {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains XXX, consider resolving the issue")
+        "Line contains XXX, consider resolving the issue".to_string()
     }
 }
 
@@ -105,28 +106,34 @@ impl Violation for LineContainsXxx {
 ///         os.rmdir("C:\\Windows\\System32\\")
 ///         return False
 /// ```
-#[violation]
-pub struct LineContainsHack;
+#[derive(ViolationMetadata)]
+pub(crate) struct LineContainsHack;
 impl Violation for LineContainsHack {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains HACK, consider resolving the issue")
+        "Line contains HACK, consider resolving the issue".to_string()
     }
 }
 
-pub(crate) fn todos(diagnostics: &mut Vec<Diagnostic>, directive_ranges: &[TodoComment]) {
-    diagnostics.extend(
-        directive_ranges
-            .iter()
-            .map(|TodoComment { directive, .. }| match directive.kind {
-                // FIX001
-                TodoDirectiveKind::Fixme => Diagnostic::new(LineContainsFixme, directive.range),
-                // FIX002
-                TodoDirectiveKind::Hack => Diagnostic::new(LineContainsHack, directive.range),
-                // FIX003
-                TodoDirectiveKind::Todo => Diagnostic::new(LineContainsTodo, directive.range),
-                // FIX004
-                TodoDirectiveKind::Xxx => Diagnostic::new(LineContainsXxx, directive.range),
-            }),
-    );
+pub(crate) fn todos(context: &LintContext, directive_ranges: &[TodoComment]) {
+    for TodoComment { directive, .. } in directive_ranges {
+        match directive.kind {
+            // FIX001
+            TodoDirectiveKind::Fixme => {
+                context.report_diagnostic_if_enabled(LineContainsFixme, directive.range);
+            }
+            // FIX002
+            TodoDirectiveKind::Hack => {
+                context.report_diagnostic_if_enabled(LineContainsHack, directive.range);
+            }
+            // FIX003
+            TodoDirectiveKind::Todo => {
+                context.report_diagnostic_if_enabled(LineContainsTodo, directive.range);
+            }
+            // FIX004
+            TodoDirectiveKind::Xxx => {
+                context.report_diagnostic_if_enabled(LineContainsXxx, directive.range);
+            }
+        }
+    }
 }

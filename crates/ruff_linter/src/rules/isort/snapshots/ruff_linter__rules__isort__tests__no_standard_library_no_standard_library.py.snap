@@ -4,14 +4,15 @@ source: crates/ruff_linter/src/rules/isort/mod.rs
 no_standard_library.py:1:1: I001 (unsorted-imports) [*] Import block is un-sorted or un-formatted
   |
 1 | / from __future__ import annotations
-2 | | 
+2 | |
 3 | | import os
 4 | | import django.settings
 5 | | from library import foo
 6 | | import pytz
-7 | | 
+7 | |
 8 | | from . import local
 9 | | import sys
+  | |__________^ I001 (unsorted-imports)
   |
   = help: Organize imports
 

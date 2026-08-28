@@ -4,10 +4,10 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 FURB136.py:4:1: FURB136 (if-expr-min-max) [*] Replace `x if x > y else y` with `max(y, x)`
   |
 2 | y = 2
-3 | 
+3 |
 4 | x if x > y else y  # FURB136
   | ^^^^^^^^^^^^^^^^^ FURB136 (if-expr-min-max)
-5 | 
+5 |
 6 | x if x >= y else y  # FURB136
   |
   = help: Replace with `max(y, x)`
@@ -25,10 +25,10 @@ FURB136.py:4:1: FURB136 (if-expr-min-max) [*] Replace `x if x > y else y` with `
 FURB136.py:6:1: FURB136 (if-expr-min-max) [*] Replace `x if x >= y else y` with `max(x, y)`
   |
 4 | x if x > y else y  # FURB136
-5 | 
+5 |
 6 | x if x >= y else y  # FURB136
   | ^^^^^^^^^^^^^^^^^^ FURB136 (if-expr-min-max)
-7 | 
+7 |
 8 | x if x < y else y  # FURB136
   |
   = help: Replace with `max(x, y)`
@@ -46,10 +46,10 @@ FURB136.py:6:1: FURB136 (if-expr-min-max) [*] Replace `x if x >= y else y` with 
 FURB136.py:8:1: FURB136 (if-expr-min-max) [*] Replace `x if x < y else y` with `min(y, x)`
    |
  6 | x if x >= y else y  # FURB136
- 7 | 
+ 7 |
  8 | x if x < y else y  # FURB136
    | ^^^^^^^^^^^^^^^^^ FURB136 (if-expr-min-max)
- 9 | 
+ 9 |
 10 | x if x <= y else y  # FURB136
    |
    = help: Replace with `min(y, x)`
@@ -67,10 +67,10 @@ FURB136.py:8:1: FURB136 (if-expr-min-max) [*] Replace `x if x < y else y` with `
 FURB136.py:10:1: FURB136 (if-expr-min-max) [*] Replace `x if x <= y else y` with `min(x, y)`
    |
  8 | x if x < y else y  # FURB136
- 9 | 
+ 9 |
 10 | x if x <= y else y  # FURB136
    | ^^^^^^^^^^^^^^^^^^ FURB136 (if-expr-min-max)
-11 | 
+11 |
 12 | y if x > y else x  # FURB136
    |
    = help: Replace with `min(x, y)`
@@ -88,10 +88,10 @@ FURB136.py:10:1: FURB136 (if-expr-min-max) [*] Replace `x if x <= y else y` with
 FURB136.py:12:1: FURB136 (if-expr-min-max) [*] Replace `y if x > y else x` with `min(x, y)`
    |
 10 | x if x <= y else y  # FURB136
-11 | 
+11 |
 12 | y if x > y else x  # FURB136
    | ^^^^^^^^^^^^^^^^^ FURB136 (if-expr-min-max)
-13 | 
+13 |
 14 | y if x >= y else x  # FURB136
    |
    = help: Replace with `min(x, y)`
@@ -109,10 +109,10 @@ FURB136.py:12:1: FURB136 (if-expr-min-max) [*] Replace `y if x > y else x` with 
 FURB136.py:14:1: FURB136 (if-expr-min-max) [*] Replace `y if x >= y else x` with `min(y, x)`
    |
 12 | y if x > y else x  # FURB136
-13 | 
+13 |
 14 | y if x >= y else x  # FURB136
    | ^^^^^^^^^^^^^^^^^^ FURB136 (if-expr-min-max)
-15 | 
+15 |
 16 | y if x < y else x  # FURB136
    |
    = help: Replace with `min(y, x)`
@@ -130,10 +130,10 @@ FURB136.py:14:1: FURB136 (if-expr-min-max) [*] Replace `y if x >= y else x` with
 FURB136.py:16:1: FURB136 (if-expr-min-max) [*] Replace `y if x < y else x` with `max(x, y)`
    |
 14 | y if x >= y else x  # FURB136
-15 | 
+15 |
 16 | y if x < y else x  # FURB136
    | ^^^^^^^^^^^^^^^^^ FURB136 (if-expr-min-max)
-17 | 
+17 |
 18 | y if x <= y else x  # FURB136
    |
    = help: Replace with `max(x, y)`
@@ -151,10 +151,10 @@ FURB136.py:16:1: FURB136 (if-expr-min-max) [*] Replace `y if x < y else x` with 
 FURB136.py:18:1: FURB136 (if-expr-min-max) [*] Replace `y if x <= y else x` with `max(y, x)`
    |
 16 | y if x < y else x  # FURB136
-17 | 
+17 |
 18 | y if x <= y else x  # FURB136
    | ^^^^^^^^^^^^^^^^^^ FURB136 (if-expr-min-max)
-19 | 
+19 |
 20 | x + y if x > y else y  # OK
    |
    = help: Replace with `max(y, x)`
@@ -172,7 +172,7 @@ FURB136.py:18:1: FURB136 (if-expr-min-max) [*] Replace `y if x <= y else x` with
 FURB136.py:22:1: FURB136 (if-expr-min-max) [*] Replace `if` expression with `max(y, x)`
    |
 20 |   x + y if x > y else y  # OK
-21 |   
+21 |
 22 | / x if (
 23 | |     x
 24 | |     > y

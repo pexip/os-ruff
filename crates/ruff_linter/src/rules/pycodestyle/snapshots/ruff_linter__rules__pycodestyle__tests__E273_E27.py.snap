@@ -111,7 +111,7 @@ E27.py:74:5: E273 (tab-after-keyword) [*] Tab after keyword
 73 | #: E273
 74 | type    Number = int
    |     ^^^^ E273 (tab-after-keyword)
-75 | 
+75 |
 76 | #: E275
    |
    = help: Replace with single space

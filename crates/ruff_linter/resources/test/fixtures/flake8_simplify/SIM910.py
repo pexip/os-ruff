@@ -33,3 +33,25 @@ age = ages.get("Cat", None)
 # OK
 ages = ["Tom", "Maria", "Dog"]
 age = ages.get("Cat", None)
+
+# SIM910
+def foo(**kwargs):
+    a = kwargs.get('a', None)
+
+# SIM910
+def foo(some_dict: dict):
+    a = some_dict.get('a', None)
+
+# OK
+def foo(some_other: object):
+    a = some_other.get('a', None)
+
+# OK
+def foo(some_other):
+    a = some_other.get('a', None)
+
+
+# https://github.com/astral-sh/ruff/issues/18777
+def foo():
+    dict = {"Tom": 23, "Maria": 23, "Dog": 11}
+    age = dict.get("Cat", None)

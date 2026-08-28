@@ -35,6 +35,6 @@ subprocess_popen_preexec_fn.py:12:26: PLW1509 (subprocess-popen-preexec-fn) `pre
 11 | subprocess.Popen(preexec_fn=lambda: print("Hello, world!"))
 12 | subprocess.Popen(["ls"], preexec_fn=lambda: print("Hello, world!"))
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW1509 (subprocess-popen-preexec-fn)
-13 | 
+13 |
 14 | # Non-errors.
    |

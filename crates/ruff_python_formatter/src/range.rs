@@ -2,15 +2,14 @@ use tracing::Level;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{
-    format, FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode,
+    FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode, format,
 };
-use ruff_python_ast::visitor::source_order::{walk_body, SourceOrderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
-use ruff_python_parser::{parse, AsMode};
+use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::{
-    indentation_at_offset, BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind,
+    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, indentation_at_offset,
 };
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::Comments;
@@ -18,7 +17,7 @@ use crate::context::{IndentLevel, NodeLevel};
 use crate::prelude::*;
 use crate::statement::suite::DocstringStmt;
 use crate::verbatim::{ends_suppression, starts_suppression};
-use crate::{format_module_source, FormatModuleError, PyFormatOptions};
+use crate::{FormatModuleError, PyFormatOptions, format_module_source};
 
 /// Formats the given `range` in source rather than the entire file.
 ///
@@ -74,7 +73,7 @@ pub fn format_range(
 
     assert_valid_char_boundaries(range, source);
 
-    let parsed = parse(source, options.source_type().as_mode())?;
+    let parsed = parse(source, ParseOptions::from(options.source_type()))?;
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
@@ -155,7 +154,7 @@ fn find_enclosing_node<'ast>(
     let mut visitor = FindEnclosingNode::new(range, context);
 
     if visitor.enter_node(root).is_traverse() {
-        root.visit_preorder(&mut visitor);
+        root.visit_source_order(&mut visitor);
     }
     visitor.leave_node(root);
 
@@ -211,9 +210,9 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
         // Don't pick potential docstrings as the closest enclosing node because `suite.rs` than fails to identify them as
         // docstrings and docstring formatting won't kick in.
         // Format the enclosing node instead and slice the formatted docstring from the result.
-        let is_maybe_docstring = node.as_stmt_expr().is_some_and(|stmt| {
-            DocstringStmt::is_docstring_statement(stmt, self.context.options().source_type())
-        });
+        let is_maybe_docstring = node
+            .as_stmt_expr()
+            .is_some_and(|stmt| DocstringStmt::is_docstring_statement(stmt, self.context));
 
         if is_maybe_docstring {
             return TraversalSignal::Skip;
@@ -300,8 +299,7 @@ fn narrow_range(
     enclosing_node: AnyNodeRef,
     context: &PyFormatContext,
 ) -> TextRange {
-    let locator = context.locator();
-    let enclosing_indent = indentation_at_offset(enclosing_node.start(), &locator)
+    let enclosing_indent = indentation_at_offset(enclosing_node.start(), context.source())
         .expect("Expected enclosing to never be a same line body statement.");
 
     let mut visitor = NarrowRange {
@@ -316,7 +314,7 @@ fn narrow_range(
     };
 
     if visitor.enter_node(enclosing_node).is_traverse() {
-        enclosing_node.visit_preorder(&mut visitor);
+        enclosing_node.visit_source_order(&mut visitor);
     }
 
     visitor.leave_node(enclosing_node);
@@ -371,6 +369,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 subject: _,
                 cases,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(saved_state) = self.enter_level(cases.first().map(AnyNodeRef::from)) {
                     for match_case in cases {
@@ -389,6 +388,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 finalbody,
                 is_star: _,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_body(body);
                 if let Some(except_handler_saved) =
@@ -513,7 +513,7 @@ impl NarrowRange<'_> {
             // dedent the second line to 0 spaces and the `indent` then adds a 2 space indentation to match the indentation in the source.
             // This is incorrect because the leading whitespace is the content of the string and not indentation, resulting in changed string content.
             if let Some(indentation) =
-                indentation_at_offset(first_child.start(), &self.context.locator())
+                indentation_at_offset(first_child.start(), self.context.source())
             {
                 let relative_indent = indentation.strip_prefix(self.enclosing_indent).unwrap();
                 let expected_indents = self.level;
@@ -548,7 +548,7 @@ impl NarrowRange<'_> {
         Some(SavedLevel { level: saved_level })
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn leave_level(&mut self, saved_state: SavedLevel) {
         self.level = saved_state.level;
     }
@@ -661,10 +661,11 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::ExprYieldFrom(_)
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::FStringExpressionElement(_)
-            | AnyNodeRef::FStringLiteralElement(_)
-            | AnyNodeRef::FStringFormatSpec(_)
+            | AnyNodeRef::InterpolatedElement(_)
+            | AnyNodeRef::InterpolatedStringLiteralElement(_)
+            | AnyNodeRef::InterpolatedStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
+            | AnyNodeRef::ExprTString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
             | AnyNodeRef::ExprNumberLiteral(_)
@@ -681,6 +682,7 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::ExprIpyEscapeCommand(_)
             | AnyNodeRef::FString(_)
             | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::TString(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -703,6 +705,7 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::Identifier(_)
             | AnyNodeRef::BytesLiteral(_) => {
                 panic!("Range formatting only supports formatting logical lines")
             }
@@ -717,8 +720,7 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
 /// # Panics
 /// If `offset` is outside of `source`.
 fn indent_level(offset: TextSize, source: &str, options: &PyFormatOptions) -> Option<u16> {
-    let locator = Locator::new(source);
-    let indentation = indentation_at_offset(offset, &locator)?;
+    let indentation = indentation_at_offset(offset, source)?;
 
     let level = match options.indent_style() {
         IndentStyle::Tab => {

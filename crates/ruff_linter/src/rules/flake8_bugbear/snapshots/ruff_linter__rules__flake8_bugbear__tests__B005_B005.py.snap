@@ -77,6 +77,6 @@ B005.py:24:1: B005 (strip-with-multi-characters) Using `.strip()` with multi-cha
 23 | s.strip("\ufeff")  # no warning
 24 | s.strip("\u0074\u0065\u0073\u0074")  # warning
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B005 (strip-with-multi-characters)
-25 | 
+25 |
 26 | from somewhere import other_type, strip
    |

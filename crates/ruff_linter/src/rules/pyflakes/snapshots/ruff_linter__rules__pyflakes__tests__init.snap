@@ -5,7 +5,7 @@ __init__.py:1:8: F401 (unused-import) `os` imported but unused
   |
 1 | import os
   |        ^^ F401 (unused-import)
-2 | 
+2 |
 3 | print(__path__)
   |
   = help: Remove unused import: `os`

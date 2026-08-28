@@ -35,6 +35,6 @@ pandas_use_of_dot_read_table.py:8:6: PD012 (pandas-use-of-dot-read-table) Use `.
  7 | df = pd.read_table(filename, sep=",")
  8 | df = pd.read_table(filename, sep=",", header=0)
    |      ^^^^^^^^^^^^^ PD012 (pandas-use-of-dot-read-table)
- 9 | 
+ 9 |
 10 | # Non-errors.
    |

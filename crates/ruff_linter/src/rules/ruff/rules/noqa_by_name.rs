@@ -1,8 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_diagnostics::{Edit, Fix};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::LintContext;
 use crate::{
+    AlwaysFixableViolation,
     noqa::{Directive, NoqaDirectives, NoqaIdentifier},
     registry::Rule,
     rule_redirects::get_redirect_target,
@@ -23,9 +25,9 @@ use crate::{
 /// ```python
 /// from typing import Never  # noqa: F401
 /// ```
-#[violation]
-pub struct NOQAByName {
-    pub names_and_codes: Vec<(String, String)>,
+#[derive(ViolationMetadata)]
+pub(crate) struct NOQAByName {
+    names_and_codes: Vec<(String, String)>,
 }
 
 impl AlwaysFixableViolation for NOQAByName {
@@ -47,8 +49,8 @@ impl AlwaysFixableViolation for NOQAByName {
     }
 }
 
-/// RUF103
-pub(crate) fn noqa_by_name(diagnostics: &mut Vec<Diagnostic>, noqa_directives: &NoqaDirectives) {
+/// RUF852
+pub(crate) fn noqa_by_name(context: &LintContext, noqa_directives: &NoqaDirectives) {
     'line: for line in noqa_directives.lines() {
         let mut names_and_codes = Vec::new();
         let mut new_rule_identifiers = Vec::new();
@@ -70,7 +72,7 @@ pub(crate) fn noqa_by_name(diagnostics: &mut Vec<Diagnostic>, noqa_directives: &
                             new_rule_identifiers.push(rule_code.to_string());
                         }
                         NoqaIdentifier::Name(name) => {
-                            if Rule::UnusedNOQA.as_ref() == name {
+                            if Rule::UnusedNOQA.name() == name {
                                 continue 'line;
                             }
 
@@ -85,14 +87,12 @@ pub(crate) fn noqa_by_name(diagnostics: &mut Vec<Diagnostic>, noqa_directives: &
                     }
                 }
                 if !names_and_codes.is_empty() {
-                    let mut diagnostic =
-                        Diagnostic::new(NOQAByName { names_and_codes }, directive.range());
-
+                    let mut diagnostic = context
+                        .report_diagnostic(NOQAByName { names_and_codes }, directive.range());
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         format!("# noqa: {}", new_rule_identifiers.join(", ")),
                         directive.range(),
                     )));
-                    diagnostics.push(diagnostic);
                 }
             }
         }

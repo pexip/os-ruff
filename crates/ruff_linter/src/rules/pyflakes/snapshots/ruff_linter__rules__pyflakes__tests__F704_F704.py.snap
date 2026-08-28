@@ -30,4 +30,6 @@ F704.py:11:1: F704 (yield-outside-function) `await` statement outside of a funct
 10 | yield from 3
 11 | await f()
    | ^^^^^^^^^ F704 (yield-outside-function)
+12 |
+13 | def _():
    |
