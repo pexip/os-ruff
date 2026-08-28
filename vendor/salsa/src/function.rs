@@ -1,16 +1,27 @@
-use std::{any::Any, fmt, sync::Arc};
+pub(crate) use maybe_changed_after::VerifyResult;
+use std::any::Any;
+use std::fmt;
+use std::ptr::NonNull;
+use std::sync::atomic::Ordering;
+pub(crate) use sync::SyncGuard;
 
-use crossbeam::atomic::AtomicCell;
-
-use crate::{
-    cycle::CycleRecoveryStrategy, ingredient::fmt_index, key::DatabaseKeyIndex,
-    salsa_struct::SalsaStructInDb, zalsa::IngredientIndex, zalsa_local::QueryOrigin,
-    AsDynDatabase as _, Cycle, Database, Event, EventKind, Id, Revision,
+use crate::accumulator::accumulated_map::{AccumulatedMap, InputAccumulatedValues};
+use crate::cycle::{
+    empty_cycle_heads, CycleHeads, CycleRecoveryAction, CycleRecoveryStrategy, ProvisionalStatus,
 };
-
-use self::delete::DeletedEntries;
-
-use super::ingredient::Ingredient;
+use crate::function::delete::DeletedEntries;
+use crate::function::sync::{ClaimResult, SyncTable};
+use crate::ingredient::{Ingredient, WaitForResult};
+use crate::key::DatabaseKeyIndex;
+use crate::plumbing::MemoIngredientMap;
+use crate::salsa_struct::SalsaStructInDb;
+use crate::sync::Arc;
+use crate::table::memo::MemoTableTypes;
+use crate::table::Table;
+use crate::views::DatabaseDownCaster;
+use crate::zalsa::{IngredientIndex, MemoIngredientIndex, Zalsa};
+use crate::zalsa_local::QueryOriginRef;
+use crate::{Database, Id, Revision};
 
 mod accumulated;
 mod backdate;
@@ -23,11 +34,13 @@ mod lru;
 mod maybe_changed_after;
 mod memo;
 mod specify;
-mod store;
 mod sync;
+
+pub type Memo<C> = memo::Memo<<C as Configuration>::Output<'static>>;
 
 pub trait Configuration: Any {
     const DEBUG_NAME: &'static str;
+    const LOCATION: crate::ingredient::Location;
 
     /// The database that this function is associated with.
     type DbView: ?Sized + crate::Database;
@@ -41,20 +54,20 @@ pub trait Configuration: Any {
     type Input<'db>: Send + Sync;
 
     /// The value computed by the function.
-    type Output<'db>: fmt::Debug + Send + Sync;
+    type Output<'db>: Send + Sync;
 
     /// Determines whether this function can recover from being a participant in a cycle
     /// (and, if so, how).
     const CYCLE_STRATEGY: CycleRecoveryStrategy;
 
-    /// Invokes after a new result `new_value`` has been computed for which an older memoized
-    /// value existed `old_value`. Returns true if the new value is equal to the older one
-    /// and hence should be "backdated" (i.e., marked as having last changed in an older revision,
-    /// even though it was recomputed).
+    /// Invokes after a new result `new_value` has been computed for which an older memoized value
+    /// existed `old_value`, or in fixpoint iteration. Returns true if the new value is equal to
+    /// the older one.
     ///
-    /// This invokes user's code in form of the `Eq` impl.
-    fn should_backdate_value(old_value: &Self::Output<'_>, new_value: &Self::Output<'_>) -> bool;
+    /// This invokes user code in form of the `Eq` impl.
+    fn values_equal<'db>(old_value: &Self::Output<'db>, new_value: &Self::Output<'db>) -> bool;
 
+    // FIXME: This should take a `&Zalsa`
     /// Convert from the id used internally to the value that execute is expecting.
     /// This is a no-op if the input to the function is a salsa struct.
     fn id_to_input(db: &Self::DbView, key: Id) -> Self::Input<'_>;
@@ -65,18 +78,22 @@ pub trait Configuration: Any {
     /// This invokes the function the user wrote.
     fn execute<'db>(db: &'db Self::DbView, input: Self::Input<'db>) -> Self::Output<'db>;
 
-    /// If the cycle strategy is `Fallback`, then invoked when `key` is a participant
-    /// in a cycle to find out what value it should have.
-    ///
-    /// This invokes the recovery function given by the user.
+    /// Get the cycle recovery initial value.
+    fn cycle_initial<'db>(db: &'db Self::DbView, input: Self::Input<'db>) -> Self::Output<'db>;
+
+    /// Decide whether to iterate a cycle again or fallback. `value` is the provisional return
+    /// value from the latest iteration of this cycle. `count` is the number of cycle iterations
+    /// we've already completed.
     fn recover_from_cycle<'db>(
         db: &'db Self::DbView,
-        cycle: &Cycle,
+        value: &Self::Output<'db>,
+        count: u32,
         input: Self::Input<'db>,
-    ) -> Self::Output<'db>;
+    ) -> CycleRecoveryAction<Self::Output<'db>>;
 }
 
 /// Function ingredients are the "workhorse" of salsa.
+///
 /// They are used for tracked functions, for the "value" fields of tracked structs, and for the fields of input structs.
 /// The function ingredient is fairly complex and so its code is spread across multiple modules, typically one per method.
 /// The main entry points are:
@@ -91,15 +108,25 @@ pub struct IngredientImpl<C: Configuration> {
     /// Used to construct `DatabaseKeyIndex` values.
     index: IngredientIndex,
 
-    /// Tracks the keys for which we have memoized values.
-    memo_map: memo::MemoMap<C>,
-
-    /// Tracks the keys that are currently being processed; used to coordinate between
-    /// worker threads.
-    sync_map: sync::SyncMap,
+    /// The index for the memo/sync tables
+    ///
+    /// This may be a [`crate::memo_ingredient_indices::MemoIngredientSingletonIndex`] or a
+    /// [`crate::memo_ingredient_indices::MemoIngredientIndices`], depending on whether the
+    /// tracked function's struct is a plain salsa struct or an enum `#[derive(Supertype)]`.
+    memo_ingredient_indices: <C::SalsaStruct<'static> as SalsaStructInDb>::MemoIngredientMap,
 
     /// Used to find memos to throw out when we have too many memoized values.
     lru: lru::Lru,
+
+    /// A downcaster from `dyn Database` to `C::DbView`.
+    ///
+    /// # Safety
+    ///
+    /// The supplied database must be be the same as the database used to construct the [`Views`]
+    /// instances that this downcaster was derived from.
+    view_caster: DatabaseDownCaster<C::DbView>,
+
+    sync_table: SyncTable,
 
     /// When `fetch` and friends executes, they return a reference to the
     /// value stored in the memo that is extended to live as long as the `&self`
@@ -114,42 +141,34 @@ pub struct IngredientImpl<C: Configuration> {
     /// we don't know that we can trust the database to give us the same runtime
     /// everytime and so forth.
     deleted_entries: DeletedEntries<C>,
-
-    /// Set to true once we invoke `register_dependent_fn` for `C::SalsaStruct`.
-    /// Prevents us from registering more than once.
-    registered: AtomicCell<bool>,
-}
-
-/// True if `old_value == new_value`. Invoked by the generated
-/// code for `should_backdate_value` so as to give a better
-/// error message.
-pub fn should_backdate_value<V: Eq>(old_value: &V, new_value: &V) -> bool {
-    old_value == new_value
 }
 
 impl<C> IngredientImpl<C>
 where
     C: Configuration,
 {
-    pub fn new(index: IngredientIndex) -> Self {
+    pub fn new(
+        index: IngredientIndex,
+        memo_ingredient_indices: <C::SalsaStruct<'static> as SalsaStructInDb>::MemoIngredientMap,
+        lru: usize,
+        view_caster: DatabaseDownCaster<C::DbView>,
+    ) -> Self {
         Self {
             index,
-            memo_map: memo::MemoMap::default(),
-            lru: Default::default(),
-            sync_map: Default::default(),
+            memo_ingredient_indices,
+            lru: lru::Lru::new(lru),
             deleted_entries: Default::default(),
-            registered: Default::default(),
+            view_caster,
+            sync_table: SyncTable::new(index),
         }
     }
 
-    pub fn database_key_index(&self, k: Id) -> DatabaseKeyIndex {
-        DatabaseKeyIndex {
-            ingredient_index: self.index,
-            key_index: k,
-        }
+    #[inline]
+    pub fn database_key_index(&self, key: Id) -> DatabaseKeyIndex {
+        DatabaseKeyIndex::new(self.index, key)
     }
 
-    pub fn set_capacity(&self, capacity: usize) {
+    pub fn set_capacity(&mut self, capacity: usize) {
         self.lru.set_capacity(capacity);
     }
 
@@ -160,45 +179,47 @@ where
     /// when this function is called and (b) ensuring that any entries
     /// removed from the memo-map are added to `deleted_entries`, which is
     /// only cleared with `&mut self`.
-    unsafe fn extend_memo_lifetime<'this, 'memo>(
+    unsafe fn extend_memo_lifetime<'this>(
         &'this self,
-        memo: &'memo memo::Memo<C::Output<'this>>,
-    ) -> Option<&'this C::Output<'this>> {
-        let memo_value: Option<&'memo C::Output<'this>> = memo.value.as_ref();
-        std::mem::transmute(memo_value)
+        memo: &memo::Memo<C::Output<'this>>,
+    ) -> &'this memo::Memo<C::Output<'this>> {
+        // SAFETY: the caller must guarantee that the memo will not be released before `&self`
+        unsafe { std::mem::transmute(memo) }
     }
 
     fn insert_memo<'db>(
         &'db self,
-        db: &'db C::DbView,
-        key: Id,
-        memo: memo::Memo<C::Output<'db>>,
-    ) -> Option<&C::Output<'db>> {
-        self.register(db);
-        let memo = Arc::new(memo);
-        let value = unsafe {
-            // Unsafety conditions: memo must be in the map (it's not yet, but it will be by the time this
-            // value is returned) and anything removed from map is added to deleted entries (ensured elsewhere).
-            self.extend_memo_lifetime(&memo)
-        };
-        if let Some(old_value) = self.memo_map.insert(key, memo) {
+        zalsa: &'db Zalsa,
+        id: Id,
+        mut memo: memo::Memo<C::Output<'db>>,
+        memo_ingredient_index: MemoIngredientIndex,
+    ) -> &'db memo::Memo<C::Output<'db>> {
+        if let Some(tracked_struct_ids) = memo.revisions.tracked_struct_ids_mut() {
+            tracked_struct_ids.shrink_to_fit();
+        }
+
+        // We convert to a `NonNull` here as soon as possible because we are going to alias
+        // into the `Box`, which is a `noalias` type.
+        // FIXME: Use `Box::into_non_null` once stable
+        let memo = NonNull::from(Box::leak(Box::new(memo)));
+
+        if let Some(old_value) =
+            self.insert_memo_into_table_for(zalsa, id, memo, memo_ingredient_index)
+        {
             // In case there is a reference to the old memo out there, we have to store it
             // in the deleted entries. This will get cleared when a new revision starts.
-            self.deleted_entries.push(old_value);
+            //
+            // SAFETY: Once the revision starts, there will be no outstanding borrows to the
+            // memo contents, and so it will be safe to free.
+            unsafe { self.deleted_entries.push(old_value) };
         }
-        value
+        // SAFETY: memo has been inserted into the table
+        unsafe { self.extend_memo_lifetime(memo.as_ref()) }
     }
 
-    /// Register this function as a dependent fn of the given salsa struct.
-    /// When instances of that salsa struct are deleted, we'll get a callback
-    /// so we can remove any data keyed by them.
-    fn register<'db>(&self, db: &'db C::DbView) {
-        if !self.registered.fetch_or(true) {
-            <C::SalsaStruct<'db> as SalsaStructInDb>::register_dependent_fn(
-                db.as_dyn_database(),
-                self.index,
-            )
-        }
+    #[inline]
+    fn memo_ingredient_index(&self, zalsa: &Zalsa, id: Id) -> MemoIngredientIndex {
+        self.memo_ingredient_indices.get_zalsa_id(zalsa, id)
     }
 }
 
@@ -206,44 +227,87 @@ impl<C> Ingredient for IngredientImpl<C>
 where
     C: Configuration,
 {
+    fn location(&self) -> &'static crate::ingredient::Location {
+        &C::LOCATION
+    }
+
     fn ingredient_index(&self) -> IngredientIndex {
         self.index
     }
 
-    fn maybe_changed_after(
+    unsafe fn maybe_changed_after(
         &self,
         db: &dyn Database,
-        input: Option<Id>,
+        input: Id,
         revision: Revision,
-    ) -> bool {
-        let key = input.unwrap();
-        let db = db.as_view::<C::DbView>();
-        self.maybe_changed_after(db, key, revision)
+        cycle_heads: &mut CycleHeads,
+    ) -> VerifyResult {
+        // SAFETY: The `db` belongs to the ingredient as per caller invariant
+        let db = unsafe { self.view_caster.downcast_unchecked(db) };
+        self.maybe_changed_after(db, input, revision, cycle_heads)
     }
 
-    fn cycle_recovery_strategy(&self) -> CycleRecoveryStrategy {
-        C::CYCLE_STRATEGY
+    /// Returns `final` only if the memo has the `verified_final` flag set and the cycle recovery strategy is not `FallbackImmediate`.
+    ///
+    /// Otherwise, the value is still provisional. For both final and provisional, it also
+    /// returns the iteration in which this memo was created (always 0 except for cycle heads).
+    fn provisional_status(&self, zalsa: &Zalsa, input: Id) -> Option<ProvisionalStatus> {
+        let memo =
+            self.get_memo_from_table_for(zalsa, input, self.memo_ingredient_index(zalsa, input))?;
+
+        let iteration = memo.revisions.iteration();
+        let verified_final = memo.revisions.verified_final.load(Ordering::Relaxed);
+
+        Some(if verified_final {
+            if C::CYCLE_STRATEGY == CycleRecoveryStrategy::FallbackImmediate {
+                ProvisionalStatus::FallbackImmediate
+            } else {
+                ProvisionalStatus::Final { iteration }
+            }
+        } else {
+            ProvisionalStatus::Provisional { iteration }
+        })
     }
 
-    fn origin(&self, key: Id) -> Option<QueryOrigin> {
-        self.origin(key)
+    fn cycle_heads<'db>(&self, zalsa: &'db Zalsa, input: Id) -> &'db CycleHeads {
+        self.get_memo_from_table_for(zalsa, input, self.memo_ingredient_index(zalsa, input))
+            .map(|memo| memo.cycle_heads())
+            .unwrap_or(empty_cycle_heads())
+    }
+
+    /// Attempts to claim `key_index` without blocking.
+    ///
+    /// * [`WaitForResult::Running`] if the `key_index` is running on another thread. It's up to the caller to block on the other thread
+    ///   to wait until the result becomes available.
+    /// * [`WaitForResult::Available`] It is (or at least was) possible to claim the `key_index`
+    /// * [`WaitResult::Cycle`] Claiming the `key_index` results in a cycle because it's on the current's thread query stack or
+    ///   running on another thread that is blocked on this thread.
+    fn wait_for<'me>(&'me self, zalsa: &'me Zalsa, key_index: Id) -> WaitForResult<'me> {
+        match self.sync_table.try_claim(zalsa, key_index) {
+            ClaimResult::Running(blocked_on) => WaitForResult::Running(blocked_on),
+            ClaimResult::Cycle { same_thread } => WaitForResult::Cycle { same_thread },
+            ClaimResult::Claimed(_) => WaitForResult::Available,
+        }
+    }
+
+    fn origin<'db>(&self, zalsa: &'db Zalsa, key: Id) -> Option<QueryOriginRef<'db>> {
+        self.origin(zalsa, key)
     }
 
     fn mark_validated_output(
         &self,
-        db: &dyn Database,
+        zalsa: &Zalsa,
         executor: DatabaseKeyIndex,
-        output_key: Option<crate::Id>,
+        output_key: crate::Id,
     ) {
-        let output_key = output_key.unwrap();
-        self.validate_specified_value(db, executor, output_key);
+        self.validate_specified_value(zalsa, executor, output_key);
     }
 
     fn remove_stale_output(
         &self,
-        _db: &dyn Database,
+        _zalsa: &Zalsa,
         _executor: DatabaseKeyIndex,
-        _stale_output_key: Option<crate::Id>,
+        _stale_output_key: crate::Id,
     ) {
         // This function is invoked when a query Q specifies the value for `stale_output_key` in rev 1,
         // but not in rev 2. We don't do anything in this case, we just leave the (now stale) memo.
@@ -254,38 +318,37 @@ where
         true
     }
 
-    fn reset_for_new_revision(&mut self) {
-        std::mem::take(&mut self.deleted_entries);
-    }
+    fn reset_for_new_revision(&mut self, table: &mut Table) {
+        self.lru.for_each_evicted(|evict| {
+            let ingredient_index = table.ingredient_index(evict);
+            Self::evict_value_from_memo_for(
+                table.memos_mut(evict),
+                self.memo_ingredient_indices.get(ingredient_index),
+            )
+        });
 
-    fn salsa_struct_deleted(&self, db: &dyn Database, id: Id) {
-        // Remove any data keyed by `id`, since `id` no longer
-        // exists in this revision.
-
-        if let Some(origin) = self.delete_memo(id) {
-            let key = self.database_key_index(id);
-            db.salsa_event(&|| Event {
-                thread_id: std::thread::current().id(),
-                kind: EventKind::DidDiscard { key },
-            });
-
-            // Anything that was output by this memoized execution
-            // is now itself stale.
-            let zalsa = db.zalsa();
-            for stale_output in origin.outputs() {
-                zalsa
-                    .lookup_ingredient(stale_output.ingredient_index)
-                    .remove_stale_output(db, key, stale_output.key_index);
-            }
-        }
-    }
-
-    fn fmt_index(&self, index: Option<crate::Id>, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt_index(C::DEBUG_NAME, index, fmt)
+        self.deleted_entries.clear();
     }
 
     fn debug_name(&self) -> &'static str {
         C::DEBUG_NAME
+    }
+
+    fn memo_table_types(&self) -> Arc<MemoTableTypes> {
+        unreachable!("function does not allocate pages")
+    }
+
+    fn cycle_recovery_strategy(&self) -> CycleRecoveryStrategy {
+        C::CYCLE_STRATEGY
+    }
+
+    fn accumulated<'db>(
+        &'db self,
+        db: &'db dyn Database,
+        key_index: Id,
+    ) -> (Option<&'db AccumulatedMap>, InputAccumulatedValues) {
+        let db = self.view_caster.downcast(db);
+        self.accumulated_map(db, key_index)
     }
 }
 

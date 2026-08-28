@@ -11,14 +11,20 @@
 
 [package]
 edition = "2021"
-rust-version = "1.72.0"
+rust-version = "1.79.0"
 name = "clearscreen"
-version = "3.0.0"
+version = "4.0.1"
 authors = ["Félix Saparelli <felix@passcod.name>"]
+build = false
 exclude = [
     "/bin",
     "/.github",
 ]
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Cross-platform terminal screen clearing"
 homepage = "https://github.com/watchexec/clearscreen"
 documentation = "https://github.com/watchexec/clearscreen"
@@ -32,37 +38,49 @@ keywords = [
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/watchexec/clearscreen"
 
+[lib]
+name = "clearscreen"
+path = "src/lib.rs"
+
+[[example]]
+name = "clscli"
+path = "examples/clscli.rs"
+
+[[test]]
+name = "default"
+path = "tests/default.rs"
+
+[[test]]
+name = "platformed"
+path = "tests/platformed.rs"
+
 [dependencies.terminfo]
-version = "0.8.0"
+version = "0.9.0"
 
 [dependencies.thiserror]
-version = "1.0.38"
+version = "2.0.9"
 
 [dependencies.which]
-version = "6.0.1"
+version = "7.0.0"
 
 [features]
 windows-console = []
 
 [target."cfg(unix)".dependencies.nix]
-version = "0.28.0"
+version = "0.29.0"
 features = [
     "fs",
     "term",
 ]
 default-features = false
 
-[target."cfg(windows)".dependencies.winapi]
-version = "0.3.9"
+[target."cfg(windows)".dependencies.windows-sys]
+version = "0.59.0"
 features = [
-    "consoleapi",
-    "errhandlingapi",
-    "handleapi",
-    "impl-default",
-    "lmapibuf",
-    "lmserver",
-    "lmwksta",
-    "processenv",
-    "winbase",
-    "wincon",
+    "Win32_Foundation",
+    "Win32_System_Console",
+    "Win32_System_SystemInformation",
+    "Win32_System_SystemServices",
+    "Win32_NetworkManagement_NetManagement",
 ]
+default-features = false

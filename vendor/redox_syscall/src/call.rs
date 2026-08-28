@@ -1,8 +1,10 @@
-use super::arch::*;
-use super::data::{Map, Stat, StatVfs, TimeSpec};
-use super::error::Result;
-use super::flag::*;
-use super::number::*;
+use super::{
+    arch::*,
+    data::{Map, Stat, StatVfs, TimeSpec},
+    error::Result,
+    flag::*,
+    number::*,
+};
 
 use core::mem;
 
@@ -26,21 +28,14 @@ pub fn dup2(fd: usize, newfd: usize, buf: &[u8]) -> Result<usize> {
     unsafe { syscall4(SYS_DUP2, fd, newfd, buf.as_ptr() as usize, buf.len()) }
 }
 
-/// Exit the current process
-pub fn exit(status: usize) -> Result<usize> {
-    unsafe { syscall1(SYS_EXIT, status) }
-}
-
 /// Change file permissions
 pub fn fchmod(fd: usize, mode: u16) -> Result<usize> {
     unsafe { syscall2(SYS_FCHMOD, fd, mode as usize) }
-
 }
 
 /// Change file ownership
 pub fn fchown(fd: usize, uid: u32, gid: u32) -> Result<usize> {
     unsafe { syscall3(SYS_FCHOWN, fd, uid as usize, gid as usize) }
-
 }
 
 /// Change file descriptor flags
@@ -59,7 +54,12 @@ pub fn fcntl(fd: usize, cmd: usize, arg: usize) -> Result<usize> {
 /// `EEXIST` - if [`MapFlags::MAP_FIXED`] was set, and the address specified was already in use.
 ///
 pub unsafe fn fmap(fd: usize, map: &Map) -> Result<usize> {
-    syscall3(SYS_FMAP, fd, map as *const Map as usize, mem::size_of::<Map>())
+    syscall3(
+        SYS_FMAP,
+        fd,
+        map as *const Map as usize,
+        mem::size_of::<Map>(),
+    )
 }
 
 /// Unmap whole (or partial) continous memory-mapped files
@@ -72,19 +72,40 @@ pub fn fpath(fd: usize, buf: &mut [u8]) -> Result<usize> {
     unsafe { syscall3(SYS_FPATH, fd, buf.as_mut_ptr() as usize, buf.len()) }
 }
 
+/// Create a link to a file
+pub fn flink<T: AsRef<str>>(fd: usize, path: T) -> Result<usize> {
+    let path = path.as_ref();
+    unsafe { syscall3(SYS_FLINK, fd, path.as_ptr() as usize, path.len()) }
+}
+
 /// Rename a file
 pub fn frename<T: AsRef<str>>(fd: usize, path: T) -> Result<usize> {
-    unsafe { syscall3(SYS_FRENAME, fd, path.as_ref().as_ptr() as usize, path.as_ref().len()) }
+    let path = path.as_ref();
+    unsafe { syscall3(SYS_FRENAME, fd, path.as_ptr() as usize, path.len()) }
 }
 
 /// Get metadata about a file
 pub fn fstat(fd: usize, stat: &mut Stat) -> Result<usize> {
-    unsafe { syscall3(SYS_FSTAT, fd, stat as *mut Stat as usize, mem::size_of::<Stat>()) }
+    unsafe {
+        syscall3(
+            SYS_FSTAT,
+            fd,
+            stat as *mut Stat as usize,
+            mem::size_of::<Stat>(),
+        )
+    }
 }
 
 /// Get metadata about a filesystem
 pub fn fstatvfs(fd: usize, stat: &mut StatVfs) -> Result<usize> {
-    unsafe { syscall3(SYS_FSTATVFS, fd, stat as *mut StatVfs as usize, mem::size_of::<StatVfs>()) }
+    unsafe {
+        syscall3(
+            SYS_FSTATVFS,
+            fd,
+            stat as *mut StatVfs as usize,
+            mem::size_of::<StatVfs>(),
+        )
+    }
 }
 
 /// Sync a file descriptor to its underlying medium
@@ -99,78 +120,32 @@ pub fn ftruncate(fd: usize, len: usize) -> Result<usize> {
 
 // Change modify and/or access times
 pub fn futimens(fd: usize, times: &[TimeSpec]) -> Result<usize> {
-    unsafe { syscall3(SYS_FUTIMENS, fd, times.as_ptr() as usize, times.len() * mem::size_of::<TimeSpec>()) }
+    unsafe {
+        syscall3(
+            SYS_FUTIMENS,
+            fd,
+            times.as_ptr() as usize,
+            times.len() * mem::size_of::<TimeSpec>(),
+        )
+    }
 }
 
 /// Fast userspace mutex
-pub unsafe fn futex(addr: *mut i32, op: usize, val: i32, val2: usize, addr2: *mut i32)
-                    -> Result<usize> {
-    syscall5(SYS_FUTEX, addr as usize, op, (val as isize) as usize, val2, addr2 as usize)
-}
-
-/// Get the effective group ID
-pub fn getegid() -> Result<usize> {
-    unsafe { syscall0(SYS_GETEGID) }
-}
-
-/// Get the effective namespace
-pub fn getens() -> Result<usize> {
-    unsafe { syscall0(SYS_GETENS) }
-}
-
-/// Get the effective user ID
-pub fn geteuid() -> Result<usize> {
-    unsafe { syscall0(SYS_GETEUID) }
-}
-
-/// Get the current group ID
-pub fn getgid() -> Result<usize> {
-    unsafe { syscall0(SYS_GETGID) }
-}
-
-/// Get the current namespace
-pub fn getns() -> Result<usize> {
-    unsafe { syscall0(SYS_GETNS) }
-}
-
-/// Get the current process ID
-pub fn getpid() -> Result<usize> {
-    unsafe { syscall0(SYS_GETPID) }
-}
-
-/// Get the process group ID
-pub fn getpgid(pid: usize) -> Result<usize> {
-    unsafe { syscall1(SYS_GETPGID, pid) }
-}
-
-/// Get the parent process ID
-pub fn getppid() -> Result<usize> {
-    unsafe { syscall0(SYS_GETPPID) }
-}
-
-/// Get the current user ID
-pub fn getuid() -> Result<usize> {
-    unsafe { syscall0(SYS_GETUID) }
-}
-
-/// Set the I/O privilege level
-///
-/// # Errors
-///
-/// * `EPERM` - `uid != 0`
-/// * `EINVAL` - `level > 3`
-pub unsafe fn iopl(level: usize) -> Result<usize> {
-    syscall1(SYS_IOPL, level)
-}
-
-/// Send a signal `sig` to the process identified by `pid`
-pub fn kill(pid: usize, sig: usize) -> Result<usize> {
-    unsafe { syscall2(SYS_KILL, pid, sig) }
-}
-
-/// Create a link to a file
-pub unsafe fn link(old: *const u8, new: *const u8) -> Result<usize> {
-    syscall2(SYS_LINK, old as usize, new as usize)
+pub unsafe fn futex(
+    addr: *mut i32,
+    op: usize,
+    val: i32,
+    val2: usize,
+    addr2: *mut i32,
+) -> Result<usize> {
+    syscall5(
+        SYS_FUTEX,
+        addr as usize,
+        op,
+        (val as isize) as usize,
+        val2,
+        addr2 as usize,
+    )
 }
 
 /// Seek to `offset` bytes in a file descriptor
@@ -190,13 +165,25 @@ pub unsafe fn mprotect(addr: usize, size: usize, flags: MapFlags) -> Result<usiz
 
 /// Sleep for the time specified in `req`
 pub fn nanosleep(req: &TimeSpec, rem: &mut TimeSpec) -> Result<usize> {
-    unsafe { syscall2(SYS_NANOSLEEP, req as *const TimeSpec as usize,
-                                     rem as *mut TimeSpec as usize) }
+    unsafe {
+        syscall2(
+            SYS_NANOSLEEP,
+            req as *const TimeSpec as usize,
+            rem as *mut TimeSpec as usize,
+        )
+    }
 }
 
 /// Open a file
 pub fn open<T: AsRef<str>>(path: T, flags: usize) -> Result<usize> {
-    unsafe { syscall3(SYS_OPEN, path.as_ref().as_ptr() as usize, path.as_ref().len(), flags) }
+    let path = path.as_ref();
+    unsafe { syscall3(SYS_OPEN, path.as_ptr() as usize, path.len(), flags) }
+}
+
+/// Open a file at a specific path
+pub fn openat<T: AsRef<str>>(fd: usize, path: T, flags: usize) -> Result<usize> {
+    let path = path.as_ref();
+    unsafe { syscall4(SYS_OPENAT, fd, path.as_ptr() as usize, path.len(), flags) }
 }
 
 /// Read from a file descriptor into a buffer
@@ -206,51 +193,14 @@ pub fn read(fd: usize, buf: &mut [u8]) -> Result<usize> {
 
 /// Remove a directory
 pub fn rmdir<T: AsRef<str>>(path: T) -> Result<usize> {
-    unsafe { syscall2(SYS_RMDIR, path.as_ref().as_ptr() as usize, path.as_ref().len()) }
-}
-
-/// Set the process group ID
-pub fn setpgid(pid: usize, pgid: usize) -> Result<usize> {
-    unsafe { syscall2(SYS_SETPGID, pid, pgid) }
-}
-
-/// Set the current process group IDs
-pub fn setregid(rgid: usize, egid: usize) -> Result<usize> {
-    unsafe { syscall2(SYS_SETREGID, rgid, egid) }
-}
-
-/// Make a new scheme namespace
-pub fn setrens(rns: usize, ens: usize) -> Result<usize> {
-    unsafe { syscall2(SYS_SETRENS, rns, ens) }
-}
-
-/// Set the current process user IDs
-pub fn setreuid(ruid: usize, euid: usize) -> Result<usize> {
-    unsafe { syscall2(SYS_SETREUID, ruid, euid) }
-}
-
-/// Set the file mode creation mask
-pub fn umask(mask: usize) -> Result<usize> {
-    unsafe { syscall1(SYS_UMASK, mask) }
+    let path = path.as_ref();
+    unsafe { syscall2(SYS_RMDIR, path.as_ptr() as usize, path.len()) }
 }
 
 /// Remove a file
 pub fn unlink<T: AsRef<str>>(path: T) -> Result<usize> {
-    unsafe { syscall2(SYS_UNLINK, path.as_ref().as_ptr() as usize, path.as_ref().len()) }
-}
-
-/// Convert a virtual address to a physical one
-///
-/// # Errors
-///
-/// * `EPERM` - `uid != 0`
-pub unsafe fn virttophys(virtual_address: usize) -> Result<usize> {
-    syscall1(SYS_VIRTTOPHYS, virtual_address)
-}
-
-/// Check if a child process has exited or received a signal
-pub fn waitpid(pid: usize, status: &mut usize, options: WaitFlags) -> Result<usize> {
-    unsafe { syscall3(SYS_WAITPID, pid, status as *mut usize as usize, options.bits()) }
+    let path = path.as_ref();
+    unsafe { syscall2(SYS_UNLINK, path.as_ptr() as usize, path.len()) }
 }
 
 /// Write a buffer to a file descriptor
@@ -285,7 +235,14 @@ pub fn sched_yield() -> Result<usize> {
 pub fn sendfd(receiver_socket: usize, fd: usize, flags: usize, arg: u64) -> Result<usize> {
     #[cfg(target_pointer_width = "32")]
     unsafe {
-        syscall5(SYS_SENDFD, receiver_socket, fd, flags, arg as u32 as usize, (arg >> 32) as u32 as usize)
+        syscall5(
+            SYS_SENDFD,
+            receiver_socket,
+            fd,
+            flags,
+            arg as u32 as usize,
+            (arg >> 32) as u32 as usize,
+        )
     }
 
     #[cfg(target_pointer_width = "64")]

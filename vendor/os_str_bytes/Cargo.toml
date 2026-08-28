@@ -13,8 +13,9 @@
 edition = "2021"
 rust-version = "1.74.0"
 name = "os_str_bytes"
-version = "7.0.0"
+version = "7.1.0"
 authors = ["dylni"]
+build = false
 exclude = [
     ".*",
     "tests.rs",
@@ -22,6 +23,11 @@ exclude = [
     "/src/bin",
     "/tests",
 ]
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 Lossless functionality for platform-native strings
 """
@@ -53,6 +59,10 @@ rustdoc-args = [
     "--cfg",
     "os_str_bytes_docs_rs",
 ]
+
+[lib]
+name = "os_str_bytes"
+path = "src/lib.rs"
 
 [dependencies.memchr]
 version = "2.3.5"

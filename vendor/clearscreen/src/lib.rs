@@ -392,8 +392,13 @@ impl Default for ClearScreen {
 
 			// - screen supports CSI 3J only within the XtermClear sequence, without E3 capability.
 			// - Konsole handles CSI 3J correctly only within the XtermClear sequence.
+			// - Wezterm handles CSI 3J correctly only within the XtermClear sequence.
 			// - assume tmux TERMs are only used within tmux, and avoid the requirement for a functioning terminfo then
-			if term.starts_with("screen") || term.starts_with("konsole") || term.starts_with("tmux") {
+			if term.starts_with("screen")
+				|| term.starts_with("konsole")
+				|| term == "wezterm"
+				|| term.starts_with("tmux")
+			{
 				return Self::XtermClear;
 			}
 
@@ -678,34 +683,85 @@ pub fn is_windows_10() -> bool {
 #[derive(Debug, Error)]
 pub enum Error {
 	/// Any I/O error.
-	#[error(transparent)]
+	#[error("io: {0}")]
 	Io(#[from] io::Error),
 
 	/// A non-success exit status from a command.
-	#[error("{0}: {1}")]
+	#[error("command: {0}: {1}")]
 	Command(&'static str, ExitStatus),
 
 	/// Any nix (libc) error.
 	#[cfg(unix)]
-	#[error(transparent)]
-	Nix(#[from] nix::Error),
+	#[error("unix: {0}")]
+	Nix(#[from] NixError),
 
 	/// Any terminfo error.
-	#[error(transparent)]
-	Terminfo(#[from] terminfo::Error),
+	#[error("terminfo: {0}")]
+	Terminfo(#[from] TerminfoError),
 
 	/// A missing terminfo capability.
-	#[error("required terminfo capability not available: {0}")]
+	#[error("terminfo: capability not available: {0}")]
 	TerminfoCap(&'static str),
 
 	/// A null-pointer error.
-	#[error("encountered a null pointer while reading {0}")]
+	#[error("ffi: encountered a null pointer while reading {0}")]
 	NullPtr(&'static str),
+}
+
+/// Nix error type.
+///
+/// This wraps a [`nix::Error`] to avoid directly exposing the type in the public API, which
+/// required a breaking change every time `clearscreen` updated its `nix` version.
+///
+/// To obtain a nix error, convert this error to an `i32` then use [`nix::Error::from_raw`]:
+///
+/// Creating a [`NixError`] is explicitly not possible from the public API.
+///
+/// ```no_compile
+/// let nix_error = nix::Error::from_raw(error.into());
+/// assert_eq!(nix_error, nix::Error::EINVAL);
+/// ```
+#[cfg(unix)]
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct NixError(nix::Error);
+
+#[cfg(unix)]
+impl From<NixError> for i32 {
+	fn from(err: NixError) -> Self {
+		err.0 as _
+	}
+}
+
+/// Terminfo error type.
+///
+/// This wraps a [`terminfo::Error`] to avoid directly exposing the type in the public API, which
+/// required a breaking change every time `clearscreen` updated its `terminfo` version.
+#[derive(Debug, Error)]
+#[error("{description}")]
+pub struct TerminfoError {
+	inner: terminfo::Error,
+	description: String,
+}
+
+impl From<terminfo::Error> for TerminfoError {
+	fn from(inner: terminfo::Error) -> Self {
+		Self {
+			description: inner.to_string(),
+			inner,
+		}
+	}
+}
+
+impl From<terminfo::Error> for Error {
+	fn from(err: terminfo::Error) -> Self {
+		Self::Terminfo(TerminfoError::from(err))
+	}
 }
 
 #[cfg(unix)]
 mod unix {
-	use super::Error;
+	use super::{Error, NixError};
 
 	use nix::{
 		sys::termios::{
@@ -721,8 +777,10 @@ mod unix {
 		write_termios(|t| {
 			t.input_flags.insert(
 				InputFlags::BRKINT
-					| InputFlags::ICRNL | InputFlags::IGNPAR
-					| InputFlags::ISTRIP | InputFlags::IXON,
+					| InputFlags::ICRNL
+					| InputFlags::IGNPAR
+					| InputFlags::ISTRIP
+					| InputFlags::IXON,
 			);
 			t.output_flags.insert(OutputFlags::OPOST);
 			t.local_flags.insert(LocalFlags::ICANON | LocalFlags::ISIG);
@@ -731,11 +789,12 @@ mod unix {
 
 	pub(crate) fn vt_well_done() -> Result<(), Error> {
 		write_termios(|t| {
-			let mut inserts =
-				InputFlags::BRKINT
-					| InputFlags::ICRNL | InputFlags::IGNPAR
-					| InputFlags::IMAXBEL
-					| InputFlags::ISTRIP | InputFlags::IXON;
+			let mut inserts = InputFlags::BRKINT
+				| InputFlags::ICRNL
+				| InputFlags::IGNPAR
+				| InputFlags::IMAXBEL
+				| InputFlags::ISTRIP
+				| InputFlags::IXON;
 
 			#[cfg(any(target_os = "android", target_os = "linux", target_os = "macos"))]
 			{
@@ -758,19 +817,19 @@ mod unix {
 	}
 
 	fn write_termios(f: impl Fn(&mut Termios)) -> Result<(), Error> {
-		if isatty(stdin().as_raw_fd())? {
-			let mut t = tcgetattr(stdin().as_fd())?;
+		if isatty(stdin().as_raw_fd()).map_err(NixError)? {
+			let mut t = tcgetattr(stdin().as_fd()).map_err(NixError)?;
 			reset_termios(&mut t);
 			f(&mut t);
-			tcsetattr(stdin().as_fd(), TCSANOW, &t)?;
+			tcsetattr(stdin().as_fd(), TCSANOW, &t).map_err(NixError)?;
 		} else {
 			let tty = OpenOptions::new().read(true).write(true).open("/dev/tty")?;
 			let fd = tty.as_fd();
 
-			let mut t = tcgetattr(fd)?;
+			let mut t = tcgetattr(fd).map_err(NixError)?;
 			reset_termios(&mut t);
 			f(&mut t);
-			tcsetattr(fd, TCSANOW, &t)?;
+			tcsetattr(fd, TCSANOW, &t).map_err(NixError)?;
 		}
 
 		Ok(())
@@ -781,38 +840,29 @@ mod unix {
 mod win {
 	use super::Error;
 
-	use std::{convert::TryFrom, io, mem::size_of, ptr};
+	use std::{io, mem::size_of, ptr};
 
-	use winapi::{
-		shared::minwindef::{DWORD, FALSE},
-		um::{
-			consoleapi::{GetConsoleMode, SetConsoleMode},
-			handleapi::INVALID_HANDLE_VALUE,
-			lmapibuf::{NetApiBufferAllocate, NetApiBufferFree},
-			lmserver::{NetServerGetInfo, MAJOR_VERSION_MASK, SERVER_INFO_101, SV_PLATFORM_ID_NT},
-			lmwksta::{NetWkstaGetInfo, WKSTA_INFO_100},
-			processenv::GetStdHandle,
-			winbase::{VerifyVersionInfoW, STD_OUTPUT_HANDLE},
-			wincon::{
-				ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT,
-				ENABLE_VIRTUAL_TERMINAL_PROCESSING,
-			},
-			winnt::{
-				VerSetConditionMask, HANDLE, OSVERSIONINFOEXW, POSVERSIONINFOEXW, ULONGLONG,
-				VER_GREATER_EQUAL, VER_MAJORVERSION, VER_MINORVERSION, VER_SERVICEPACKMAJOR,
-			},
-		},
+	use windows_sys::Win32::Foundation::{FALSE, HANDLE, INVALID_HANDLE_VALUE};
+	use windows_sys::Win32::NetworkManagement::NetManagement::{
+		NetApiBufferAllocate, NetApiBufferFree, NetServerGetInfo, NetWkstaGetInfo,
+		MAJOR_VERSION_MASK, SERVER_INFO_101, SV_PLATFORM_ID_NT, WKSTA_INFO_100,
 	};
+	use windows_sys::Win32::System::Console::{
+		GetConsoleMode, GetStdHandle, SetConsoleMode, CONSOLE_MODE, ENABLE_ECHO_INPUT,
+		ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT, ENABLE_VIRTUAL_TERMINAL_PROCESSING,
+		STD_OUTPUT_HANDLE,
+	};
+	use windows_sys::Win32::System::SystemInformation::{
+		VerSetConditionMask, VerifyVersionInfoW, OSVERSIONINFOEXW, VER_MAJORVERSION,
+		VER_MINORVERSION, VER_SERVICEPACKMAJOR,
+	};
+	use windows_sys::Win32::System::SystemServices::VER_GREATER_EQUAL;
 
 	#[cfg(feature = "windows-console")]
-	use winapi::um::{
-		wincon::{
-			FillConsoleOutputAttribute, FillConsoleOutputCharacterW, GetConsoleScreenBufferInfo,
-			ScrollConsoleScreenBufferW, SetConsoleCursorPosition, CONSOLE_SCREEN_BUFFER_INFO,
-			PCONSOLE_SCREEN_BUFFER_INFO,
-		},
-		wincontypes::{CHAR_INFO_Char, CHAR_INFO, COORD, SMALL_RECT},
-		winnt::SHORT,
+	use windows_sys::Win32::System::Console::{
+		FillConsoleOutputAttribute, FillConsoleOutputCharacterW, GetConsoleScreenBufferInfo,
+		ScrollConsoleScreenBufferW, SetConsoleCursorPosition, CHAR_INFO, CHAR_INFO_0,
+		CONSOLE_SCREEN_BUFFER_INFO, COORD, SMALL_RECT,
 	};
 
 	fn console_handle() -> Result<HANDLE, Error> {
@@ -824,7 +874,7 @@ mod win {
 
 	#[cfg(feature = "windows-console")]
 	fn buffer_info(console: HANDLE) -> Result<CONSOLE_SCREEN_BUFFER_INFO, Error> {
-		let csbi: PCONSOLE_SCREEN_BUFFER_INFO = ptr::null_mut();
+		let csbi: *mut CONSOLE_SCREEN_BUFFER_INFO = ptr::null_mut();
 		if unsafe { GetConsoleScreenBufferInfo(console, csbi) } == FALSE {
 			return Err(io::Error::last_os_error().into());
 		}
@@ -869,12 +919,13 @@ mod win {
 		// Scroll it upwards off the top of the buffer with a magnitude of the entire height.
 		let target = COORD {
 			X: 0,
-			Y: (0 - csbi.dwSize.Y) as SHORT,
+			Y: (0 - csbi.dwSize.Y) as i16,
 		};
 
 		// Fill with empty spaces with the buffer’s default text attribute.
-		let mut space = CHAR_INFO_Char::default();
-		unsafe { *space.AsciiChar_mut() = b' ' as i8 };
+		let space = CHAR_INFO_0 {
+			AsciiChar: b' ' as i8,
+		};
 
 		let fill = CHAR_INFO {
 			Char: space,
@@ -947,7 +998,7 @@ mod win {
 		Ok(())
 	}
 
-	const ENABLE_COOKED_MODE: DWORD =
+	const ENABLE_COOKED_MODE: CONSOLE_MODE =
 		ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT;
 
 	pub(crate) fn cooked() -> Result<(), Error> {
@@ -972,15 +1023,15 @@ mod win {
 	// proper way, requires manifesting
 	#[inline]
 	fn um_verify_version() -> bool {
-		let condition_mask: ULONGLONG = unsafe {
+		let condition_mask: u64 = unsafe {
 			VerSetConditionMask(
 				VerSetConditionMask(
-					VerSetConditionMask(0, VER_MAJORVERSION, VER_GREATER_EQUAL),
+					VerSetConditionMask(0, VER_MAJORVERSION, VER_GREATER_EQUAL as u8),
 					VER_MINORVERSION,
-					VER_GREATER_EQUAL,
+					VER_GREATER_EQUAL as u8,
 				),
 				VER_SERVICEPACKMAJOR,
-				VER_GREATER_EQUAL,
+				VER_GREATER_EQUAL as u8,
 			)
 		};
 
@@ -988,12 +1039,19 @@ mod win {
 			dwMinorVersion: ABRACADABRA_THRESHOLD.1 as _,
 			dwMajorVersion: ABRACADABRA_THRESHOLD.0 as _,
 			wServicePackMajor: 0,
-			..OSVERSIONINFOEXW::default()
+			dwOSVersionInfoSize: size_of::<OSVERSIONINFOEXW>() as u32,
+			dwBuildNumber: 0,
+			dwPlatformId: 0,
+			szCSDVersion: [0; 128],
+			wServicePackMinor: 0,
+			wSuiteMask: 0,
+			wProductType: 0,
+			wReserved: 0,
 		};
 
 		let ret = unsafe {
 			VerifyVersionInfoW(
-				&mut osvi as POSVERSIONINFOEXW,
+				&mut osvi,
 				VER_MAJORVERSION | VER_MINORVERSION | VER_SERVICEPACKMAJOR,
 				condition_mask,
 			)
@@ -1190,14 +1248,14 @@ impl<'a, T: AsRef<&'a [u8]>> From<T> for ResetScrollback<'a> {
 	}
 }
 
-impl<'a> AsRef<[u8]> for ResetScrollback<'a> {
+impl AsRef<[u8]> for ResetScrollback<'_> {
 	#[inline]
 	fn as_ref(&self) -> &[u8] {
 		&self.0
 	}
 }
 
-impl<'a> ResetScrollback<'a> {
+impl ResetScrollback<'_> {
 	#[inline]
 	fn expand(&self) -> Expansion<Self> {
 		#[allow(dead_code)]

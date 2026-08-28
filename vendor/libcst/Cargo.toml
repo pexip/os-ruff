@@ -13,8 +13,14 @@
 edition = "2018"
 rust-version = "1.70"
 name = "libcst"
-version = "1.4.0"
+version = "1.8.2"
 authors = ["LibCST Developers"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A Python parser and Concrete Syntax Tree library."
 documentation = "https://libcst.rtfd.org"
 readme = "README.md"
@@ -24,7 +30,7 @@ keywords = [
     "ast",
 ]
 categories = ["parser-implementations"]
-license-file = "LICENSE"
+license = "MIT AND (MIT AND PSF-2.0)"
 repository = "https://github.com/Instagram/LibCST"
 
 [lib]
@@ -33,52 +39,58 @@ crate-type = [
     "cdylib",
     "rlib",
 ]
+path = "src/lib.rs"
 
 [[bin]]
 name = "parse"
 path = "src/bin.rs"
 
+[[test]]
+name = "parser_roundtrip"
+path = "tests/parser_roundtrip.rs"
+
 [[bench]]
 name = "parser_benchmark"
+path = "benches/parser_benchmark.rs"
 harness = false
 
-[dependencies.chic]
-version = "1.2.2"
+[dependencies.annotate-snippets]
+version = "0.11.5"
 
 [dependencies.libcst_derive]
-version = "1.4.0"
+version = "1.8.2"
 
 [dependencies.memchr]
-version = "2.5.0"
+version = "2.7.4"
 
 [dependencies.paste]
-version = "1.0.9"
+version = "1.0.15"
 
 [dependencies.peg]
-version = "0.8.1"
+version = "0.8.5"
 
 [dependencies.pyo3]
-version = "0.20"
+version = "0.25"
 optional = true
 
 [dependencies.regex]
-version = "1.9.3"
+version = "1.11.1"
 
 [dependencies.thiserror]
-version = "1.0.37"
+version = "2.0.12"
 
 [dev-dependencies.criterion]
-version = "0.5.1"
+version = "0.6.0"
 features = ["html_reports"]
 
 [dev-dependencies.difference]
 version = "2.0.0"
 
 [dev-dependencies.itertools]
-version = "0.11.0"
+version = "0.14.0"
 
 [dev-dependencies.rayon]
-version = "1.7.0"
+version = "1.10.0"
 
 [features]
 default = ["py"]

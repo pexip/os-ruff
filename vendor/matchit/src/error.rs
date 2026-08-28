@@ -2,6 +2,7 @@ use crate::escape::{UnescapedRef, UnescapedRoute};
 use crate::tree::{denormalize_params, Node};
 
 use std::fmt;
+use std::ops::Deref;
 
 /// Represents errors that can occur when inserting a new route.
 #[non_exhaustive]
@@ -12,15 +13,18 @@ pub enum InsertError {
         /// The existing route that the insertion is conflicting with.
         with: String,
     },
+
     /// Only one parameter per route segment is allowed.
     ///
-    /// Static segments are also allowed before a parameter, but not after it. For example,
-    /// `/foo-{bar}` is a valid route, but `/{bar}-foo` is not.
+    /// For example, `/foo-{bar}` and `/{bar}-foo` are valid routes, but `/{foo}-{bar}`
+    /// is not.
     InvalidParamSegment,
+
     /// Parameters must be registered with a valid name and matching braces.
     ///
     /// Note you can use `{{` or `}}` to escape literal brackets.
     InvalidParam,
+
     /// Catch-all parameters are only allowed at the end of a path.
     InvalidCatchAll,
 }
@@ -31,8 +35,7 @@ impl fmt::Display for InsertError {
             Self::Conflict { with } => {
                 write!(
                     f,
-                    "Insertion failed due to conflict with previously registered route: {}",
-                    with
+                    "Insertion failed due to conflict with previously registered route: {with}"
                 )
             }
             Self::InvalidParamSegment => {
@@ -94,6 +97,40 @@ impl InsertError {
         InsertError::Conflict {
             with: String::from_utf8(route.into_unescaped()).unwrap(),
         }
+    }
+}
+
+/// A failed merge attempt.
+///
+/// See [`Router::merge`](crate::Router::merge) for details.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MergeError(pub(crate) Vec<InsertError>);
+
+impl MergeError {
+    /// Returns a list of [`InsertError`] for every insertion that failed
+    /// during the merge.
+    pub fn into_errors(self) -> Vec<InsertError> {
+        self.0
+    }
+}
+
+impl fmt::Display for MergeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for error in self.0.iter() {
+            writeln!(f, "{}", error)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl std::error::Error for MergeError {}
+
+impl Deref for MergeError {
+    type Target = Vec<InsertError>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 

@@ -1,4 +1,4 @@
-#[salsa::input(return_ref)]
+#[salsa::input(returns(ref))]
 struct InputWithRetRef(u32);
 
 #[salsa::input(specify)]
@@ -17,8 +17,8 @@ struct InputWithRecover(u32);
 struct InputWithLru(u32);
 
 #[salsa::input]
-struct InputWithIdField {
-    #[id]
+struct InputWithTrackedField {
+    #[tracked]
     field: u32,
 }
 

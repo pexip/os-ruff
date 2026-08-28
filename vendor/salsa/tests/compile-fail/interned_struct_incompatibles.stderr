@@ -1,8 +1,8 @@
-error: `return_ref` option not allowed here
+error: `returns` option not allowed here
  --> tests/compile-fail/interned_struct_incompatibles.rs:1:19
   |
-1 | #[salsa::interned(return_ref)]
-  |                   ^^^^^^^^^^
+1 | #[salsa::interned(returns(ref))]
+  |                   ^^^^^^^
 
 error: `specify` option not allowed here
  --> tests/compile-fail/interned_struct_incompatibles.rs:6:19
@@ -34,9 +34,22 @@ error: `lru` option not allowed here
 26 | #[salsa::interned(lru = 12)]
    |                   ^^^
 
-error: `#[id]` cannot be used with `#[salsa::interned]`
+error: `#[tracked]` cannot be used with `#[salsa::interned]`
   --> tests/compile-fail/interned_struct_incompatibles.rs:33:5
    |
-33 | /     #[id]
+33 | /     #[tracked]
 34 | |     field: u32,
    | |______________^
+
+error: cannot find attribute `tracked` in this scope
+  --> tests/compile-fail/interned_struct_incompatibles.rs:33:7
+   |
+33 |     #[tracked]
+   |       ^^^^^^^
+   |
+help: consider importing one of these attribute macros
+   |
+1  + use salsa::tracked;
+   |
+1  + use salsa_macros::tracked;
+   |

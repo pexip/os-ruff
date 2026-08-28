@@ -11,15 +11,21 @@
 
 [package]
 edition = "2021"
-rust-version = "1.61"
+rust-version = "1.71"
 name = "imara-diff"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["pascalkuthe <pascalkuthe@pm.me>"]
+build = false
 exclude = [
     "tests",
     "bench_data",
     "plt.py",
 ]
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A high performance library for computing diffs."
 readme = "README.md"
 keywords = [
@@ -35,13 +41,14 @@ repository = "https://github.com/pascalkuthe/imara-diff"
 [profile.release]
 debug = 2
 
-[dependencies.ahash]
-version = "0.8.0"
+[lib]
+name = "imara_diff"
+path = "src/lib.rs"
 
 [dependencies.hashbrown]
-version = "0.14"
+version = "0.15"
 features = [
-    "raw",
+    "default-hasher",
     "inline-more",
 ]
 default-features = false
@@ -52,6 +59,3 @@ version = "1.4.0"
 [features]
 default = ["unified_diff"]
 unified_diff = []
-
-[badges.maintenance]
-status = "actively-developed"

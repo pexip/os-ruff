@@ -2,74 +2,123 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::num::NonZeroU32;
 
-use crate::Database;
+use crate::zalsa::Zalsa;
 
-/// An Id is a newtype'd u32 ranging from `0..Id::MAX_U32`.
-/// The maximum range is smaller than a standard u32 to leave
+/// The `Id` of a salsa struct in the database [`Table`](`crate::table::Table`).
+///
+/// The high-order bits of an `Id` store a 32-bit generation counter, while
+/// the low-order bits pack a [`PageIndex`](`crate::table::PageIndex`) and
+/// [`SlotIndex`](`crate::table::SlotIndex`) within the page.
+///
+/// The low-order bits of `Id` are a `u32` ranging from `0..Id::MAX_U32`.
+/// The maximum range is smaller than a standard `u32` to leave
 /// room for niches; currently there is only one niche, so that
 /// `Option<Id>` is the same size as an `Id`.
 ///
-/// You will rarely use the `Id` type directly, though you can.
-/// You are more likely to use types that implement the `AsId` trait,
-/// such as entity keys.
+/// As an end-user of `Salsa` you will generally not use `Id` directly,
+/// it is wrapped in new types.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id {
-    value: NonZeroU32,
+    index: NonZeroU32,
+    generation: u32,
 }
 
 impl Id {
     pub const MAX_U32: u32 = u32::MAX - 0xFF;
     pub const MAX_USIZE: usize = Self::MAX_U32 as usize;
 
-    /// Create a `salsa::Id` from a u32 value. This value should
-    /// be less than [`Self::MAX_U32`].
+    /// Create a `salsa::Id` from a u32 value, without a generation. This
+    /// value should be less than [`Self::MAX_U32`].
     ///
     /// In general, you should not need to create salsa ids yourself,
     /// but it can be useful if you are using the type as a general
     /// purpose "identifier" internally.
+    ///
+    /// # Safety
+    ///
+    /// The supplied value must be less than [`Self::MAX_U32`].
+    #[doc(hidden)]
     #[track_caller]
-    pub const fn from_u32(x: u32) -> Self {
+    #[inline]
+    pub const unsafe fn from_index(index: u32) -> Self {
+        debug_assert!(index < Self::MAX_U32);
+
         Id {
-            value: match NonZeroU32::new(x + 1) {
-                Some(v) => v,
-                None => panic!("given value is too large to be a `salsa::Id`"),
-            },
+            // SAFETY: Caller obligation.
+            index: unsafe { NonZeroU32::new_unchecked(index + 1) },
+            generation: 0,
         }
     }
 
-    pub const fn as_u32(self) -> u32 {
-        self.value.get() - 1
+    /// Create a `salsa::Id` from a `u64` value.
+    ///
+    /// This should only be used to recreate an `Id` together with `Id::as_u64`.
+    ///
+    /// # Safety
+    ///
+    /// The data bits of the supplied value must represent a valid `Id` returned
+    /// by `Id::as_u64`.
+    #[doc(hidden)]
+    #[track_caller]
+    #[inline]
+    pub const unsafe fn from_bits(bits: u64) -> Self {
+        // SAFETY: Caller obligation.
+        let index = unsafe { NonZeroU32::new_unchecked(bits as u32) };
+        let generation = (bits >> 32) as u32;
+
+        Id { index, generation }
+    }
+
+    /// Return a `u64` representation of this `Id`.
+    #[inline]
+    pub fn as_bits(self) -> u64 {
+        u64::from(self.index.get()) | (u64::from(self.generation) << 32)
+    }
+
+    /// Returns a new `Id` with same index, but the generation incremented by one.
+    ///
+    /// Returns `None` if the generation would overflow, i.e. the current generation
+    /// is `u32::MAX`.
+    #[inline]
+    pub fn next_generation(self) -> Option<Id> {
+        self.generation()
+            .checked_add(1)
+            .map(|generation| self.with_generation(generation))
+    }
+
+    /// Mark the `Id` with a generation.
+    ///
+    /// This `Id` will refer to the same page and slot in the database,
+    /// but will differ from other identifiers of the slot based on the
+    /// provided generation.
+    #[inline]
+    pub const fn with_generation(self, generation: u32) -> Id {
+        Id {
+            index: self.index,
+            generation,
+        }
+    }
+
+    /// Return the index portion of this `Id`.
+    #[inline]
+    pub const fn index(self) -> u32 {
+        self.index.get() - 1
+    }
+
+    /// Return the generation of this `Id`.
+    #[inline]
+    pub const fn generation(self) -> u32 {
+        self.generation
     }
 }
 
 impl Debug for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Id({})", self.as_u32())
-    }
-}
-
-impl From<u32> for Id {
-    fn from(n: u32) -> Self {
-        Id::from_u32(n)
-    }
-}
-
-impl From<usize> for Id {
-    fn from(n: usize) -> Self {
-        assert!(n < Id::MAX_USIZE);
-        Id::from_u32(n as u32)
-    }
-}
-
-impl From<Id> for u32 {
-    fn from(n: Id) -> Self {
-        n.as_u32()
-    }
-}
-
-impl From<Id> for usize {
-    fn from(n: Id) -> usize {
-        n.as_u32() as usize
+        if self.generation() == 0 {
+            write!(f, "Id({:x})", self.index())
+        } else {
+            write!(f, "Id({:x}g{:x})", self.index(), self.generation())
+        }
     }
 }
 
@@ -78,62 +127,34 @@ pub trait AsId: Sized {
     fn as_id(&self) -> Id;
 }
 
-/// Internal Salsa trait for types that have a salsa id but require looking
-/// up in the database to find it. This is different from
-/// [`AsId`][] where what we have is literally a *newtype*
-/// for an `Id`.
-pub trait LookupId<'db>: AsId {
-    /// Lookup from an `Id` to get an instance of the type.
-    ///
-    /// # Panics
-    ///
-    /// This fn may panic if the value with this id has not been
-    /// produced in this revision already (e.g., for a tracked
-    /// struct, the function will panic if the tracked struct
-    /// has not yet been created in this revision). Salsa's
-    /// dependency tracking typically ensures this does not
-    /// occur, but it is possible for a user to violate this
-    /// rule.
-    fn lookup_id(id: Id, db: &'db dyn Database) -> Self;
-}
-
 /// Internal Salsa trait for types that are just a newtype'd [`Id`][].
-pub trait FromId: AsId + Copy + Eq + Hash + Debug {
+pub trait FromId {
     fn from_id(id: Id) -> Self;
-
-    fn from_as_id(id: &impl AsId) -> Self {
-        Self::from_id(id.as_id())
-    }
 }
 
 impl AsId for Id {
+    #[inline]
     fn as_id(&self) -> Id {
         *self
     }
 }
 
 impl FromId for Id {
+    #[inline]
     fn from_id(id: Id) -> Self {
         id
     }
 }
 
-/// As a special case, we permit `Singleton` to be converted to an `Id`.
-/// This is useful for declaring functions with no arguments.
-impl AsId for () {
-    fn as_id(&self) -> Id {
-        Id::from_u32(0)
-    }
+/// Enums cannot use [`FromId`] because they need access to the DB to tell the `TypeId` of the variant,
+/// so they use this trait instead, that has a blanket implementation for `FromId`.
+pub trait FromIdWithDb {
+    fn from_id(id: Id, zalsa: &Zalsa) -> Self;
 }
 
-impl FromId for () {
-    fn from_id(id: Id) -> Self {
-        assert_eq!(0, id.as_u32());
-    }
-}
-
-impl<'db, ID: FromId> LookupId<'db> for ID {
-    fn lookup_id(id: Id, _db: &'db dyn Database) -> Self {
-        Self::from_id(id)
+impl<T: FromId> FromIdWithDb for T {
+    #[inline]
+    fn from_id(id: Id, _zalsa: &Zalsa) -> Self {
+        FromId::from_id(id)
     }
 }

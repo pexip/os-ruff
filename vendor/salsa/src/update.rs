@@ -1,9 +1,14 @@
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    hash::{BuildHasher, Hash},
-    path::PathBuf,
-};
+#![allow(clippy::undocumented_unsafe_blocks)] // TODO(#697) document safety
 
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::hash::{BuildHasher, Hash};
+use std::marker::PhantomData;
+use std::path::PathBuf;
+
+#[cfg(feature = "rayon")]
+use rayon::iter::Either;
+
+use crate::sync::Arc;
 use crate::Revision;
 
 /// This is used by the macro generated code.
@@ -27,12 +32,7 @@ pub mod helper {
 
     pub struct Dispatch<D>(PhantomData<D>);
 
-    impl<D> Default for Dispatch<D> {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
+    #[allow(clippy::new_without_default)]
     impl<D> Dispatch<D> {
         pub fn new() -> Self {
             Dispatch(PhantomData)
@@ -47,6 +47,7 @@ pub mod helper {
         ///
         /// See the `maybe_update` method in the [`Update`][] trait.
         pub unsafe fn maybe_update(old_pointer: *mut D, new_value: D) -> bool {
+            // SAFETY: Same safety conditions as `Update::maybe_update`
             unsafe { D::maybe_update(old_pointer, new_value) }
         }
     }
@@ -61,8 +62,10 @@ pub mod helper {
         unsafe fn maybe_update(old_pointer: *mut T, new_value: T) -> bool;
     }
 
+    // SAFETY: Same safety conditions as `Update::maybe_update`
     unsafe impl<T: 'static + PartialEq> Fallback<T> for Dispatch<T> {
         unsafe fn maybe_update(old_pointer: *mut T, new_value: T) -> bool {
+            // SAFETY: Same safety conditions as `Update::maybe_update`
             unsafe { update_fallback(old_pointer, new_value) }
         }
     }
@@ -82,7 +85,7 @@ pub unsafe fn update_fallback<T>(old_pointer: *mut T, new_value: T) -> bool
 where
     T: 'static + PartialEq,
 {
-    // Because everything is owned, this ref is simply a valid `&mut`
+    // SAFETY: Because everything is owned, this ref is simply a valid `&mut`
     let old_ref: &mut T = unsafe { &mut *old_pointer };
 
     if *old_ref != new_value {
@@ -157,12 +160,18 @@ pub unsafe trait Update {
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool;
 }
 
-unsafe impl<T> Update for Vec<T>
-where
-    T: Update,
-{
-    unsafe fn maybe_update(old_pointer: *mut Self, new_vec: Self) -> bool {
-        let old_vec: &mut Vec<T> = unsafe { &mut *old_pointer };
+unsafe impl Update for std::convert::Infallible {
+    unsafe fn maybe_update(_old_pointer: *mut Self, new_value: Self) -> bool {
+        match new_value {}
+    }
+}
+
+macro_rules! maybe_update_vec {
+    ($old_pointer: expr, $new_vec: expr, $elem_ty: ty) => {{
+        let old_pointer = $old_pointer;
+        let new_vec = $new_vec;
+
+        let old_vec: &mut Self = unsafe { &mut *old_pointer };
 
         if old_vec.len() != new_vec.len() {
             old_vec.clear();
@@ -172,10 +181,38 @@ where
 
         let mut changed = false;
         for (old_element, new_element) in old_vec.iter_mut().zip(new_vec) {
-            changed |= T::maybe_update(old_element, new_element);
+            changed |= unsafe { <$elem_ty>::maybe_update(old_element, new_element) };
         }
 
         changed
+    }};
+}
+
+unsafe impl<T> Update for Vec<T>
+where
+    T: Update,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_vec: Self) -> bool {
+        maybe_update_vec!(old_pointer, new_vec, T)
+    }
+}
+
+unsafe impl<T> Update for thin_vec::ThinVec<T>
+where
+    T: Update,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_vec: Self) -> bool {
+        maybe_update_vec!(old_pointer, new_vec, T)
+    }
+}
+
+unsafe impl<A> Update for smallvec::SmallVec<A>
+where
+    A: smallvec::Array,
+    A::Item: Update,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_vec: Self) -> bool {
+        maybe_update_vec!(old_pointer, new_vec, A::Item)
     }
 }
 
@@ -243,7 +280,7 @@ macro_rules! maybe_update_map {
             let mut changed = false;
             for (key, new_value) in new_map.into_iter() {
                 let old_value = old_map.get_mut(&key).unwrap();
-                changed |= V::maybe_update(old_value, new_value);
+                changed |= unsafe { V::maybe_update(old_value, new_value) };
             }
             changed
         }
@@ -258,6 +295,48 @@ where
 {
     unsafe fn maybe_update(old_pointer: *mut Self, new_map: Self) -> bool {
         maybe_update_map!(old_pointer, new_map)
+    }
+}
+
+unsafe impl<K, V, S> Update for hashbrown::HashMap<K, V, S>
+where
+    K: Update + Eq + Hash,
+    V: Update,
+    S: BuildHasher,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_map: Self) -> bool {
+        maybe_update_map!(old_pointer, new_map)
+    }
+}
+
+unsafe impl<K, S> Update for hashbrown::HashSet<K, S>
+where
+    K: Update + Eq + Hash,
+    S: BuildHasher,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_set: Self) -> bool {
+        maybe_update_set!(old_pointer, new_set)
+    }
+}
+
+unsafe impl<K, V, S> Update for indexmap::IndexMap<K, V, S>
+where
+    K: Update + Eq + Hash,
+    V: Update,
+    S: BuildHasher,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_map: Self) -> bool {
+        maybe_update_map!(old_pointer, new_map)
+    }
+}
+
+unsafe impl<K, S> Update for indexmap::IndexSet<K, S>
+where
+    K: Update + Eq + Hash,
+    S: BuildHasher,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_set: Self) -> bool {
+        maybe_update_set!(old_pointer, new_set)
     }
 }
 
@@ -278,7 +357,54 @@ where
     unsafe fn maybe_update(old_pointer: *mut Self, new_box: Self) -> bool {
         let old_box: &mut Box<T> = unsafe { &mut *old_pointer };
 
-        T::maybe_update(&mut **old_box, *new_box)
+        unsafe { T::maybe_update(&mut **old_box, *new_box) }
+    }
+}
+
+unsafe impl<T> Update for Box<[T]>
+where
+    T: Update,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_box: Self) -> bool {
+        let old_box: &mut Box<[T]> = unsafe { &mut *old_pointer };
+
+        if old_box.len() == new_box.len() {
+            let mut changed = false;
+            for (old_element, new_element) in old_box.iter_mut().zip(new_box) {
+                changed |= unsafe { T::maybe_update(old_element, new_element) };
+            }
+            changed
+        } else {
+            *old_box = new_box;
+            true
+        }
+    }
+}
+
+unsafe impl<T> Update for Arc<T>
+where
+    T: Update,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_arc: Self) -> bool {
+        let old_arc: &mut Arc<T> = unsafe { &mut *old_pointer };
+
+        if Arc::ptr_eq(old_arc, &new_arc) {
+            return false;
+        }
+
+        if let Some(inner) = Arc::get_mut(old_arc) {
+            match Arc::try_unwrap(new_arc) {
+                Ok(new_inner) => unsafe { T::maybe_update(inner, new_inner) },
+                Err(new_arc) => {
+                    // We can't unwrap the new arc, so we have to update the old one in place.
+                    *old_arc = new_arc;
+                    true
+                }
+            }
+        } else {
+            unsafe { *old_pointer = new_arc };
+            true
+        }
     }
 }
 
@@ -287,12 +413,49 @@ where
     T: Update,
 {
     unsafe fn maybe_update(old_pointer: *mut Self, new_vec: Self) -> bool {
-        let old_pointer: *mut T = std::ptr::addr_of_mut!((*old_pointer)[0]);
+        let old_pointer: *mut T = unsafe { std::ptr::addr_of_mut!((*old_pointer)[0]) };
         let mut changed = false;
         for (new_element, i) in new_vec.into_iter().zip(0..) {
-            changed |= T::maybe_update(old_pointer.add(i), new_element);
+            changed |= unsafe { T::maybe_update(old_pointer.add(i), new_element) };
         }
         changed
+    }
+}
+
+unsafe impl<T, E> Update for Result<T, E>
+where
+    T: Update,
+    E: Update,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        let old_value = unsafe { &mut *old_pointer };
+        match (old_value, new_value) {
+            (Ok(old), Ok(new)) => unsafe { T::maybe_update(old, new) },
+            (Err(old), Err(new)) => unsafe { E::maybe_update(old, new) },
+            (old_value, new_value) => {
+                *old_value = new_value;
+                true
+            }
+        }
+    }
+}
+
+#[cfg(feature = "rayon")]
+unsafe impl<L, R> Update for Either<L, R>
+where
+    L: Update,
+    R: Update,
+{
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        let old_value = unsafe { &mut *old_pointer };
+        match (old_value, new_value) {
+            (Either::Left(old), Either::Left(new)) => unsafe { L::maybe_update(old, new) },
+            (Either::Right(old), Either::Right(new)) => unsafe { R::maybe_update(old, new) },
+            (old_value, new_value) => {
+                *old_value = new_value;
+                true
+            }
+        }
     }
 }
 
@@ -301,7 +464,7 @@ macro_rules! fallback_impl {
         $(
             unsafe impl Update for $t {
                 unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-                    update_fallback(old_pointer, new_value)
+                    unsafe { update_fallback(old_pointer, new_value) }
                 }
             }
         )*
@@ -325,6 +488,9 @@ fallback_impl! {
     isize,
     PathBuf,
 }
+
+#[cfg(feature = "compact_str")]
+fallback_impl! { compact_str::CompactString, }
 
 macro_rules! tuple_impl {
     ($($t:ident),*; $($u:ident),*) => {
@@ -370,12 +536,18 @@ where
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         let old_value = unsafe { &mut *old_pointer };
         match (old_value, new_value) {
-            (Some(old), Some(new)) => T::maybe_update(old, new),
+            (Some(old), Some(new)) => unsafe { T::maybe_update(old, new) },
             (None, None) => false,
             (old_value, new_value) => {
                 *old_value = new_value;
                 true
             }
         }
+    }
+}
+
+unsafe impl<T> Update for PhantomData<T> {
+    unsafe fn maybe_update(_old_pointer: *mut Self, _new_value: Self) -> bool {
+        false
     }
 }

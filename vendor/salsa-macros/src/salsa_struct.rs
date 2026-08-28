@@ -25,12 +25,11 @@
 //! * data method `impl Foo { fn data(&self, db: &dyn crate::Db) -> FooData { FooData { f: self.f(db), ... } } }`
 //!     * this could be optimized, particularly for interned fields
 
-use crate::{
-    db_lifetime,
-    options::{AllowedOptions, Options},
-};
 use proc_macro2::{Ident, Literal, Span, TokenStream};
-use syn::spanned::Spanned;
+use syn::{ext::IdentExt, spanned::Spanned};
+
+use crate::db_lifetime;
+use crate::options::{AllowedOptions, Options};
 
 pub(crate) struct SalsaStruct<'s, A: SalsaStructAllowedOptions> {
     struct_item: &'s syn::ItemStruct,
@@ -42,11 +41,14 @@ pub(crate) trait SalsaStructAllowedOptions: AllowedOptions {
     /// The kind of struct (e.g., interned, input, tracked).
     const KIND: &'static str;
 
-    /// Are `#[id]` fields allowed?
-    const ALLOW_ID: bool;
+    /// Are `#[tracked]` fields allowed?
+    const ALLOW_TRACKED: bool;
 
     /// Does this kind of struct have a `'db` lifetime?
     const HAS_LIFETIME: bool;
+
+    /// Can this struct elide the `'db` lifetime?
+    const ELIDABLE_LIFETIME: bool;
 
     /// Are `#[default]` fields allowed?
     const ALLOW_DEFAULT: bool;
@@ -55,21 +57,25 @@ pub(crate) trait SalsaStructAllowedOptions: AllowedOptions {
 pub(crate) struct SalsaField<'s> {
     field: &'s syn::Field,
 
-    pub(crate) has_id_attr: bool,
+    pub(crate) has_tracked_attr: bool,
     pub(crate) has_default_attr: bool,
-    pub(crate) has_ref_attr: bool,
+    pub(crate) returns: syn::Ident,
     pub(crate) has_no_eq_attr: bool,
     get_name: syn::Ident,
     set_name: syn::Ident,
+    unknown_attrs: Vec<&'s syn::Attribute>,
 }
 
 const BANNED_FIELD_NAMES: &[&str] = &["from", "new"];
+const ALLOWED_RETURN_MODES: &[&str] = &["copy", "clone", "ref", "deref", "as_ref", "as_deref"];
 
 #[allow(clippy::type_complexity)]
 pub(crate) const FIELD_OPTION_ATTRIBUTES: &[(&str, fn(&syn::Attribute, &mut SalsaField))] = &[
-    ("id", |_, ef| ef.has_id_attr = true),
+    ("tracked", |_, ef| ef.has_tracked_attr = true),
     ("default", |_, ef| ef.has_default_attr = true),
-    ("return_ref", |_, ef| ef.has_ref_attr = true),
+    ("returns", |attr, ef| {
+        ef.returns = attr.parse_args_with(syn::Ident::parse_any).unwrap();
+    }),
     ("no_eq", |_, ef| ef.has_no_eq_attr = true),
     ("get", |attr, ef| {
         ef.get_name = attr.parse_args().unwrap();
@@ -103,7 +109,7 @@ where
             fields,
         };
 
-        this.maybe_disallow_id_fields()?;
+        this.maybe_disallow_tracked_fields()?;
         this.maybe_disallow_default_fields()?;
 
         this.check_generics()?;
@@ -115,28 +121,36 @@ where
     pub(crate) fn constructor_name(&self) -> syn::Ident {
         match self.args.constructor_name.clone() {
             Some(name) => name,
-            None => Ident::new("new", self.struct_item.span()),
+            None => Ident::new("new", self.struct_item.ident.span()),
         }
     }
 
-    /// Disallow `#[id]` attributes on the fields of this struct.
+    /// Returns the `id` in `Options` if it is `Some`, else `salsa::Id`.
+    pub(crate) fn id(&self) -> syn::Path {
+        match &self.args.id {
+            Some(id) => id.clone(),
+            None => parse_quote!(salsa::Id),
+        }
+    }
+
+    /// Disallow `#[tracked]` attributes on the fields of this struct.
     ///
-    /// If an `#[id]` field is found, return an error.
+    /// If an `#[tracked]` field is found, return an error.
     ///
     /// # Parameters
     ///
     /// * `kind`, the attribute name (e.g., `input` or `interned`)
-    fn maybe_disallow_id_fields(&self) -> syn::Result<()> {
-        if A::ALLOW_ID {
+    fn maybe_disallow_tracked_fields(&self) -> syn::Result<()> {
+        if A::ALLOW_TRACKED {
             return Ok(());
         }
 
-        // Check if any field has the `#[id]` attribute.
+        // Check if any field has the `#[tracked]` attribute.
         for ef in &self.fields {
-            if ef.has_id_attr {
+            if ef.has_tracked_attr {
                 return Err(syn::Error::new_spanned(
                     ef.field,
-                    format!("`#[id]` cannot be used with `#[salsa::{}]`", A::KIND),
+                    format!("`#[tracked]` cannot be used with `#[salsa::{}]`", A::KIND),
                 ));
             }
         }
@@ -156,12 +170,12 @@ where
             return Ok(());
         }
 
-        // Check if any field has the `#[id]` attribute.
+        // Check if any field has the `#[default]` attribute.
         for ef in &self.fields {
             if ef.has_default_attr {
                 return Err(syn::Error::new_spanned(
                     ef.field,
-                    format!("`#[id]` cannot be used with `#[salsa::{}]`", A::KIND),
+                    format!("`#[default]` cannot be used with `#[salsa::{}]`", A::KIND),
                 ));
             }
         }
@@ -172,7 +186,11 @@ where
     /// Check that the generic parameters look as expected for this kind of struct.
     fn check_generics(&self) -> syn::Result<()> {
         if A::HAS_LIFETIME {
-            db_lifetime::require_db_lifetime(&self.struct_item.generics)
+            if !A::ELIDABLE_LIFETIME {
+                db_lifetime::require_db_lifetime(&self.struct_item.generics)
+            } else {
+                Ok(())
+            }
         } else {
             db_lifetime::require_no_generics(&self.struct_item.generics)
         }
@@ -185,9 +203,27 @@ where
             .collect()
     }
 
+    pub(crate) fn tracked_ids(&self) -> Vec<&syn::Ident> {
+        self.tracked_fields_iter()
+            .map(|(_, f)| f.field.ident.as_ref().unwrap())
+            .collect()
+    }
+
     pub(crate) fn field_indices(&self) -> Vec<Literal> {
         (0..self.fields.len())
             .map(Literal::usize_unsuffixed)
+            .collect()
+    }
+
+    pub(crate) fn tracked_field_indices(&self) -> Vec<Literal> {
+        self.tracked_fields_iter()
+            .map(|(index, _)| Literal::usize_unsuffixed(index))
+            .collect()
+    }
+
+    pub(crate) fn untracked_field_indices(&self) -> Vec<Literal> {
+        self.untracked_fields_iter()
+            .map(|(index, _)| Literal::usize_unsuffixed(index))
             .collect()
     }
 
@@ -195,13 +231,8 @@ where
         Literal::usize_unsuffixed(self.fields.len())
     }
 
-    pub(crate) fn id_field_indices(&self) -> Vec<Literal> {
-        self.fields
-            .iter()
-            .zip(0..)
-            .filter_map(|(f, index)| if f.has_id_attr { Some(index) } else { None })
-            .map(Literal::usize_unsuffixed)
-            .collect()
+    pub(crate) fn num_tracked_fields(&self) -> Literal {
+        Literal::usize_unsuffixed(self.tracked_fields_iter().count())
     }
 
     pub(crate) fn required_fields(&self) -> Vec<TokenStream> {
@@ -223,8 +254,32 @@ where
         self.fields.iter().map(|f| &f.field.vis).collect()
     }
 
+    pub(crate) fn tracked_vis(&self) -> Vec<&syn::Visibility> {
+        self.tracked_fields_iter()
+            .map(|(_, f)| &f.field.vis)
+            .collect()
+    }
+
+    pub(crate) fn untracked_vis(&self) -> Vec<&syn::Visibility> {
+        self.untracked_fields_iter()
+            .map(|(_, f)| &f.field.vis)
+            .collect()
+    }
+
     pub(crate) fn field_getter_ids(&self) -> Vec<&syn::Ident> {
         self.fields.iter().map(|f| &f.get_name).collect()
+    }
+
+    pub(crate) fn tracked_getter_ids(&self) -> Vec<&syn::Ident> {
+        self.tracked_fields_iter()
+            .map(|(_, f)| &f.get_name)
+            .collect()
+    }
+
+    pub(crate) fn untracked_getter_ids(&self) -> Vec<&syn::Ident> {
+        self.untracked_fields_iter()
+            .map(|(_, f)| &f.get_name)
+            .collect()
     }
 
     pub(crate) fn field_setter_ids(&self) -> Vec<&syn::Ident> {
@@ -242,35 +297,78 @@ where
         self.fields.iter().map(|f| &f.field.ty).collect()
     }
 
-    pub(crate) fn field_options(&self) -> Vec<TokenStream> {
+    pub(crate) fn tracked_tys(&self) -> Vec<&syn::Type> {
+        self.tracked_fields_iter()
+            .map(|(_, f)| &f.field.ty)
+            .collect()
+    }
+
+    pub(crate) fn untracked_tys(&self) -> Vec<&syn::Type> {
+        self.untracked_fields_iter()
+            .map(|(_, f)| &f.field.ty)
+            .collect()
+    }
+
+    pub(crate) fn field_indexed_tys(&self) -> Vec<syn::Ident> {
         self.fields
             .iter()
-            .map(|f| {
-                let clone_ident = if f.has_ref_attr {
-                    syn::Ident::new("no_clone", Span::call_site())
-                } else {
-                    syn::Ident::new("clone", Span::call_site())
-                };
+            .enumerate()
+            .map(|(i, _)| quote::format_ident!("T{i}"))
+            .collect()
+    }
 
-                let backdate_ident = if f.has_no_eq_attr {
-                    syn::Ident::new("no_backdate", Span::call_site())
-                } else {
-                    syn::Ident::new("backdate", Span::call_site())
-                };
+    pub(crate) fn field_attrs(&self) -> Vec<&[&syn::Attribute]> {
+        self.fields.iter().map(|f| &*f.unknown_attrs).collect()
+    }
 
-                let default_ident = if f.has_default_attr {
-                    syn::Ident::new("default", Span::call_site())
-                } else {
-                    syn::Ident::new("required", Span::call_site())
-                };
+    pub(crate) fn tracked_field_attrs(&self) -> Vec<&[&syn::Attribute]> {
+        self.tracked_fields_iter()
+            .map(|f| &*f.1.unknown_attrs)
+            .collect()
+    }
 
-                quote!((#clone_ident, #backdate_ident, #default_ident))
-            })
+    pub(crate) fn untracked_field_attrs(&self) -> Vec<&[&syn::Attribute]> {
+        self.untracked_fields_iter()
+            .map(|f| &*f.1.unknown_attrs)
+            .collect()
+    }
+
+    pub(crate) fn field_options(&self) -> Vec<TokenStream> {
+        self.fields.iter().map(SalsaField::options).collect()
+    }
+
+    pub(crate) fn tracked_options(&self) -> Vec<TokenStream> {
+        self.tracked_fields_iter()
+            .map(|(_, f)| f.options())
+            .collect()
+    }
+
+    pub(crate) fn untracked_options(&self) -> Vec<TokenStream> {
+        self.untracked_fields_iter()
+            .map(|(_, f)| f.options())
             .collect()
     }
 
     pub fn generate_debug_impl(&self) -> bool {
-        self.args.no_debug.is_none()
+        self.args.debug.is_some()
+    }
+
+    pub fn generate_lifetime(&self) -> bool {
+        self.args.no_lifetime.is_none()
+    }
+
+    fn tracked_fields_iter(&self) -> impl Iterator<Item = (usize, &SalsaField<'s>)> {
+        self.fields
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| f.has_tracked_attr)
+    }
+
+    fn untracked_fields_iter(&self) -> impl Iterator<Item = (usize, &SalsaField<'s>)> {
+        self.fields
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| !f.has_tracked_attr)
     }
 }
 
@@ -281,34 +379,68 @@ impl<'s> SalsaField<'s> {
         if BANNED_FIELD_NAMES.iter().any(|n| *n == field_name_str) {
             return Err(syn::Error::new(
                 field_name.span(),
-                format!(
-                    "the field name `{}` is disallowed in salsa structs",
-                    field_name_str
-                ),
+                format!("the field name `{field_name_str}` is disallowed in salsa structs",),
             ));
         }
 
         let get_name = Ident::new(&field_name_str, field_name.span());
-        let set_name = Ident::new(&format!("set_{}", field_name_str), field_name.span());
+        let set_name = Ident::new(&format!("set_{field_name_str}",), field_name.span());
+        let returns = Ident::new("clone", field.span());
         let mut result = SalsaField {
             field,
-            has_id_attr: false,
-            has_ref_attr: false,
+            has_tracked_attr: false,
+            returns,
             has_default_attr: false,
             has_no_eq_attr: false,
             get_name,
             set_name,
+            unknown_attrs: Default::default(),
         };
 
         // Scan the attributes and look for the salsa attributes:
         for attr in &field.attrs {
+            let mut handled = false;
             for (fa, func) in FIELD_OPTION_ATTRIBUTES {
                 if attr.path().is_ident(fa) {
                     func(attr, &mut result);
+                    handled = true;
+                    break;
                 }
+            }
+            if !handled {
+                result.unknown_attrs.push(attr);
             }
         }
 
+        // Validate return mode
+        if !ALLOWED_RETURN_MODES
+            .iter()
+            .any(|mode| mode == &result.returns.to_string())
+        {
+            return Err(syn::Error::new(
+                result.returns.span(),
+                format!("Invalid return mode. Allowed modes are: {ALLOWED_RETURN_MODES:?}"),
+            ));
+        }
+
         Ok(result)
+    }
+
+    fn options(&self) -> TokenStream {
+        let returns = &self.returns;
+
+        let backdate_ident = if self.has_no_eq_attr {
+            syn::Ident::new("no_backdate", Span::call_site())
+        } else {
+            syn::Ident::new("backdate", Span::call_site())
+        };
+
+        let default_ident = if self.has_default_attr {
+            syn::Ident::new("default", Span::call_site())
+        } else {
+            syn::Ident::new("required", Span::call_site())
+        };
+
+        quote!((#returns, #backdate_ident, #default_ident))
     }
 }

@@ -1,10 +1,9 @@
-use crate::{
-    db_lifetime,
-    hygiene::Hygiene,
-    options::Options,
-    salsa_struct::{SalsaStruct, SalsaStructAllowedOptions},
-};
 use proc_macro2::TokenStream;
+
+use crate::db_lifetime;
+use crate::hygiene::Hygiene;
+use crate::options::Options;
+use crate::salsa_struct::{SalsaStruct, SalsaStructAllowedOptions};
 
 /// For an entity struct `Foo` with fields `f1: T1, ..., fN: TN`, we generate...
 ///
@@ -29,15 +28,17 @@ type TrackedArgs = Options<TrackedStruct>;
 struct TrackedStruct;
 
 impl crate::options::AllowedOptions for TrackedStruct {
-    const RETURN_REF: bool = false;
+    const RETURNS: bool = false;
 
     const SPECIFY: bool = false;
 
     const NO_EQ: bool = false;
 
-    const NO_DEBUG: bool = true;
+    const DEBUG: bool = true;
 
-    const NO_CLONE: bool = false;
+    const NO_LIFETIME: bool = false;
+
+    const NON_UPDATE_RETURN_TYPE: bool = false;
 
     const SINGLETON: bool = true;
 
@@ -45,19 +46,27 @@ impl crate::options::AllowedOptions for TrackedStruct {
 
     const DB: bool = false;
 
-    const RECOVERY_FN: bool = false;
+    const CYCLE_FN: bool = false;
+
+    const CYCLE_INITIAL: bool = false;
+
+    const CYCLE_RESULT: bool = false;
 
     const LRU: bool = false;
 
     const CONSTRUCTOR_NAME: bool = true;
+
+    const ID: bool = false;
 }
 
 impl SalsaStructAllowedOptions for TrackedStruct {
     const KIND: &'static str = "tracked";
 
-    const ALLOW_ID: bool = true;
+    const ALLOW_TRACKED: bool = true;
 
     const HAS_LIFETIME: bool = true;
+
+    const ELIDABLE_LIFETIME: bool = false;
 
     const ALLOW_DEFAULT: bool = false;
 }
@@ -78,14 +87,34 @@ impl Macro {
         let struct_ident = &self.struct_item.ident;
         let db_lt = db_lifetime::db_lifetime(&self.struct_item.generics);
         let new_fn = salsa_struct.constructor_name();
+
         let field_ids = salsa_struct.field_ids();
-        let field_vis = salsa_struct.field_vis();
-        let field_getter_ids = salsa_struct.field_getter_ids();
+        let tracked_ids = salsa_struct.tracked_ids();
+
+        let tracked_vis = salsa_struct.tracked_vis();
+        let untracked_vis = salsa_struct.untracked_vis();
+
+        let tracked_getter_ids = salsa_struct.tracked_getter_ids();
+        let untracked_getter_ids = salsa_struct.untracked_getter_ids();
+
         let field_indices = salsa_struct.field_indices();
-        let id_field_indices = salsa_struct.id_field_indices();
-        let num_fields = salsa_struct.num_fields();
-        let field_options = salsa_struct.field_options();
+
+        let absolute_tracked_indices = salsa_struct.tracked_field_indices();
+        let relative_tracked_indices = (0..absolute_tracked_indices.len()).collect::<Vec<_>>();
+
+        let absolute_untracked_indices = salsa_struct.untracked_field_indices();
+
+        let tracked_options = salsa_struct.tracked_options();
+        let untracked_options = salsa_struct.untracked_options();
+
         let field_tys = salsa_struct.field_tys();
+        let tracked_tys = salsa_struct.tracked_tys();
+        let untracked_tys = salsa_struct.untracked_tys();
+
+        let tracked_field_unused_attrs = salsa_struct.tracked_field_attrs();
+        let untracked_field_unused_attrs = salsa_struct.untracked_field_attrs();
+
+        let num_tracked_fields = salsa_struct.num_tracked_fields();
         let generate_debug_impl = salsa_struct.generate_debug_impl();
 
         let zalsa = self.hygiene.ident("zalsa");
@@ -93,7 +122,6 @@ impl Macro {
         let Configuration = self.hygiene.ident("Configuration");
         let CACHE = self.hygiene.ident("CACHE");
         let Db = self.hygiene.ident("Db");
-        let NonNull = self.hygiene.ident("NonNull");
         let Revision = self.hygiene.ident("Revision");
 
         Ok(crate::debug::dump_tokens(
@@ -105,13 +133,31 @@ impl Macro {
                     Struct: #struct_ident,
                     db_lt: #db_lt,
                     new_fn: #new_fn,
+
                     field_ids: [#(#field_ids),*],
-                    field_getters: [#(#field_vis #field_getter_ids),*],
+                    tracked_ids: [#(#tracked_ids),*],
+
+                    tracked_getters: [#(#tracked_vis #tracked_getter_ids),*],
+                    untracked_getters: [#(#untracked_vis #untracked_getter_ids),*],
+
                     field_tys: [#(#field_tys),*],
+                    tracked_tys: [#(#tracked_tys),*],
+                    untracked_tys: [#(#untracked_tys),*],
+
                     field_indices: [#(#field_indices),*],
-                    id_field_indices: [#(#id_field_indices),*],
-                    field_options: [#(#field_options),*],
-                    num_fields: #num_fields,
+
+                    absolute_tracked_indices: [#(#absolute_tracked_indices),*],
+                    relative_tracked_indices: [#(#relative_tracked_indices),*],
+
+                    absolute_untracked_indices: [#(#absolute_untracked_indices),*],
+
+                    tracked_options: [#(#tracked_options),*],
+                    untracked_options: [#(#untracked_options),*],
+
+                    tracked_field_attrs: [#([#(#tracked_field_unused_attrs),*]),*],
+                    untracked_field_attrs: [#([#(#untracked_field_unused_attrs),*]),*],
+
+                    num_tracked_fields: #num_tracked_fields,
                     generate_debug_impl: #generate_debug_impl,
                     unused_names: [
                         #zalsa,
@@ -119,7 +165,6 @@ impl Macro {
                         #Configuration,
                         #CACHE,
                         #Db,
-                        #NonNull,
                         #Revision,
                     ]
                 );

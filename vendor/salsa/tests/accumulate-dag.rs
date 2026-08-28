@@ -4,13 +4,14 @@ use expect_test::expect;
 use salsa::{Accumulator, Database};
 use test_log::test;
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct MyInput {
     field_a: u32,
     field_b: u32,
 }
 
 #[salsa::accumulator]
+#[derive(Debug)]
 struct Log(#[allow(dead_code)] String);
 
 #[salsa::tracked]
@@ -23,7 +24,7 @@ fn push_logs(db: &dyn Database, input: MyInput) {
 fn push_a_logs(db: &dyn Database, input: MyInput) {
     let count = input.field_a(db);
     for i in 0..count {
-        Log(format!("log_a({} of {})", i, count)).accumulate(db);
+        Log(format!("log_a({i} of {count})")).accumulate(db);
     }
 }
 
@@ -33,7 +34,7 @@ fn push_b_logs(db: &dyn Database, input: MyInput) {
     push_a_logs(db, input);
     let count = input.field_b(db);
     for i in 0..count {
-        Log(format!("log_b({} of {})", i, count)).accumulate(db);
+        Log(format!("log_b({i} of {count})")).accumulate(db);
     }
 }
 
@@ -61,6 +62,6 @@ fn accumulate_a_called_twice() {
                     "log_b(2 of 3)",
                 ),
             ]"#]]
-        .assert_eq(&format!("{:#?}", logs));
+        .assert_eq(&format!("{logs:#?}"));
     })
 }

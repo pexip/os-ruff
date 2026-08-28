@@ -13,12 +13,18 @@
 edition = "2021"
 rust-version = "1.69.0"
 name = "ctrlc"
-version = "3.4.4"
+version = "3.4.7"
 authors = ["Antti Keränen <detegr@gmail.com>"]
+build = false
 exclude = [
     "/.travis.yml",
     "/appveyor.yml",
 ]
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Easy Ctrl-C handler for Rust projects"
 homepage = "https://github.com/Detegr/rust-ctrlc"
 documentation = "https://detegr.github.io/doc/ctrlc"
@@ -32,24 +38,39 @@ categories = ["os"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/Detegr/rust-ctrlc.git"
 
-[[test]]
-name = "main"
-path = "tests/main/mod.rs"
-harness = false
+[badges.maintenance]
+status = "passively-maintained"
+
+[features]
+termination = []
+
+[lib]
+name = "ctrlc"
+path = "src/lib.rs"
+
+[[example]]
+name = "issue_46_example"
+path = "examples/issue_46_example.rs"
+
+[[example]]
+name = "readme_example"
+path = "examples/readme_example.rs"
 
 [[test]]
 name = "issue_97"
 path = "tests/main/issue_97.rs"
 harness = false
 
+[[test]]
+name = "main"
+path = "tests/main/mod.rs"
+harness = false
+
 [dev-dependencies.signal-hook]
 version = "0.3"
 
-[features]
-termination = []
-
 [target."cfg(unix)".dependencies.nix]
-version = "0.28"
+version = "0.30"
 features = [
     "fs",
     "signal",
@@ -57,7 +78,7 @@ features = [
 default-features = false
 
 [target."cfg(windows)".dependencies.windows-sys]
-version = "0.52"
+version = "0.59"
 features = [
     "Win32_Foundation",
     "Win32_System_Threading",
@@ -66,13 +87,10 @@ features = [
 ]
 
 [target."cfg(windows)".dev-dependencies.windows-sys]
-version = "0.52"
+version = "0.59"
 features = [
     "Win32_Storage_FileSystem",
     "Win32_Foundation",
     "Win32_System_IO",
     "Win32_System_Console",
 ]
-
-[badges.maintenance]
-status = "passively-maintained"

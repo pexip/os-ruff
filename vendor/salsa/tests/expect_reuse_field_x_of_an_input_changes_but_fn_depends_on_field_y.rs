@@ -5,11 +5,10 @@
 
 mod common;
 use common::LogDatabase;
-
 use expect_test::expect;
 use salsa::Setter;
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct MyInput {
     x: u32,
     y: u32,
@@ -17,15 +16,16 @@ struct MyInput {
 
 #[salsa::tracked]
 fn result_depends_on_x(db: &dyn LogDatabase, input: MyInput) -> u32 {
-    db.push_log(format!("result_depends_on_x({:?})", input));
+    db.push_log(format!("result_depends_on_x({input:?})"));
     input.x(db) + 1
 }
 
 #[salsa::tracked]
 fn result_depends_on_y(db: &dyn LogDatabase, input: MyInput) -> u32 {
-    db.push_log(format!("result_depends_on_y({:?})", input));
+    db.push_log(format!("result_depends_on_y({input:?})"));
     input.y(db) - 1
 }
+
 #[test]
 fn execute() {
     // result_depends_on_x = x + 1

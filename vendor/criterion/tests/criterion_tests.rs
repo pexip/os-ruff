@@ -52,7 +52,7 @@ impl Default for Counter {
     }
 }
 
-fn verify_file(dir: &PathBuf, path: &str) -> PathBuf {
+fn verify_file(dir: &Path, path: &str) -> PathBuf {
     let full_path = dir.join(path);
     assert!(
         full_path.is_file(),
@@ -64,36 +64,36 @@ fn verify_file(dir: &PathBuf, path: &str) -> PathBuf {
     full_path
 }
 
-fn verify_json(dir: &PathBuf, path: &str) {
+fn verify_json(dir: &Path, path: &str) {
     let full_path = verify_file(dir, path);
     let f = File::open(full_path).unwrap();
     serde_json::from_reader::<File, Value>(f).unwrap();
 }
 
 #[cfg(feature = "html_reports")]
-fn verify_svg(dir: &PathBuf, path: &str) {
+fn verify_svg(dir: &Path, path: &str) {
     verify_file(dir, path);
 }
 
 #[cfg(feature = "html_reports")]
-fn verify_html(dir: &PathBuf, path: &str) {
+fn verify_html(dir: &Path, path: &str) {
     verify_file(dir, path);
 }
 
-fn verify_stats(dir: &PathBuf, baseline: &str) {
+fn verify_stats(dir: &Path, baseline: &str) {
     verify_json(dir, &format!("{}/estimates.json", baseline));
     verify_json(dir, &format!("{}/sample.json", baseline));
     verify_json(dir, &format!("{}/tukey.json", baseline));
     verify_json(dir, &format!("{}/benchmark.json", baseline));
     #[cfg(feature = "csv_output")]
-    verify_file(&dir, &format!("{}/raw.csv", baseline));
+    verify_file(dir, &format!("{}/raw.csv", baseline));
 }
 
-fn verify_not_exists(dir: &PathBuf, path: &str) {
+fn verify_not_exists(dir: &Path, path: &str) {
     assert!(!dir.join(path).exists());
 }
 
-fn latest_modified(dir: &PathBuf) -> SystemTime {
+fn latest_modified(dir: &Path) -> SystemTime {
     let mut newest_update: Option<SystemTime> = None;
     for entry in WalkDir::new(dir) {
         let entry = entry.unwrap();
@@ -197,7 +197,7 @@ fn test_sample_size() {
         .sample_size(50)
         .bench_function("test_sample_size", move |b| {
             clone.count();
-            b.iter(|| 10)
+            b.iter(|| 10);
         });
 
     // This function will be called more than sample_size times because of the
@@ -215,7 +215,7 @@ fn test_warmup_time() {
         .warm_up_time(Duration::from_millis(100))
         .bench_function("test_warmup_time_1", move |b| {
             clone.count();
-            b.iter(|| 10)
+            b.iter(|| 10);
         });
 
     let counter2 = Counter::default();
@@ -224,7 +224,7 @@ fn test_warmup_time() {
         .warm_up_time(Duration::from_millis(2000))
         .bench_function("test_warmup_time_2", move |b| {
             clone.count();
-            b.iter(|| 10)
+            b.iter(|| 10);
         });
 
     assert!(counter1.read() < counter2.read());
@@ -275,43 +275,43 @@ fn test_timing_loops() {
     let mut c = short_benchmark(&dir);
     let mut group = c.benchmark_group("test_timing_loops");
     group.bench_function("iter_with_setup", |b| {
-        b.iter_with_setup(|| vec![10], |v| v[0])
+        b.iter_with_setup(|| vec![10], |v| v[0]);
     });
     group.bench_function("iter_with_large_setup", |b| {
-        b.iter_batched(|| vec![10], |v| v[0], BatchSize::NumBatches(1))
+        b.iter_batched(|| vec![10], |v| v[0], BatchSize::NumBatches(1));
     });
     group.bench_function("iter_with_large_drop", |b| {
-        b.iter_with_large_drop(|| vec![10; 100])
+        b.iter_with_large_drop(|| vec![10; 100]);
     });
     group.bench_function("iter_batched_small", |b| {
-        b.iter_batched(|| vec![10], |v| v[0], BatchSize::SmallInput)
+        b.iter_batched(|| vec![10], |v| v[0], BatchSize::SmallInput);
     });
     group.bench_function("iter_batched_large", |b| {
-        b.iter_batched(|| vec![10], |v| v[0], BatchSize::LargeInput)
+        b.iter_batched(|| vec![10], |v| v[0], BatchSize::LargeInput);
     });
     group.bench_function("iter_batched_per_iteration", |b| {
-        b.iter_batched(|| vec![10], |v| v[0], BatchSize::PerIteration)
+        b.iter_batched(|| vec![10], |v| v[0], BatchSize::PerIteration);
     });
     group.bench_function("iter_batched_one_batch", |b| {
-        b.iter_batched(|| vec![10], |v| v[0], BatchSize::NumBatches(1))
+        b.iter_batched(|| vec![10], |v| v[0], BatchSize::NumBatches(1));
     });
     group.bench_function("iter_batched_10_iterations", |b| {
-        b.iter_batched(|| vec![10], |v| v[0], BatchSize::NumIterations(10))
+        b.iter_batched(|| vec![10], |v| v[0], BatchSize::NumIterations(10));
     });
     group.bench_function("iter_batched_ref_small", |b| {
-        b.iter_batched_ref(|| vec![10], |v| v[0], BatchSize::SmallInput)
+        b.iter_batched_ref(|| vec![10], |v| v[0], BatchSize::SmallInput);
     });
     group.bench_function("iter_batched_ref_large", |b| {
-        b.iter_batched_ref(|| vec![10], |v| v[0], BatchSize::LargeInput)
+        b.iter_batched_ref(|| vec![10], |v| v[0], BatchSize::LargeInput);
     });
     group.bench_function("iter_batched_ref_per_iteration", |b| {
-        b.iter_batched_ref(|| vec![10], |v| v[0], BatchSize::PerIteration)
+        b.iter_batched_ref(|| vec![10], |v| v[0], BatchSize::PerIteration);
     });
     group.bench_function("iter_batched_ref_one_batch", |b| {
-        b.iter_batched_ref(|| vec![10], |v| v[0], BatchSize::NumBatches(1))
+        b.iter_batched_ref(|| vec![10], |v| v[0], BatchSize::NumBatches(1));
     });
     group.bench_function("iter_batched_ref_10_iterations", |b| {
-        b.iter_batched_ref(|| vec![10], |v| v[0], BatchSize::NumIterations(10))
+        b.iter_batched_ref(|| vec![10], |v| v[0], BatchSize::NumIterations(10));
     });
 }
 
@@ -461,7 +461,7 @@ fn test_criterion_doesnt_panic_if_measured_time_is_zero() {
     let dir = temp_dir();
     let mut c = short_benchmark(&dir);
     c.bench_function("zero_time", |bencher| {
-        bencher.iter_custom(|_iters| Duration::new(0, 0))
+        bencher.iter_custom(|_iters| Duration::new(0, 0));
     });
 }
 
@@ -494,7 +494,7 @@ mod macros {
 
         // silence dead_code warning
         if false {
-            main()
+            main();
         }
     }
 

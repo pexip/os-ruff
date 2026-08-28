@@ -225,6 +225,7 @@ impl<T, S> OrderSet<T, S> {
     ///
     /// ***Panics*** if the starting point is greater than the end point or if
     /// the end point is greater than the length of the set.
+    #[track_caller]
     pub fn drain<R>(&mut self, range: R) -> Drain<'_, T>
     where
         R: RangeBounds<usize>,
@@ -239,6 +240,7 @@ impl<T, S> OrderSet<T, S> {
     /// the elements `[0, at)` with its previous capacity unchanged.
     ///
     /// ***Panics*** if `at > len`.
+    #[track_caller]
     pub fn split_off(&mut self, at: usize) -> Self
     where
         S: Clone,
@@ -335,7 +337,7 @@ where
     ///
     /// This is equivalent to finding the position with
     /// [`binary_search`][Self::binary_search], and if needed calling
-    /// [`shift_insert`][Self::shift_insert] for a new value.
+    /// [`insert_before`][Self::insert_before] for a new value.
     ///
     /// If the sorted item is found in the set, it returns the index of that
     /// existing item and `false`, without any change. Otherwise, it inserts the
@@ -356,16 +358,107 @@ where
         self.inner.insert_sorted(value)
     }
 
-    /// Insert the value into the set at the given index.
+    /// Insert the value into the set before the value at the given index, or at the end.
     ///
-    /// If an equivalent item already exists in the set, it returns
-    /// `false` leaving the original value in the set, but moving it to
-    /// the new position in the set. Otherwise, it inserts the new
-    /// item at the given index and returns `true`.
+    /// If an equivalent item already exists in the set, it returns `false` leaving the
+    /// original value in the set, but moved to the new position. The returned index
+    /// will either be the given index or one less, depending on how the value moved.
+    /// (See [`shift_insert`](Self::shift_insert) for different behavior here.)
+    ///
+    /// Otherwise, it inserts the new value exactly at the given index and returns `true`.
     ///
     /// ***Panics*** if `index` is out of bounds.
+    /// Valid indices are `0..=set.len()` (inclusive).
     ///
     /// Computes in **O(n)** time (average).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ordermap::OrderSet;
+    /// let mut set: OrderSet<char> = ('a'..='z').collect();
+    ///
+    /// // The new value '*' goes exactly at the given index.
+    /// assert_eq!(set.get_index_of(&'*'), None);
+    /// assert_eq!(set.insert_before(10, '*'), (10, true));
+    /// assert_eq!(set.get_index_of(&'*'), Some(10));
+    ///
+    /// // Moving the value 'a' up will shift others down, so this moves *before* 10 to index 9.
+    /// assert_eq!(set.insert_before(10, 'a'), (9, false));
+    /// assert_eq!(set.get_index_of(&'a'), Some(9));
+    /// assert_eq!(set.get_index_of(&'*'), Some(10));
+    ///
+    /// // Moving the value 'z' down will shift others up, so this moves to exactly 10.
+    /// assert_eq!(set.insert_before(10, 'z'), (10, false));
+    /// assert_eq!(set.get_index_of(&'z'), Some(10));
+    /// assert_eq!(set.get_index_of(&'*'), Some(11));
+    ///
+    /// // Moving or inserting before the endpoint is also valid.
+    /// assert_eq!(set.len(), 27);
+    /// assert_eq!(set.insert_before(set.len(), '*'), (26, false));
+    /// assert_eq!(set.get_index_of(&'*'), Some(26));
+    /// assert_eq!(set.insert_before(set.len(), '+'), (27, true));
+    /// assert_eq!(set.get_index_of(&'+'), Some(27));
+    /// assert_eq!(set.len(), 28);
+    /// ```
+    #[track_caller]
+    pub fn insert_before(&mut self, index: usize, value: T) -> (usize, bool) {
+        self.inner.insert_before(index, value)
+    }
+
+    /// Insert the value into the set at the given index.
+    ///
+    /// If an equivalent item already exists in the set, it returns `false` leaving
+    /// the original value in the set, but moved to the given index.
+    /// Note that existing values **cannot** be moved to `index == set.len()`!
+    /// (See [`insert_before`](Self::insert_before) for different behavior here.)
+    ///
+    /// Otherwise, it inserts the new value at the given index and returns `true`.
+    ///
+    /// ***Panics*** if `index` is out of bounds.
+    /// Valid indices are `0..set.len()` (exclusive) when moving an existing value, or
+    /// `0..=set.len()` (inclusive) when inserting a new value.
+    ///
+    /// Computes in **O(n)** time (average).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ordermap::OrderSet;
+    /// let mut set: OrderSet<char> = ('a'..='z').collect();
+    ///
+    /// // The new value '*' goes exactly at the given index.
+    /// assert_eq!(set.get_index_of(&'*'), None);
+    /// assert_eq!(set.shift_insert(10, '*'), true);
+    /// assert_eq!(set.get_index_of(&'*'), Some(10));
+    ///
+    /// // Moving the value 'a' up to 10 will shift others down, including the '*' that was at 10.
+    /// assert_eq!(set.shift_insert(10, 'a'), false);
+    /// assert_eq!(set.get_index_of(&'a'), Some(10));
+    /// assert_eq!(set.get_index_of(&'*'), Some(9));
+    ///
+    /// // Moving the value 'z' down to 9 will shift others up, including the '*' that was at 9.
+    /// assert_eq!(set.shift_insert(9, 'z'), false);
+    /// assert_eq!(set.get_index_of(&'z'), Some(9));
+    /// assert_eq!(set.get_index_of(&'*'), Some(10));
+    ///
+    /// // Existing values can move to len-1 at most, but new values can insert at the endpoint.
+    /// assert_eq!(set.len(), 27);
+    /// assert_eq!(set.shift_insert(set.len() - 1, '*'), false);
+    /// assert_eq!(set.get_index_of(&'*'), Some(26));
+    /// assert_eq!(set.shift_insert(set.len(), '+'), true);
+    /// assert_eq!(set.get_index_of(&'+'), Some(27));
+    /// assert_eq!(set.len(), 28);
+    /// ```
+    ///
+    /// ```should_panic
+    /// use ordermap::OrderSet;
+    /// let mut set: OrderSet<char> = ('a'..='z').collect();
+    ///
+    /// // This is an invalid index for moving an existing value!
+    /// set.shift_insert(set.len(), 'a');
+    /// ```
+    #[track_caller]
     pub fn shift_insert(&mut self, index: usize, value: T) -> bool {
         self.inner.shift_insert(index, value)
     }
@@ -463,12 +556,43 @@ where
     /// assert!(set.into_iter().eq([0, 1, 5, 3, 2, 4]));
     /// assert_eq!(removed, &[2, 3]);
     /// ```
+    #[track_caller]
     pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter, T, S>
     where
         R: RangeBounds<usize>,
         I: IntoIterator<Item = T>,
     {
         self.inner.splice(range, replace_with)
+    }
+
+    /// Moves all values from `other` into `self`, leaving `other` empty.
+    ///
+    /// This is equivalent to calling [`insert`][Self::insert] for each value
+    /// from `other` in order, which means that values that already exist
+    /// in `self` are unchanged in their current position.
+    ///
+    /// See also [`union`][Self::union] to iterate the combined values by
+    /// reference, without modifying `self` or `other`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ordermap::OrderSet;
+    ///
+    /// let mut a = OrderSet::from([3, 2, 1]);
+    /// let mut b = OrderSet::from([3, 4, 5]);
+    /// let old_capacity = b.capacity();
+    ///
+    /// a.append(&mut b);
+    ///
+    /// assert_eq!(a.len(), 5);
+    /// assert_eq!(b.len(), 0);
+    /// assert_eq!(b.capacity(), old_capacity);
+    ///
+    /// assert!(a.iter().eq(&[3, 2, 1, 4, 5]));
+    /// ```
+    pub fn append<S2>(&mut self, other: &mut OrderSet<T, S2>) {
+        self.inner.append(&mut other.inner);
     }
 }
 
@@ -619,6 +743,7 @@ impl<T, S> OrderSet<T, S> {
     /// This preserves the order of the remaining elements.
     ///
     /// Computes in **O(1)** time (average).
+    #[doc(alias = "pop_last")] // like `BTreeSet`
     pub fn pop(&mut self) -> Option<T> {
         self.inner.pop()
     }
@@ -797,7 +922,7 @@ impl<T, S> OrderSet<T, S> {
 
     /// Get a value by index
     ///
-    /// Valid indices are *0 <= index < self.len()*
+    /// Valid indices are `0 <= index < self.len()`.
     ///
     /// Computes in **O(1)** time.
     pub fn get_index(&self, index: usize) -> Option<&T> {
@@ -806,7 +931,7 @@ impl<T, S> OrderSet<T, S> {
 
     /// Returns a slice of values in the given range of indices.
     ///
-    /// Valid indices are *0 <= index < self.len()*
+    /// Valid indices are `0 <= index < self.len()`.
     ///
     /// Computes in **O(1)** time.
     pub fn get_range<R: RangeBounds<usize>>(&self, range: R) -> Option<&Slice<T>> {
@@ -829,7 +954,7 @@ impl<T, S> OrderSet<T, S> {
 
     /// Remove the value by index
     ///
-    /// Valid indices are *0 <= index < self.len()*
+    /// Valid indices are `0 <= index < self.len()`
     ///
     /// **NOTE:** This is equivalent to [`IndexSet::shift_remove_index`], and
     /// like [`Vec::remove`], the value is removed by shifting all of the
@@ -843,7 +968,7 @@ impl<T, S> OrderSet<T, S> {
 
     /// Remove the value by index
     ///
-    /// Valid indices are *0 <= index < self.len()*
+    /// Valid indices are `0 <= index < self.len()`.
     ///
     /// Like [`Vec::swap_remove`], the value is removed by swapping it with the
     /// last element of the set and popping it off. **This perturbs
@@ -863,6 +988,7 @@ impl<T, S> OrderSet<T, S> {
     /// ***Panics*** if `from` or `to` are out of bounds.
     ///
     /// Computes in **O(n)** time (average).
+    #[track_caller]
     pub fn move_index(&mut self, from: usize, to: usize) {
         self.inner.move_index(from, to)
     }
@@ -872,6 +998,7 @@ impl<T, S> OrderSet<T, S> {
     /// ***Panics*** if `a` or `b` are out of bounds.
     ///
     /// Computes in **O(1)** time (average).
+    #[track_caller]
     pub fn swap_indices(&mut self, a: usize, b: usize) {
         self.inner.swap_indices(a, b)
     }
@@ -912,8 +1039,12 @@ impl<T, S> Index<usize> for OrderSet<T, S> {
     ///
     /// ***Panics*** if `index` is out of bounds.
     fn index(&self, index: usize) -> &T {
-        self.get_index(index)
-            .expect("OrderSet: index out of bounds")
+        self.get_index(index).unwrap_or_else(|| {
+            panic!(
+                "index out of bounds: the len is {len} but the index is {index}",
+                len = self.len()
+            );
+        })
     }
 }
 

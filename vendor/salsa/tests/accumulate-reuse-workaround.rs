@@ -4,24 +4,23 @@
 
 mod common;
 use common::{LogDatabase, LoggerDatabase};
-
 use expect_test::expect;
 use salsa::{Accumulator, Setter};
 use test_log::test;
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct List {
     value: u32,
     next: Option<List>,
 }
 
 #[salsa::accumulator]
-#[derive(Copy)]
+#[derive(Copy, Clone, Debug)]
 struct Integers(u32);
 
 #[salsa::tracked]
 fn compute(db: &dyn LogDatabase, input: List) -> u32 {
-    db.push_log(format!("compute({:?})", input,));
+    db.push_log(format!("compute({input:?})",));
 
     // always pushes 0
     Integers(0).accumulate(db);
@@ -38,9 +37,9 @@ fn compute(db: &dyn LogDatabase, input: List) -> u32 {
     result
 }
 
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(ref))]
 fn accumulated(db: &dyn LogDatabase, input: List) -> Vec<u32> {
-    db.push_log(format!("accumulated({:?})", input));
+    db.push_log(format!("accumulated({input:?})"));
     compute::accumulated::<Integers>(db, input)
         .into_iter()
         .map(|a| a.0)

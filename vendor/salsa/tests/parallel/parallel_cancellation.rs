@@ -1,14 +1,12 @@
-//! Test for cycle recover spread across two threads.
-//! See `../cycles.rs` for a complete listing of cycle tests,
-//! both intra and cross thread.
+// Shuttle doesn't like panics inside of its runtime.
+#![cfg(not(feature = "shuttle"))]
 
-use salsa::Cancelled;
-use salsa::Setter;
+//! Test for thread cancellation.
+use salsa::{Cancelled, Setter};
 
-use crate::setup::Knobs;
-use crate::setup::KnobsDatabase;
+use crate::setup::{Knobs, KnobsDatabase};
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct MyInput {
     field: i32,
 }
@@ -51,7 +49,7 @@ fn execute() {
         move || a1(&db, input)
     });
 
-    db.signal_on_did_cancel.store(2);
+    db.signal_on_did_cancel(2);
     input.set_field(&mut db).to(2);
 
     // Assert thread A *should* was cancelled

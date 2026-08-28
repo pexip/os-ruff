@@ -3,11 +3,10 @@
 //! Singleton structs are created only once. Subsequent `get`s and `new`s after creation return the same `Id`.
 
 use expect_test::expect;
-
 use salsa::Database as _;
 use test_log::test;
 
-#[salsa::input(singleton)]
+#[salsa::input(singleton, debug)]
 struct MyInput {
     field: u32,
     id_field: u16,
@@ -42,7 +41,7 @@ fn twice() {
 fn debug() {
     salsa::DatabaseImpl::new().attach(|db| {
         let input = MyInput::new(db, 3, 4);
-        let actual = format!("{:?}", input);
+        let actual = format!("{input:?}");
         let expected = expect!["MyInput { [salsa id]: Id(0), field: 3, id_field: 4 }"];
         expected.assert_eq(&actual);
     });

@@ -9,19 +9,19 @@ use insta::assert_yaml_snapshot;
 #[cfg(feature = "json")]
 use insta::{assert_compact_json_snapshot, assert_json_snapshot};
 
-use insta::{assert_debug_snapshot, assert_snapshot};
+use insta::{assert_compact_debug_snapshot, assert_debug_snapshot, assert_snapshot};
 use std::thread;
 
 #[test]
 fn test_simple() {
-    assert_debug_snapshot!(vec![1, 2, 3, 4], @r###"
+    assert_debug_snapshot!(vec![1, 2, 3, 4], @r"
     [
         1,
         2,
         3,
         4,
     ]
-    "###);
+    ");
 }
 
 #[test]
@@ -56,9 +56,12 @@ fn test_unnamed_thread_single_line() {
 #[test]
 fn test_newline() {
     // https://github.com/mitsuhiko/insta/issues/39
-    assert_snapshot!("\n", @r###"
+    assert_snapshot!("\n", @"");
+}
 
-    "###);
+#[test]
+fn test_inline_debug_expr() {
+    assert_snapshot!("hello", "a debug expr", @"hello");
 }
 
 #[cfg(feature = "csv")]
@@ -168,12 +171,12 @@ fn test_toml_inline() {
 #[cfg(feature = "json")]
 #[test]
 fn test_json_inline() {
-    assert_json_snapshot!(vec!["foo", "bar"], @r###"
+    assert_json_snapshot!(vec!["foo", "bar"], @r#"
     [
       "foo",
       "bar"
     ]
-    "###);
+    "#);
 }
 
 #[cfg(feature = "yaml")]
@@ -190,12 +193,11 @@ fn test_yaml_inline() {
         id: 42,
         username: "peter-pan".into(),
         email: "peterpan@wonderland.invalid".into()
-    }, @r###"
-    ---
+    }, @r"
     id: 42
     username: peter-pan
     email: peterpan@wonderland.invalid
-    "###);
+    ");
 }
 
 #[cfg(all(feature = "redactions", feature = "yaml"))]
@@ -214,12 +216,11 @@ fn test_yaml_inline_redacted() {
         email: "peterpan@wonderland.invalid".into()
     }, {
         ".id" => "[user-id]"
-    }, @r###"
-    ---
+    }, @r#"
     id: "[user-id]"
     username: peter-pan
     email: peterpan@wonderland.invalid
-    "###);
+    "#);
 }
 
 #[test]
@@ -229,20 +230,20 @@ fn test_non_basic_plane() {
 
 #[test]
 fn test_multiline_with_empty_lines() {
-    assert_snapshot!("# first\nsecond\n  third\n\n# alternative", @r###"
+    assert_snapshot!("# first\nsecond\n  third\n\n# alternative", @r"
     # first
     second
       third
 
     # alternative
-    "###);
+    ");
 }
 
 #[cfg(feature = "json")]
 #[test]
 fn test_compact_json() {
     assert_compact_json_snapshot!((1..30).collect::<Vec<_>>(), @"[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]");
-    assert_compact_json_snapshot!((1..34).collect::<Vec<_>>(), @r###"
+    assert_compact_json_snapshot!((1..34).collect::<Vec<_>>(), @r"
     [
       1,
       2,
@@ -278,7 +279,13 @@ fn test_compact_json() {
       32,
       33
     ]
-    "###);
+    ");
+}
+
+#[test]
+fn test_compact_debug() {
+    assert_compact_debug_snapshot!((1..30).collect::<Vec<_>>(), @"[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]");
+    assert_compact_debug_snapshot!((1..34).collect::<Vec<_>>(), @"[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33]");
 }
 
 #[test]
@@ -291,12 +298,20 @@ fn test_inline_test_in_loop() {
 
 #[test]
 fn test_inline_snapshot_whitespace() {
-    assert_snapshot!("\n\nfoo\n\n    bar\n\n", @r###"
-
-
+    assert_snapshot!("\n\nfoo\n\n    bar\n\n", @r"
     foo
 
         bar
+    ");
+}
 
-    "###);
+#[test]
+fn test_indentation() {
+    assert_snapshot!("aaa\nbbb\nccc\nddd", @r"
+    aaa
+    bbb
+    ccc
+    ddd
+    "
+    );
 }

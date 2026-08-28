@@ -1,7 +1,17 @@
+#[cfg(feature = "pep639-glob")]
+mod pep639_glob;
+
+#[cfg(feature = "pep639-glob")]
+pub use pep639_glob::{check_pep639_glob, parse_pep639_glob, Pep639GlobError};
+
+pub mod pep735_resolve;
+
 use indexmap::IndexMap;
 use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::Requirement;
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
+use std::path::PathBuf;
 
 /// The `[build-system]` section of a pyproject.toml as specified in PEP 517
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -23,6 +33,8 @@ pub struct PyProjectToml {
     pub build_system: Option<BuildSystem>,
     /// Project metadata
     pub project: Option<Project>,
+    /// Dependency groups table
+    pub dependency_groups: Option<DependencyGroups>,
 }
 
 /// PEP 621 project metadata
@@ -39,10 +51,19 @@ pub struct Project {
     pub readme: Option<ReadMe>,
     /// The Python version requirements of the project
     pub requires_python: Option<VersionSpecifiers>,
-    /// License
+    /// The license under which the project is distributed
+    ///
+    /// Supports both the current standard and the provisional PEP 639
     pub license: Option<License>,
-    /// License Files (PEP 639) - https://peps.python.org/pep-0639/#add-license-files-key
-    pub license_files: Option<LicenseFiles>,
+    /// The paths to files containing licenses and other legal notices to be distributed with the
+    /// project.
+    ///
+    /// Use `parse_pep639_glob` from the optional `pep639-glob` feature to find the matching files.
+    ///
+    /// Note that this doesn't check the PEP 639 rules for combining `license_files` and `license`.
+    ///
+    /// From the provisional PEP 639
+    pub license_files: Option<Vec<String>>,
     /// The people or organizations considered to be the "authors" of the project
     pub authors: Option<Vec<Contact>>,
     /// Similar to "authors" in that its exact meaning is open to interpretation
@@ -113,52 +134,95 @@ pub enum ReadMe {
     },
 }
 
-/// License
+/// The optional `project.license` key
+///
+/// Specified in <https://packaging.python.org/en/latest/specifications/pyproject-toml/#license>.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum License {
-    /// A SPDX license expression, according to PEP 639
-    String(String),
-    /// A PEP 621 license table. Note that accepting PEP 639 will deprecate this table
-    Table {
-        /// A relative file path to the file which contains the license for the project
-        file: Option<String>,
-        /// The license content of the project
-        text: Option<String>,
+    /// An SPDX Expression.
+    ///
+    /// Note that this doesn't check the validity of the SPDX expression or PEP 639 rules.
+    ///
+    /// From the provisional PEP 639.
+    Spdx(String),
+    Text {
+        /// The full text of the license.
+        text: String,
+    },
+    File {
+        /// The file containing the license text.
+        file: PathBuf,
     },
 }
 
-/// License-Files
+/// A `project.authors` or `project.maintainers` entry.
+///
+/// Specified in
+/// <https://packaging.python.org/en/latest/specifications/pyproject-toml/#authors-maintainers>.
+///
+/// The entry is derived from the email format of `John Doe <john.doe@example.net>`. You need to
+/// provide at least name or email.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub enum LicenseFiles {
-    /// List of file paths describing `License-File` output
-    #[serde(rename = "paths")]
-    Paths(Option<Vec<String>>),
-    /// List of glob patterns describing `License-File` output
-    #[serde(rename = "globs")]
-    Globs(Option<Vec<String>>),
+// deny_unknown_fields prevents using the name field when the email is not a string.
+#[serde(
+    untagged,
+    deny_unknown_fields,
+    expecting = "a table with 'name' and/or 'email' keys"
+)]
+pub enum Contact {
+    /// TODO(konsti): RFC 822 validation.
+    NameEmail { name: String, email: String },
+    /// TODO(konsti): RFC 822 validation.
+    Name { name: String },
+    /// TODO(konsti): RFC 822 validation.
+    Email { email: String },
 }
 
-/// Default value specified by PEP 639
-impl Default for LicenseFiles {
-    fn default() -> Self {
-        LicenseFiles::Globs(Some(vec![
-            "LICEN[CS]E*".to_owned(),
-            "COPYING*".to_owned(),
-            "NOTICE*".to_owned(),
-            "AUTHORS*".to_owned(),
-        ]))
+impl Contact {
+    /// Returns the name of the contact.
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Contact::NameEmail { name, .. } | Contact::Name { name } => Some(name),
+            Contact::Email { .. } => None,
+        }
+    }
+
+    /// Returns the email of the contact.
+    pub fn email(&self) -> Option<&str> {
+        match self {
+            Contact::NameEmail { email, .. } | Contact::Email { email } => Some(email),
+            Contact::Name { .. } => None,
+        }
     }
 }
 
-/// Project people contact information
+/// The `[dependency-groups]` section of pyproject.toml, as specified in PEP 735
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(expecting = "a table with 'name' and 'email' keys")]
-pub struct Contact {
-    /// A valid email name
-    pub name: Option<String>,
-    /// A valid email address
-    pub email: Option<String>,
+#[serde(transparent)]
+pub struct DependencyGroups(pub IndexMap<String, Vec<DependencyGroupSpecifier>>);
+
+impl Deref for DependencyGroups {
+    type Target = IndexMap<String, Vec<DependencyGroupSpecifier>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// A specifier item in a Dependency Group
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case", untagged)]
+#[allow(clippy::large_enum_variant)]
+pub enum DependencyGroupSpecifier {
+    /// PEP 508 requirement string
+    String(Requirement),
+    /// Include another dependency group
+    #[serde(rename_all = "kebab-case")]
+    Table {
+        /// The name of the group to include
+        include_group: String,
+    },
 }
 
 impl PyProjectToml {
@@ -170,9 +234,10 @@ impl PyProjectToml {
 
 #[cfg(test)]
 mod tests {
-    use super::{License, LicenseFiles, PyProjectToml, ReadMe};
+    use super::{DependencyGroupSpecifier, License, PyProjectToml, ReadMe};
     use pep440_rs::{Version, VersionSpecifiers};
     use pep508_rs::Requirement;
+    use std::path::PathBuf;
     use std::str::FromStr;
 
     #[test]
@@ -256,9 +321,8 @@ tomatoes = "spam:main_tomatoes""#;
         );
         assert_eq!(
             project.license,
-            Some(License::Table {
-                file: Some("LICENSE.txt".to_owned()),
-                text: None
+            Some(License::File {
+                file: PathBuf::from("LICENSE.txt"),
             })
         );
         assert_eq!(
@@ -289,11 +353,11 @@ license = "MIT OR BSD-3-Clause"
         let project = project_toml.project.as_ref().unwrap();
         assert_eq!(
             project.license,
-            Some(License::String("MIT OR BSD-3-Clause".to_owned()))
+            Some(License::Spdx("MIT OR BSD-3-Clause".to_owned()))
         );
     }
 
-    /// https://peps.python.org/pep-0639/#advanced-example
+    /// https://peps.python.org/pep-0639/
     #[test]
     fn test_parse_pyproject_toml_license_paths() {
         let source = r#"[build-system]
@@ -303,7 +367,7 @@ build-backend = "maturin"
 [project]
 name = "spam"
 license = "MIT AND (Apache-2.0 OR BSD-2-Clause)"
-license-files.paths = [
+license-files = [
     "LICENSE",
     "setuptools/_vendor/LICENSE",
     "setuptools/_vendor/LICENSE.APACHE",
@@ -315,22 +379,22 @@ license-files.paths = [
 
         assert_eq!(
             project.license,
-            Some(License::String(
+            Some(License::Spdx(
                 "MIT AND (Apache-2.0 OR BSD-2-Clause)".to_owned()
             ))
         );
         assert_eq!(
             project.license_files,
-            Some(LicenseFiles::Paths(Some(vec![
+            Some(vec![
                 "LICENSE".to_owned(),
                 "setuptools/_vendor/LICENSE".to_owned(),
                 "setuptools/_vendor/LICENSE.APACHE".to_owned(),
                 "setuptools/_vendor/LICENSE.BSD".to_owned()
-            ])))
+            ])
         );
     }
 
-    // https://peps.python.org/pep-0639/#advanced-example
+    // https://peps.python.org/pep-0639/
     #[test]
     fn test_parse_pyproject_toml_license_globs() {
         let source = r#"[build-system]
@@ -340,7 +404,7 @@ build-backend = "maturin"
 [project]
 name = "spam"
 license = "MIT AND (Apache-2.0 OR BSD-2-Clause)"
-license-files.globs = [
+license-files = [
     "LICENSE*",
     "setuptools/_vendor/LICENSE*",
 ]
@@ -350,16 +414,16 @@ license-files.globs = [
 
         assert_eq!(
             project.license,
-            Some(License::String(
+            Some(License::Spdx(
                 "MIT AND (Apache-2.0 OR BSD-2-Clause)".to_owned()
             ))
         );
         assert_eq!(
             project.license_files,
-            Some(LicenseFiles::Globs(Some(vec![
+            Some(vec![
                 "LICENSE*".to_owned(),
                 "setuptools/_vendor/LICENSE*".to_owned(),
-            ])))
+            ])
         );
     }
 
@@ -375,15 +439,8 @@ name = "spam"
         let project_toml = PyProjectToml::new(source).unwrap();
         let project = project_toml.project.as_ref().unwrap();
 
-        assert_eq!(
-            project.license_files.clone().unwrap_or_default(),
-            LicenseFiles::Globs(Some(vec![
-                "LICEN[CS]E*".to_owned(),
-                "COPYING*".to_owned(),
-                "NOTICE*".to_owned(),
-                "AUTHORS*".to_owned(),
-            ]))
-        );
+        // Changed from the PEP 639 draft.
+        assert_eq!(project.license_files.clone(), None);
     }
 
     #[test]
@@ -407,5 +464,88 @@ readme = {text = "ReadMe!", content-type = "text/plain"}
                 content_type: Some("text/plain".to_string())
             })
         );
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_dependency_groups() {
+        let source = r#"[dependency-groups]
+alpha = ["beta", "gamma", "delta"]
+epsilon = ["eta<2.0", "theta==2024.09.01"]
+iota = [{include-group = "alpha"}]
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let dependency_groups = project_toml.dependency_groups.as_ref().unwrap();
+
+        assert_eq!(
+            dependency_groups["alpha"],
+            vec![
+                DependencyGroupSpecifier::String(Requirement::from_str("beta").unwrap()),
+                DependencyGroupSpecifier::String(Requirement::from_str("gamma").unwrap()),
+                DependencyGroupSpecifier::String(Requirement::from_str("delta").unwrap(),)
+            ]
+        );
+        assert_eq!(
+            dependency_groups["epsilon"],
+            vec![
+                DependencyGroupSpecifier::String(Requirement::from_str("eta<2.0").unwrap()),
+                DependencyGroupSpecifier::String(
+                    Requirement::from_str("theta==2024.09.01").unwrap()
+                )
+            ]
+        );
+        assert_eq!(
+            dependency_groups["iota"],
+            vec![DependencyGroupSpecifier::Table {
+                include_group: "alpha".to_string()
+            }]
+        );
+    }
+
+    #[test]
+    fn invalid_email() {
+        let source = r#"
+[project]
+name = "hello-world"
+version = "0.1.0"
+# Ensure that the spans from toml handle utf-8 correctly
+authors = [
+    { name = "Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍A̴̵̜̰͔ͫ͗͢L̠ͨͧͩ͘G̴̻͈͍͔̹̑͗̎̅͛́Ǫ̵̹̻̝̳͂̌̌͘", email = 1 }
+]
+"#;
+        let err = PyProjectToml::new(source).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "TOML parse error at line 6, column 11
+  |
+6 | authors = [
+  |           ^
+a table with 'name' and/or 'email' keys
+"
+        );
+    }
+
+    #[test]
+    fn test_contact_accessors() {
+        let contact = super::Contact::NameEmail {
+            name: "John Doe".to_string(),
+            email: "john@example.com".to_string(),
+        };
+
+        assert_eq!(contact.name(), Some("John Doe"));
+        assert_eq!(contact.email(), Some("john@example.com"));
+
+        let contact = super::Contact::Name {
+            name: "John Doe".to_string(),
+        };
+
+        assert_eq!(contact.name(), Some("John Doe"));
+        assert_eq!(contact.email(), None);
+
+        let contact = super::Contact::Email {
+            email: "john@example.com".to_string(),
+        };
+
+        assert_eq!(contact.name(), None);
+        assert_eq!(contact.email(), Some("john@example.com"));
     }
 }

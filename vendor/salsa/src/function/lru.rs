@@ -1,38 +1,51 @@
-use crate::{hash::FxLinkedHashSet, Id};
+use std::num::NonZeroUsize;
 
-use crossbeam::atomic::AtomicCell;
-use parking_lot::Mutex;
+use crate::hash::FxLinkedHashSet;
+use crate::sync::Mutex;
+use crate::Id;
 
-#[derive(Default)]
 pub(super) struct Lru {
-    capacity: AtomicCell<usize>,
+    capacity: Option<NonZeroUsize>,
     set: Mutex<FxLinkedHashSet<Id>>,
 }
 
 impl Lru {
-    pub(super) fn record_use(&self, index: Id) -> Option<Id> {
-        let capacity = self.capacity.load();
-
-        if capacity == 0 {
-            // LRU is disabled
-            return None;
+    pub fn new(cap: usize) -> Self {
+        Self {
+            capacity: NonZeroUsize::new(cap),
+            set: Mutex::default(),
         }
-
-        let mut set = self.set.lock();
-        set.insert(index);
-        if set.len() > capacity {
-            return set.pop_front();
-        }
-
-        None
     }
 
-    pub(super) fn set_capacity(&self, capacity: usize) {
-        self.capacity.store(capacity);
+    #[inline(always)]
+    pub(super) fn record_use(&self, index: Id) {
+        if self.capacity.is_some() {
+            self.insert(index);
+        }
+    }
 
-        if capacity == 0 {
-            let mut set = self.set.lock();
-            *set = FxLinkedHashSet::default();
+    #[inline(never)]
+    fn insert(&self, index: Id) {
+        let mut set = self.set.lock();
+        set.insert(index);
+    }
+
+    pub(super) fn set_capacity(&mut self, capacity: usize) {
+        self.capacity = NonZeroUsize::new(capacity);
+        if self.capacity.is_none() {
+            self.set.get_mut().clear();
+        }
+    }
+
+    pub(super) fn for_each_evicted(&mut self, mut cb: impl FnMut(Id)) {
+        let Some(cap) = self.capacity else {
+            return;
+        };
+        let set = self.set.get_mut();
+        while set.len() > cap.get() {
+            if let Some(id) = set.pop_front() {
+                cb(id);
+            }
         }
     }
 }

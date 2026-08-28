@@ -4,17 +4,8 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::str;
 
-use borsh::io::{
-    Error,
-    ErrorKind,
-    Read,
-    Result,
-    Write,
-};
-use borsh::{
-    BorshDeserialize,
-    BorshSerialize,
-};
+use borsh::io::{Error, ErrorKind, Read, Result, Write};
+use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::repr::MAX_SIZE;
 use crate::CompactString;
@@ -52,7 +43,7 @@ fn vec_from_reader<R: Read>(len: usize, reader: &mut R) -> Result<Vec<u8>> {
     // less efficient (since we need to loop and reallocate) but it protects
     // us from someone sending us [0xff, 0xff, 0xff, 0xff] and forcing us to
     // allocate 4GiB of memory.
-    let mut vec = vec![0u8; len.min(1024 * 1024)];
+    let mut vec = alloc::vec![0u8; len.min(1024 * 1024)];
     let mut pos = 0;
     while pos < len {
         if pos == vec.len() {
@@ -80,10 +71,7 @@ mod tests {
 
     use test_strategy::proptest;
 
-    use crate::repr::{
-        HEAP_MASK,
-        MAX_SIZE,
-    };
+    use crate::repr::{HEAP_MASK, MAX_SIZE};
     use crate::CompactString;
 
     fn assert_roundtrip(s: &str) {

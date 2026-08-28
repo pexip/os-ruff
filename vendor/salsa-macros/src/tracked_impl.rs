@@ -1,8 +1,13 @@
+use std::collections::HashSet;
+
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::parse::Nothing;
+use syn::visit_mut::VisitMut;
 
-use crate::{hygiene::Hygiene, tracked_fn::FnArgs};
+use crate::hygiene::Hygiene;
+use crate::tracked_fn::FnArgs;
+use crate::xform::ChangeSelfPath;
 
 pub(crate) fn tracked_impl(
     args: proc_macro::TokenStream,
@@ -19,8 +24,8 @@ struct Macro {
     hygiene: Hygiene,
 }
 
-struct MethodArguments<'syn> {
-    self_token: &'syn syn::token::SelfValue,
+struct AssociatedFunctionArguments<'syn> {
+    self_token: Option<&'syn syn::token::SelfValue>,
     db_ty: &'syn syn::Type,
     db_ident: &'syn syn::Ident,
     db_lt: Option<&'syn syn::Lifetime>,
@@ -32,8 +37,19 @@ struct MethodArguments<'syn> {
 impl Macro {
     fn try_generate(&self, mut impl_item: syn::ItemImpl) -> syn::Result<TokenStream> {
         let mut member_items = std::mem::take(&mut impl_item.items);
+        let member_idents: HashSet<_> = member_items
+            .iter()
+            .filter_map(|item| match item {
+                syn::ImplItem::Const(it) => Some(it.ident.clone()),
+                syn::ImplItem::Fn(it) => Some(it.sig.ident.clone()),
+                syn::ImplItem::Type(it) => Some(it.ident.clone()),
+                syn::ImplItem::Macro(_) => None,
+                syn::ImplItem::Verbatim(_) => None,
+                _ => None,
+            })
+            .collect();
         for member_item in &mut member_items {
-            self.modify_member(&impl_item, member_item)?;
+            self.modify_member(&impl_item, member_item, &member_idents)?;
         }
         impl_item.items = member_items;
         Ok(crate::debug::dump_tokens(
@@ -47,6 +63,7 @@ impl Macro {
         &self,
         impl_item: &syn::ItemImpl,
         member_item: &mut syn::ImplItem,
+        member_idents: &HashSet<syn::Ident>,
     ) -> syn::Result<()> {
         let syn::ImplItem::Fn(fn_item) = member_item else {
             return Ok(());
@@ -59,6 +76,13 @@ impl Macro {
             return Ok(());
         };
 
+        let trait_ = match &impl_item.trait_ {
+            Some((None, path, _)) => Some((path, member_idents)),
+            _ => None,
+        };
+        let mut change = ChangeSelfPath::new(self_ty, trait_);
+        change.visit_impl_item_fn_mut(fn_item);
+
         let salsa_tracked_attr = fn_item.attrs.remove(tracked_attr_index);
         let args: FnArgs = match &salsa_tracked_attr.meta {
             syn::Meta::Path(..) => Default::default(),
@@ -66,9 +90,9 @@ impl Macro {
         };
 
         let InnerTrait = self.hygiene.ident("InnerTrait");
-        let inner_fn_name = self.hygiene.ident("inner_fn_name");
+        let inner_fn_name = self.hygiene.ident(&fn_item.sig.ident.to_string());
 
-        let MethodArguments {
+        let AssociatedFunctionArguments {
             self_token,
             db_ty,
             db_ident,
@@ -82,30 +106,54 @@ impl Macro {
         inner_fn.vis = syn::Visibility::Inherited;
         inner_fn.sig.ident = inner_fn_name.clone();
 
-        // Construct the body of the method
+        // Construct the body of the method or associated function
 
-        let block = parse_quote!({
-            salsa::plumbing::setup_method_body! {
-                salsa_tracked_attr: #salsa_tracked_attr,
-                self: #self_token,
-                self_ty: #self_ty,
-                db_lt: #db_lt,
-                db: #db_ident,
-                db_ty: (#db_ty),
-                input_ids: [#(#input_ids),*],
-                input_tys: [#(#input_tys),*],
-                output_ty: #output_ty,
-                inner_fn_name: #inner_fn_name,
-                inner_fn: #inner_fn,
+        let block = if let Some(self_token) = self_token {
+            parse_quote!({
+                salsa::plumbing::setup_tracked_method_body! {
+                    salsa_tracked_attr: #salsa_tracked_attr,
+                    self: #self_token,
+                    self_ty: #self_ty,
+                    db_lt: #db_lt,
+                    db: #db_ident,
+                    db_ty: (#db_ty),
+                    input_ids: [#(#input_ids),*],
+                    input_tys: [#(#input_tys),*],
+                    output_ty: #output_ty,
+                    inner_fn_name: #inner_fn_name,
+                    inner_fn: #inner_fn,
 
-                // Annoyingly macro-rules hygiene does not extend to items defined in the macro.
-                // We have the procedural macro generate names for those items that are
-                // not used elsewhere in the user's code.
-                unused_names: [
-                    #InnerTrait,
-                ]
-            }
-        });
+                    // Annoyingly macro-rules hygiene does not extend to items defined in the macro.
+                    // We have the procedural macro generate names for those items that are
+                    // not used elsewhere in the user's code.
+                    unused_names: [
+                        #InnerTrait,
+                    ]
+                }
+            })
+        } else {
+            parse_quote!({
+                salsa::plumbing::setup_tracked_assoc_fn_body! {
+                    salsa_tracked_attr: #salsa_tracked_attr,
+                    self_ty: #self_ty,
+                    db_lt: #db_lt,
+                    db: #db_ident,
+                    db_ty: (#db_ty),
+                    input_ids: [#(#input_ids),*],
+                    input_tys: [#(#input_tys),*],
+                    output_ty: #output_ty,
+                    inner_fn_name: #inner_fn_name,
+                    inner_fn: #inner_fn,
+
+                    // Annoyingly macro-rules hygiene does not extend to items defined in the macro.
+                    // We have the procedural macro generate names for those items that are
+                    // not used elsewhere in the user's code.
+                    unused_names: [
+                        #InnerTrait,
+                    ]
+                }
+            })
+        };
 
         // Update the method that will actually appear in the impl to have the new body
         // and its true return type
@@ -120,18 +168,25 @@ impl Macro {
         &self,
         impl_item: &'syn syn::ItemImpl,
         fn_item: &'syn syn::ImplItemFn,
-    ) -> syn::Result<MethodArguments<'syn>> {
+    ) -> syn::Result<AssociatedFunctionArguments<'syn>> {
         let db_lt = self.extract_db_lifetime(impl_item, fn_item)?;
 
-        let self_token = self.check_self_argument(fn_item)?;
+        let is_method = matches!(&fn_item.sig.inputs[0], syn::FnArg::Receiver(_));
 
-        let (db_ident, db_ty) = self.check_db_argument(&fn_item.sig.inputs[1])?;
+        let (self_token, db_input_index, skipped_inputs) = if is_method {
+            (Some(self.check_self_argument(fn_item)?), 1, 2)
+        } else {
+            (None, 0, 1)
+        };
 
-        let input_ids: Vec<syn::Ident> = crate::fn_util::input_ids(&self.hygiene, &fn_item.sig, 2);
-        let input_tys = crate::fn_util::input_tys(&fn_item.sig, 2)?;
+        let (db_ident, db_ty) = self.check_db_argument(&fn_item.sig.inputs[db_input_index])?;
+
+        let input_ids: Vec<syn::Ident> =
+            crate::fn_util::input_ids(&self.hygiene, &fn_item.sig, skipped_inputs);
+        let input_tys = crate::fn_util::input_tys(&fn_item.sig, skipped_inputs)?;
         let output_ty = crate::fn_util::output_ty(db_lt, &fn_item.sig)?;
 
-        Ok(MethodArguments {
+        Ok(AssociatedFunctionArguments {
             self_token,
             db_ident,
             db_lt,
@@ -272,13 +327,28 @@ impl Macro {
         args: &FnArgs,
         db_lt: &Option<syn::Lifetime>,
     ) -> syn::Result<()> {
-        if let Some(return_ref) = &args.return_ref {
+        if let Some(returns) = &args.returns {
             if let syn::ReturnType::Type(_, t) = &mut sig.output {
-                **t = parse_quote!(& #db_lt #t)
+                if returns == "copy" || returns == "clone" {
+                    // leave as is
+                } else if returns == "ref" {
+                    **t = parse_quote!(& #db_lt #t)
+                } else if returns == "deref" {
+                    **t = parse_quote!(& #db_lt <#t as ::core::ops::Deref>::Target)
+                } else if returns == "as_ref" {
+                    **t = parse_quote!(<#t as ::salsa::SalsaAsRef>::AsRef<#db_lt>)
+                } else if returns == "as_deref" {
+                    **t = parse_quote!(<#t as ::salsa::SalsaAsDeref>::AsDeref<#db_lt>)
+                } else {
+                    return Err(syn::Error::new_spanned(
+                        returns,
+                        format!("Unknown returns mode `{returns}`"),
+                    ));
+                }
             } else {
                 return Err(syn::Error::new_spanned(
-                    return_ref,
-                    "return_ref attribute requires explicit return type",
+                    returns,
+                    "returns attribute requires explicit return type",
                 ));
             };
         }

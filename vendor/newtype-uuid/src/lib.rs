@@ -87,7 +87,7 @@
 //!
 //! # Features
 //!
-//! - `default`: Enables default features in the uuid crate.
+//! - `default`: Enables default features in the newtype-uuid crate.
 //! - `std`: Enables the use of the standard library. *Enabled by default.*
 //! - `serde`: Enables serialization and deserialization support via Serde. *Not enabled by
 //!   default.*
@@ -95,17 +95,19 @@
 //! - `schemars08`: Enables support for generating JSON schemas via schemars 0.8. *Not enabled by
 //!   default.* Note that the format of the generated schema is **not currently part** of the stable
 //!   API, though we hope to stabilize it in the future.
+//! - `proptest1`: Enables support for generating `proptest::Arbitrary` instances of UUIDs. *Not enabled by default.*
 //!
 //! # Minimum supported Rust version (MSRV)
 //!
-//! The MSRV of this crate is **Rust 1.60.** In general, this crate will follow the MSRV of the
-//! underlying `uuid` crate.
+//! The MSRV of this crate is **Rust 1.67.** In general, this crate will follow the MSRV of the
+//! underlying `uuid` crate or of dependencies, with an aim to be conservative.
 //!
 //! Within the 1.x series, MSRV updates will be accompanied by a minor version bump. The MSRVs for
 //! each minor version are:
 //!
-//! * Version **1.0.x**: Rust 1.60
+//! * Version **1.0.x**: Rust 1.60.
 //! * Version **1.1.x**: Rust 1.61. This permits `TypedUuid<T>` to have `const fn` methods.
+//! * Version **1.2.x**: Rust 1.67, required by some dependency updates.
 //!
 //! # Alternatives
 //!
@@ -124,7 +126,7 @@ use core::{
     marker::PhantomData,
     str::FromStr,
 };
-use uuid::Uuid;
+use uuid::{Uuid, Version};
 
 /// A UUID with type-level information about what it's used for.
 ///
@@ -172,12 +174,122 @@ impl<T: TypedUuidKind> TypedUuid<T> {
         }
     }
 
+    /// Creates a UUID from four field values.
+    #[inline]
+    #[must_use]
+    pub const fn from_fields(d1: u32, d2: u16, d3: u16, d4: [u8; 8]) -> Self {
+        Self {
+            uuid: Uuid::from_fields(d1, d2, d3, &d4),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Creates a UUID from four field values in little-endian order.
+    ///
+    /// The bytes in the `d1`, `d2` and `d3` fields will be flipped to convert into big-endian
+    /// order. This is based on the endianness of the UUID, rather than the target environment so
+    /// bytes will be flipped on both big and little endian machines.
+    #[inline]
+    #[must_use]
+    pub const fn from_fields_le(d1: u32, d2: u16, d3: u16, d4: [u8; 8]) -> Self {
+        Self {
+            uuid: Uuid::from_fields_le(d1, d2, d3, &d4),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Creates a UUID from a 128bit value.
+    #[inline]
+    #[must_use]
+    pub const fn from_u128(value: u128) -> Self {
+        Self {
+            uuid: Uuid::from_u128(value),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Creates a UUID from a 128bit value in little-endian order.
+    ///
+    /// The entire value will be flipped to convert into big-endian order. This is based on the
+    /// endianness of the UUID, rather than the target environment so bytes will be flipped on both
+    /// big and little endian machines.
+    #[inline]
+    #[must_use]
+    pub const fn from_u128_le(value: u128) -> Self {
+        Self {
+            uuid: Uuid::from_u128_le(value),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Creates a UUID from two 64bit values.
+    #[inline]
+    #[must_use]
+    pub const fn from_u64_pair(d1: u64, d2: u64) -> Self {
+        Self {
+            uuid: Uuid::from_u64_pair(d1, d2),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Creates a UUID using the supplied bytes.
+    #[inline]
+    #[must_use]
+    pub const fn from_bytes(bytes: uuid::Bytes) -> Self {
+        Self {
+            uuid: Uuid::from_bytes(bytes),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Creates a UUID using the supplied bytes in little-endian order.
+    ///
+    /// The individual fields encoded in the buffer will be flipped.
+    #[inline]
+    #[must_use]
+    pub const fn from_bytes_le(bytes: uuid::Bytes) -> Self {
+        Self {
+            uuid: Uuid::from_bytes_le(bytes),
+            _phantom: PhantomData,
+        }
+    }
+
     /// Creates a new, random UUID v4 of this type.
     #[inline]
     #[cfg(feature = "v4")]
     #[must_use]
     pub fn new_v4() -> Self {
         Self::from_untyped_uuid(Uuid::new_v4())
+    }
+
+    /// Returns the version number of the UUID.
+    ///
+    /// This represents the algorithm used to generate the value.
+    /// This method is the future-proof alternative to [`Self::get_version`].
+    ///
+    /// # References
+    ///
+    /// * [Version Field in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-4.2)
+    #[inline]
+    pub const fn get_version_num(&self) -> usize {
+        self.uuid.get_version_num()
+    }
+
+    /// Returns the version of the UUID.
+    ///
+    /// This represents the algorithm used to generate the value.
+    /// If the version field doesn't contain a recognized version then `None`
+    /// is returned. If you're trying to read the version for a future extension
+    /// you can also use [`Uuid::get_version_num`] to unconditionally return a
+    /// number. Future extensions may start to return `Some` once they're
+    /// standardized and supported.
+    ///
+    /// # References
+    ///
+    /// * [Version Field in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-4.2)
+    #[inline]
+    pub fn get_version(&self) -> Option<Version> {
+        self.uuid.get_version()
     }
 }
 
@@ -249,6 +361,13 @@ impl<T: TypedUuidKind> FromStr for TypedUuid<T> {
     }
 }
 
+impl<T: TypedUuidKind> Default for TypedUuid<T> {
+    #[inline]
+    fn default() -> Self {
+        Self::from_untyped_uuid(Uuid::default())
+    }
+}
+
 #[cfg(feature = "schemars08")]
 mod schemars08_imp {
     use super::*;
@@ -276,6 +395,44 @@ mod schemars08_imp {
         #[inline]
         fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
             Uuid::json_schema(gen)
+        }
+    }
+}
+
+#[cfg(feature = "proptest1")]
+mod proptest1_imp {
+    use super::*;
+    use proptest::{
+        arbitrary::{any, Arbitrary},
+        strategy::{BoxedStrategy, Strategy},
+    };
+
+    /// Parameters for use with `proptest` instances.
+    ///
+    /// This is currently not exported as a type because it has no options. But
+    /// it's left in as an extension point for the future.
+    #[derive(Clone, Debug, Default)]
+    pub struct TypedUuidParams(());
+
+    /// Generates random `TypedUuid<T>` instances.
+    ///
+    /// Currently, this always returns a version 4 UUID. Support for other kinds
+    /// of UUIDs might be added via [`Self::Parameters`] in the future.
+    impl<T> Arbitrary for TypedUuid<T>
+    where
+        T: TypedUuidKind,
+    {
+        type Parameters = TypedUuidParams;
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            let bytes = any::<[u8; 16]>();
+            bytes
+                .prop_map(|b| {
+                    let uuid = uuid::Builder::from_random_bytes(b).into_uuid();
+                    TypedUuid::<T>::from_untyped_uuid(uuid)
+                })
+                .boxed()
         }
     }
 }
@@ -494,7 +651,7 @@ pub trait GenericUuid {
 
     /// Returns the inner [`Uuid`].
     ///
-    /// Generally, [`to_untyped_uuid`](GenericUuid::into_untyped_uuid) should be preferred. However,
+    /// Generally, [`into_untyped_uuid`](Self::into_untyped_uuid) should be preferred. However,
     /// in some cases it may be necessary to use this method to satisfy lifetime constraints.
     fn as_untyped_uuid(&self) -> &Uuid;
 }

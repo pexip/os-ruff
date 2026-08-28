@@ -1,41 +1,45 @@
-use std::{
-    any::Any,
-    fmt,
-    ops::DerefMut,
-    sync::atomic::{AtomicU32, Ordering},
-};
+use std::any::{Any, TypeId};
+use std::fmt;
+use std::ops::IndexMut;
 
 pub mod input_field;
 pub mod setter;
-mod struct_map;
+pub mod singleton;
 
 use input_field::FieldIngredientImpl;
-use struct_map::StructMap;
 
-use crate::{
-    cycle::CycleRecoveryStrategy,
-    id::{AsId, FromId},
-    ingredient::{fmt_index, Ingredient},
-    key::{DatabaseKeyIndex, DependencyIndex},
-    plumbing::{Jar, Stamp},
-    zalsa::IngredientIndex,
-    zalsa_local::QueryOrigin,
-    Database, Durability, Id, Revision, Runtime,
-};
+use crate::cycle::CycleHeads;
+use crate::function::VerifyResult;
+use crate::id::{AsId, FromId, FromIdWithDb};
+use crate::ingredient::Ingredient;
+use crate::input::singleton::{Singleton, SingletonChoice};
+use crate::key::DatabaseKeyIndex;
+use crate::plumbing::Jar;
+use crate::sync::Arc;
+use crate::table::memo::{MemoTable, MemoTableTypes};
+use crate::table::{Slot, Table};
+use crate::zalsa::{IngredientIndex, Zalsa};
+use crate::{Database, Durability, Id, Revision, Runtime};
 
 pub trait Configuration: Any {
     const DEBUG_NAME: &'static str;
     const FIELD_DEBUG_NAMES: &'static [&'static str];
-    const IS_SINGLETON: bool;
+    const LOCATION: crate::ingredient::Location;
+
+    /// The singleton state for this input if any.
+    type Singleton: SingletonChoice + Send + Sync;
 
     /// The input struct (which wraps an `Id`)
-    type Struct: FromId + 'static + Send + Sync;
+    type Struct: FromId + AsId + 'static + Send + Sync;
 
     /// A (possibly empty) tuple of the fields for this struct.
     type Fields: Send + Sync;
 
-    /// A array of [`StampedValue<()>`](`StampedValue`) tuples, one per each of the value fields.
-    type Stamps: Send + Sync + fmt::Debug + DerefMut<Target = [Stamp]>;
+    /// A array of [`Revision`], one per each of the value fields.
+    type Revisions: Send + Sync + fmt::Debug + IndexMut<usize, Output = Revision>;
+
+    /// A array of [`Durability`], one per each of the value fields.
+    type Durabilities: Send + Sync + fmt::Debug + IndexMut<usize, Output = Durability>;
 }
 
 pub struct JarImpl<C: Configuration> {
@@ -52,28 +56,28 @@ impl<C: Configuration> Default for JarImpl<C> {
 
 impl<C: Configuration> Jar for JarImpl<C> {
     fn create_ingredients(
-        &self,
+        _zalsa: &Zalsa,
         struct_index: crate::zalsa::IngredientIndex,
+        _dependencies: crate::memo_ingredient_indices::IngredientIndices,
     ) -> Vec<Box<dyn Ingredient>> {
         let struct_ingredient: IngredientImpl<C> = IngredientImpl::new(struct_index);
-        let struct_map = struct_ingredient.struct_map.clone();
 
         std::iter::once(Box::new(struct_ingredient) as _)
             .chain((0..C::FIELD_DEBUG_NAMES.len()).map(|field_index| {
-                Box::new(FieldIngredientImpl::new(
-                    struct_index,
-                    field_index,
-                    struct_map.clone(),
-                )) as _
+                Box::new(<FieldIngredientImpl<C>>::new(struct_index, field_index)) as _
             }))
             .collect()
+    }
+
+    fn id_struct_type_id() -> TypeId {
+        TypeId::of::<C::Struct>()
     }
 }
 
 pub struct IngredientImpl<C: Configuration> {
     ingredient_index: IngredientIndex,
-    counter: AtomicU32,
-    struct_map: StructMap<C>,
+    singleton: C::Singleton,
+    memo_table_types: Arc<MemoTableTypes>,
     _phantom: std::marker::PhantomData<C::Struct>,
 }
 
@@ -81,32 +85,43 @@ impl<C: Configuration> IngredientImpl<C> {
     pub fn new(index: IngredientIndex) -> Self {
         Self {
             ingredient_index: index,
-            counter: Default::default(),
-            struct_map: StructMap::new(),
+            singleton: Default::default(),
+            memo_table_types: Arc::new(MemoTableTypes::default()),
             _phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn database_key_index(&self, id: C::Struct) -> DatabaseKeyIndex {
-        DatabaseKeyIndex {
-            ingredient_index: self.ingredient_index,
-            key_index: id.as_id(),
-        }
+    fn data(zalsa: &Zalsa, id: Id) -> &Value<C> {
+        zalsa.table().get(id)
     }
 
-    pub fn new_input(&self, fields: C::Fields, stamps: C::Stamps) -> C::Struct {
-        // If declared as a singleton, only allow a single instance
-        if C::IS_SINGLETON && self.counter.load(Ordering::Relaxed) >= 1 {
-            panic!("singleton struct may not be duplicated");
-        }
+    fn data_raw(table: &Table, id: Id) -> *mut Value<C> {
+        table.get_raw(id)
+    }
 
-        let next_id = Id::from_u32(self.counter.fetch_add(1, Ordering::Relaxed));
-        let value = Value {
-            id: next_id,
-            fields,
-            stamps,
-        };
-        self.struct_map.insert(value)
+    pub fn database_key_index(&self, id: C::Struct) -> DatabaseKeyIndex {
+        DatabaseKeyIndex::new(self.ingredient_index, id.as_id())
+    }
+
+    pub fn new_input(
+        &self,
+        db: &dyn Database,
+        fields: C::Fields,
+        revisions: C::Revisions,
+        durabilities: C::Durabilities,
+    ) -> C::Struct {
+        let (zalsa, zalsa_local) = db.zalsas();
+
+        let id = self.singleton.with_scope(|| {
+            zalsa_local.allocate(zalsa, self.ingredient_index, |_| Value::<C> {
+                fields,
+                revisions,
+                durabilities,
+                memos: Default::default(),
+            })
+        });
+
+        FromIdWithDb::from_id(id, zalsa)
     }
 
     /// Change the value of the field `field_index` to a new value.
@@ -116,140 +131,115 @@ impl<C: Configuration> IngredientImpl<C> {
     /// * `runtime`, the salsa runtiem
     /// * `id`, id of the input struct
     /// * `field_index`, index of the field that will be changed
-    /// * `durability`, durability of the new value
+    /// * `durability`, durability of the new value. If omitted, uses the durability of the previous value.
     /// * `setter`, function that modifies the fields tuple; should only modify the element for `field_index`
     pub fn set_field<R>(
         &mut self,
         runtime: &mut Runtime,
         id: C::Struct,
         field_index: usize,
-        durability: Durability,
+        durability: Option<Durability>,
         setter: impl FnOnce(&mut C::Fields) -> R,
     ) -> R {
         let id: Id = id.as_id();
-        let mut r = self.struct_map.update(id);
-        let stamp = &mut r.stamps[field_index];
 
-        if stamp.durability != Durability::LOW {
-            runtime.report_tracked_write(stamp.durability);
+        let data_raw = Self::data_raw(runtime.table(), id);
+
+        // SAFETY: We hold `&mut` on the runtime so no `&`-references can be active.
+        // Also, we don't access any other data from the table while `r` is active.
+        let data = unsafe { &mut *data_raw };
+
+        data.revisions[field_index] = runtime.current_revision();
+
+        let field_durability = &mut data.durabilities[field_index];
+        if *field_durability != Durability::MIN {
+            runtime.report_tracked_write(*field_durability);
         }
+        *field_durability = durability.unwrap_or(*field_durability);
 
-        stamp.durability = durability;
-        stamp.changed_at = runtime.current_revision();
-        setter(&mut r.fields)
+        setter(&mut data.fields)
     }
 
     /// Get the singleton input previously created (if any).
-    pub fn get_singleton_input(&self) -> Option<C::Struct> {
-        assert!(
-            C::IS_SINGLETON,
-            "get_singleton_input invoked on a non-singleton"
-        );
-        (self.counter.load(Ordering::Relaxed) > 0).then(|| C::Struct::from_id(Id::from_u32(0)))
+    #[doc(hidden)]
+    pub fn get_singleton_input(&self, zalsa: &Zalsa) -> Option<C::Struct>
+    where
+        C: Configuration<Singleton = Singleton>,
+    {
+        self.singleton
+            .index()
+            .map(|id| FromIdWithDb::from_id(id, zalsa))
     }
 
     /// Access field of an input.
     /// Note that this function returns the entire tuple of value fields.
-    /// The caller is responible for selecting the appropriate element.
+    /// The caller is responsible for selecting the appropriate element.
     pub fn field<'db>(
         &'db self,
         db: &'db dyn crate::Database,
         id: C::Struct,
         field_index: usize,
     ) -> &'db C::Fields {
-        let zalsa_local = db.zalsa_local();
+        let (zalsa, zalsa_local) = db.zalsas();
         let field_ingredient_index = self.ingredient_index.successor(field_index);
         let id = id.as_id();
-        let value = self.struct_map.get(id);
-        let stamp = &value.stamps[field_index];
-        zalsa_local.report_tracked_read(
-            DependencyIndex {
-                ingredient_index: field_ingredient_index,
-                key_index: Some(id),
-            },
-            stamp.durability,
-            stamp.changed_at,
+        let value = Self::data(zalsa, id);
+        let durability = value.durabilities[field_index];
+        let revision = value.revisions[field_index];
+        zalsa_local.report_tracked_read_simple(
+            DatabaseKeyIndex::new(field_ingredient_index, id),
+            durability,
+            revision,
         );
         &value.fields
     }
 
+    #[cfg(feature = "salsa_unstable")]
+    /// Returns all data corresponding to the input struct.
+    pub fn entries<'db>(
+        &'db self,
+        db: &'db dyn crate::Database,
+    ) -> impl Iterator<Item = &'db Value<C>> {
+        db.zalsa().table().slots_of::<Value<C>>()
+    }
+
     /// Peek at the field values without recording any read dependency.
     /// Used for debug printouts.
-    pub fn leak_fields(&self, id: C::Struct) -> &C::Fields {
+    pub fn leak_fields<'db>(&'db self, db: &'db dyn Database, id: C::Struct) -> &'db C::Fields {
+        let zalsa = db.zalsa();
         let id = id.as_id();
-        let value = self.struct_map.get(id);
+        let value = Self::data(zalsa, id);
         &value.fields
     }
 }
 
 impl<C: Configuration> Ingredient for IngredientImpl<C> {
+    fn location(&self) -> &'static crate::ingredient::Location {
+        &C::LOCATION
+    }
+
     fn ingredient_index(&self) -> IngredientIndex {
         self.ingredient_index
     }
 
-    fn maybe_changed_after(
+    unsafe fn maybe_changed_after(
         &self,
         _db: &dyn Database,
-        _input: Option<Id>,
+        _input: Id,
         _revision: Revision,
-    ) -> bool {
+        _cycle_heads: &mut CycleHeads,
+    ) -> VerifyResult {
         // Input ingredients are just a counter, they store no data, they are immortal.
         // Their *fields* are stored in function ingredients elsewhere.
-        false
-    }
-
-    fn cycle_recovery_strategy(&self) -> CycleRecoveryStrategy {
-        CycleRecoveryStrategy::Panic
-    }
-
-    fn origin(&self, _key_index: Id) -> Option<QueryOrigin> {
-        None
-    }
-
-    fn mark_validated_output(
-        &self,
-        _db: &dyn Database,
-        executor: DatabaseKeyIndex,
-        output_key: Option<Id>,
-    ) {
-        unreachable!(
-            "mark_validated_output({:?}, {:?}): input cannot be the output of a tracked function",
-            executor, output_key
-        );
-    }
-
-    fn remove_stale_output(
-        &self,
-        _db: &dyn Database,
-        executor: DatabaseKeyIndex,
-        stale_output_key: Option<Id>,
-    ) {
-        unreachable!(
-            "remove_stale_output({:?}, {:?}): input cannot be the output of a tracked function",
-            executor, stale_output_key
-        );
-    }
-
-    fn requires_reset_for_new_revision(&self) -> bool {
-        false
-    }
-
-    fn reset_for_new_revision(&mut self) {
-        panic!("unexpected call to `reset_for_new_revision`")
-    }
-
-    fn salsa_struct_deleted(&self, _db: &dyn Database, _id: Id) {
-        panic!(
-            "unexpected call: input ingredients do not register for salsa struct deletion events"
-        );
-    }
-
-    fn fmt_index(&self, index: Option<Id>, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt_index(C::DEBUG_NAME, index, fmt)
+        VerifyResult::unchanged()
     }
 
     fn debug_name(&self) -> &'static str {
         C::DEBUG_NAME
+    }
+
+    fn memo_table_types(&self) -> Arc<MemoTableTypes> {
+        self.memo_table_types.clone()
     }
 }
 
@@ -266,17 +256,51 @@ pub struct Value<C>
 where
     C: Configuration,
 {
-    /// The id of this struct in the ingredient.
-    id: Id,
-
-    /// Fields of this input struct. They can change across revisions,
-    /// but they do not change within a particular revision.
+    /// Fields of this input struct.
+    ///
+    /// They can change across revisions, but they do not change within
+    /// a particular revision.
     fields: C::Fields,
 
-    /// The revision and durability information for each field: when did this field last change.
-    stamps: C::Stamps,
+    /// Revisions of the fields.
+    revisions: C::Revisions,
+
+    /// Durabilities of the fields.
+    durabilities: C::Durabilities,
+
+    /// Memos
+    memos: MemoTable,
+}
+
+impl<C> Value<C>
+where
+    C: Configuration,
+{
+    /// Fields of this tracked struct.
+    ///
+    /// They can change across revisions, but they do not change within
+    /// a particular revision.
+    #[cfg(feature = "salsa_unstable")]
+    pub fn fields(&self) -> &C::Fields {
+        &self.fields
+    }
 }
 
 pub trait HasBuilder {
     type Builder;
+}
+
+impl<C> Slot for Value<C>
+where
+    C: Configuration,
+{
+    #[inline(always)]
+    unsafe fn memos(&self, _current_revision: Revision) -> &crate::table::memo::MemoTable {
+        &self.memos
+    }
+
+    #[inline(always)]
+    fn memos_mut(&mut self) -> &mut crate::table::memo::MemoTable {
+        &mut self.memos
+    }
 }

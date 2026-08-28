@@ -11,10 +11,11 @@
 
 [package]
 edition = "2018"
-rust-version = "1.31"
+rust-version = "1.60"
 name = "fern"
-version = "0.6.2"
+version = "0.7.1"
 authors = ["David Ross <daboross@daboross.net>"]
+build = false
 include = [
     "Cargo.toml",
     "src/**/*",
@@ -25,6 +26,11 @@ include = [
     "CONTRIBUTING.md",
     "CHANGELOG.md",
 ]
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Simple, efficient logging"
 documentation = "https://docs.rs/fern/"
 readme = "README.md"
@@ -40,35 +46,88 @@ repository = "https://github.com/daboross/fern"
 [package.metadata.docs.rs]
 all-features = true
 
-[[example]]
-name = "cmd-program"
+[lib]
+name = "fern"
+path = "src/lib.rs"
 
 [[example]]
-name = "date-based-file-log"
-required-features = ["date-based"]
+name = "cmd-program"
+path = "examples/cmd-program.rs"
 
 [[example]]
 name = "colored"
+path = "examples/colored.rs"
 required-features = ["colored"]
 
 [[example]]
+name = "date-based-file-log"
+path = "examples/date-based-file-log.rs"
+required-features = ["date-based"]
+
+[[example]]
+name = "meta-logging"
+path = "examples/meta-logging.rs"
+
+[[example]]
 name = "pretty-colored"
+path = "examples/pretty-colored.rs"
 required-features = ["colored"]
 
 [[example]]
 name = "syslog"
+path = "examples/syslog.rs"
 required-features = ["syslog-6"]
 
 [[example]]
-name = "syslog4"
-required-features = ["syslog-4"]
-
-[[example]]
 name = "syslog3"
+path = "examples/syslog3.rs"
 required-features = ["syslog-3"]
 
 [[example]]
-name = "meta-logging"
+name = "syslog4"
+path = "examples/syslog4.rs"
+required-features = ["syslog-4"]
+
+[[example]]
+name = "syslog7"
+path = "examples/syslog7.rs"
+required-features = ["syslog-7"]
+
+[[test]]
+name = "channel_logging"
+path = "tests/channel_logging.rs"
+
+[[test]]
+name = "enabled_is_deep_check"
+path = "tests/enabled_is_deep_check.rs"
+
+[[test]]
+name = "file_logging"
+path = "tests/file_logging.rs"
+
+[[test]]
+name = "global_logging"
+path = "tests/global_logging.rs"
+
+[[test]]
+name = "meta_logging"
+path = "tests/meta_logging.rs"
+
+[[test]]
+name = "panic_logging"
+path = "tests/panic_logging.rs"
+
+[[test]]
+name = "reopen_logging"
+path = "tests/reopen_logging.rs"
+
+[[test]]
+name = "support"
+path = "tests/support.rs"
+
+[[test]]
+name = "write_logging"
+path = "tests/write_logging.rs"
 
 [dependencies.chrono]
 version = "0.4"
@@ -80,7 +139,7 @@ optional = true
 default-features = false
 
 [dependencies.colored]
-version = "1.5"
+version = "2.1.0"
 optional = true
 
 [dependencies.log]
@@ -110,6 +169,7 @@ reopen-1 = [
 syslog-3 = ["syslog3"]
 syslog-4 = ["syslog4"]
 syslog-6 = ["syslog6"]
+syslog-7 = ["syslog7"]
 
 [target."cfg(not(windows))".dependencies.libc]
 version = "0.2.58"
@@ -138,5 +198,10 @@ package = "syslog"
 
 [target."cfg(not(windows))".dependencies.syslog6]
 version = "6"
+optional = true
+package = "syslog"
+
+[target."cfg(not(windows))".dependencies.syslog7]
+version = "7"
 optional = true
 package = "syslog"

@@ -1,15 +1,15 @@
 use std::borrow::Cow;
 use std::io;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
-#[cfg(target_arch = "wasm32")]
-use instant::Instant;
 use portable_atomic::{AtomicU64, AtomicU8, Ordering};
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
-use crate::draw_target::ProgressDrawTarget;
+use crate::draw_target::{LineType, ProgressDrawTarget};
 use crate::style::ProgressStyle;
 
 pub(crate) struct BarState {
@@ -96,6 +96,11 @@ impl BarState {
         }
     }
 
+    pub(crate) fn unset_length(&mut self, now: Instant) {
+        self.state.len = None;
+        self.update_estimate_and_draw(now);
+    }
+
     pub(crate) fn set_length(&mut self, now: Instant, len: u64) {
         self.state.len = Some(len);
         self.update_estimate_and_draw(now);
@@ -104,6 +109,13 @@ impl BarState {
     pub(crate) fn inc_length(&mut self, now: Instant, delta: u64) {
         if let Some(len) = self.state.len {
             self.state.len = Some(len.saturating_add(delta));
+        }
+        self.update_estimate_and_draw(now);
+    }
+
+    pub(crate) fn dec_length(&mut self, now: Instant, delta: u64) {
+        if let Some(len) = self.state.len {
+            self.state.len = Some(len.saturating_sub(delta));
         }
         self.update_estimate_and_draw(now);
     }
@@ -144,15 +156,14 @@ impl BarState {
         };
 
         let mut draw_state = drawable.state();
-        let lines: Vec<String> = msg.lines().map(Into::into).collect();
+        let lines: Vec<LineType> = msg.lines().map(|l| LineType::Text(Into::into(l))).collect();
         // Empty msg should trigger newline as we are in println
         if lines.is_empty() {
-            draw_state.lines.push(String::new());
+            draw_state.lines.push(LineType::Empty);
         } else {
             draw_state.lines.extend(lines);
         }
 
-        draw_state.orphan_lines_count = draw_state.lines.len();
         if let Some(width) = width {
             if !matches!(self.state.status, Status::DoneHidden) {
                 self.style
@@ -179,8 +190,6 @@ impl BarState {
     }
 
     pub(crate) fn draw(&mut self, mut force_draw: bool, now: Instant) -> io::Result<()> {
-        let width = self.draw_target.width();
-
         // `|= self.is_finished()` should not be needed here, but we used to always draw for
         // finished progress bars, so it's kept as to not cause compatibility issues in weird cases.
         force_draw |= self.state.is_finished();
@@ -188,6 +197,9 @@ impl BarState {
             Some(drawable) => drawable,
             None => return Ok(()),
         };
+
+        // Getting the width can be expensive; thus this should happen after checking drawable.
+        let width = drawable.width();
 
         let mut draw_state = drawable.state();
 
@@ -342,21 +354,20 @@ pub(crate) enum TabExpandedString {
     NoTabs(Cow<'static, str>),
     WithTabs {
         original: Cow<'static, str>,
-        expanded: String,
+        expanded: OnceLock<String>,
         tab_width: usize,
     },
 }
 
 impl TabExpandedString {
     pub(crate) fn new(s: Cow<'static, str>, tab_width: usize) -> Self {
-        let expanded = s.replace('\t', &" ".repeat(tab_width));
-        if s == expanded {
+        if !s.contains('\t') {
             Self::NoTabs(s)
         } else {
             Self::WithTabs {
                 original: s,
-                expanded,
                 tab_width,
+                expanded: OnceLock::new(),
             }
         }
     }
@@ -367,20 +378,24 @@ impl TabExpandedString {
                 debug_assert!(!s.contains('\t'));
                 s
             }
-            Self::WithTabs { expanded, .. } => expanded,
+            Self::WithTabs {
+                original,
+                tab_width,
+                expanded,
+            } => expanded.get_or_init(|| original.replace('\t', &" ".repeat(*tab_width))),
         }
     }
 
     pub(crate) fn set_tab_width(&mut self, new_tab_width: usize) {
         if let Self::WithTabs {
-            original,
             expanded,
             tab_width,
+            ..
         } = self
         {
             if *tab_width != new_tab_width {
                 *tab_width = new_tab_width;
-                *expanded = original.replace('\t', &" ".repeat(new_tab_width));
+                expanded.take();
             }
         }
     }
@@ -537,7 +552,7 @@ impl AtomicPosition {
         }
 
         let mut capacity = self.capacity.load(Ordering::Acquire);
-        // `prev` is the number of ms after `self.started` we last returned `true`, in ns
+        // `prev` is the number of ns after `self.started` we last returned `true`
         let prev = self.prev.load(Ordering::Acquire);
         // `elapsed` is the number of ns since `self.started`
         let elapsed = (now - self.start).as_nanos() as u64;
@@ -551,10 +566,10 @@ impl AtomicPosition {
             return false;
         }
 
-        // We now calculate `new`, the number of ms, in ns, since we last returned `true`,
-        // and `remainder`, which represents a number of ns less than 1ms which we cannot
+        // We now calculate `new`, the number of INTERVALs since we last returned `true`,
+        // and `remainder`, which represents a number of ns less than INTERVAL which we cannot
         // convert into capacity now, so we're saving it for later. We do this by
-        // substracting this from `elapsed` before storing it into `self.prev`.
+        // subtracting this from `elapsed` before storing it into `self.prev`.
         let (new, remainder) = ((diff / INTERVAL), (diff % INTERVAL));
         // We add `new` to `capacity`, subtract one for returning `true` from here,
         // then make sure it does not exceed a maximum of `MAX_BURST`.
@@ -568,12 +583,16 @@ impl AtomicPosition {
 
     fn reset(&self, now: Instant) {
         self.set(0);
-        let elapsed = (now.saturating_duration_since(self.start)).as_millis() as u64;
+        let elapsed = (now.saturating_duration_since(self.start)).as_nanos() as u64;
         self.prev.store(elapsed, Ordering::Release);
     }
 
     pub(crate) fn inc(&self, delta: u64) {
         self.pos.fetch_add(delta, Ordering::SeqCst);
+    }
+
+    pub(crate) fn dec(&self, delta: u64) {
+        self.pos.fetch_sub(delta, Ordering::SeqCst);
     }
 
     pub(crate) fn set(&self, pos: u64) {
@@ -798,5 +817,16 @@ mod tests {
         let later = atomic_position.start + Duration::from_nanos(INTERVAL * u64::from(u8::MAX));
         // Should not panic.
         atomic_position.allow(later);
+    }
+
+    #[test]
+    fn test_atomic_position_reset() {
+        const ELAPSE_TIME: Duration = Duration::from_millis(20);
+        let mut pos = AtomicPosition::new();
+        pos.reset(pos.start + ELAPSE_TIME);
+
+        // prev should be exactly ELAPSE_TIME after reset
+        assert_eq!(*pos.pos.get_mut(), 0);
+        assert_eq!(*pos.prev.get_mut(), ELAPSE_TIME.as_nanos() as u64);
     }
 }

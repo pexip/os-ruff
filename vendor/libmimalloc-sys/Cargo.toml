@@ -12,8 +12,9 @@
 [package]
 edition = "2018"
 name = "libmimalloc-sys"
-version = "0.1.39"
+version = "0.1.43"
 authors = ["Octavian Oncescu <octavonce@gmail.com>"]
+build = "build.rs"
 links = "mimalloc"
 exclude = [
     "/c_src/mimalloc/bin",
@@ -23,7 +24,13 @@ exclude = [
     "/c_src/mimalloc/ide",
     "/c_src/mimalloc/test",
 ]
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Sys crate wrapping the mimalloc allocator"
+readme = false
 keywords = [
     "allocator",
     "encrypted-heap",
@@ -38,6 +45,10 @@ repository = "https://github.com/purpleprotocol/mimalloc_rust/tree/master/libmim
 
 [package.metadata.docs.rs]
 features = ["extended"]
+
+[lib]
+name = "libmimalloc_sys"
+path = "src/lib.rs"
 
 [dependencies.cty]
 version = "0.2"

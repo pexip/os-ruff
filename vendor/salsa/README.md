@@ -11,8 +11,7 @@
 
 ## Obligatory warning
 
-Very much a WORK IN PROGRESS at this point. Ready for experimental use
-but expect frequent breaking changes.
+Very much a WORK IN PROGRESS at this point.
 
 ## Credits
 
@@ -39,14 +38,18 @@ varieties:
 
 To learn more about Salsa, try one of the following:
 
-- read the [heavily commented `hello_world` example](https://github.com/salsa-rs/salsa/blob/master/examples/hello_world/main.rs);
+- read the [heavily commented examples](https://github.com/salsa-rs/salsa/tree/master/examples);
 - check out the [Salsa book](https://salsa-rs.github.io/salsa);
     - [中文版](https://rust-chinese-translation.github.io/salsa-book)
 - watch one of our [videos](https://salsa-rs.github.io/salsa/videos.html).
 
 ## Getting in touch
 
-The bulk of the discussion happens in the [issues](https://github.com/salsa-rs/salsa/issues) 
-and [pull requests](https://github.com/salsa-rs/salsa/pulls), 
+The bulk of the discussion happens in the [issues](https://github.com/salsa-rs/salsa/issues)
+and [pull requests](https://github.com/salsa-rs/salsa/pulls),
 but we have a [zulip chat](https://salsa.zulipchat.com/) as well.
 
+## Contributing
+
+To create a release and publish to crates.io, update the `version` field in Cargo.toml.
+After pushed, GitHub Actions will publish the crates to crates.io automatically.

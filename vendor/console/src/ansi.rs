@@ -125,7 +125,7 @@ struct Match<'a> {
 
 impl<'a> Match<'a> {
     #[inline]
-    pub fn as_str(&self) -> &'a str {
+    pub(crate) fn as_str(&self) -> &'a str {
         &self.text[self.start..self.end]
     }
 }
@@ -142,7 +142,7 @@ impl<'a> Iterator for Matches<'a> {
     }
 }
 
-impl<'a> FusedIterator for Matches<'a> {}
+impl FusedIterator for Matches<'_> {}
 
 fn find_ansi_code_exclusive(it: &mut Peekable<CharIndices>) -> Option<(usize, usize)> {
     'outer: loop {
@@ -265,26 +265,26 @@ impl<'a> Iterator for AnsiCodeIterator<'a> {
     }
 }
 
-impl<'a> FusedIterator for AnsiCodeIterator<'a> {}
+impl FusedIterator for AnsiCodeIterator<'_> {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use lazy_static::lazy_static;
+    use once_cell::sync::Lazy;
     use proptest::prelude::*;
     use regex::Regex;
 
     // The manual dfa `State` is a handwritten translation from the previously used regex. That
     // regex is kept here and used to ensure that the new matches are the same as the old
-    lazy_static! {
-        static ref STRIP_ANSI_RE: Regex = Regex::new(
+    static STRIP_ANSI_RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(
             r"[\x1b\x9b]([()][012AB]|[\[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-PRZcf-nqry=><])",
         )
-        .unwrap();
-    }
+        .unwrap()
+    });
 
-    impl<'a, 'b> PartialEq<Match<'a>> for regex::Match<'b> {
+    impl<'a> PartialEq<Match<'a>> for regex::Match<'_> {
         fn eq(&self, other: &Match<'a>) -> bool {
             self.start() == other.start && self.end() == other.end
         }

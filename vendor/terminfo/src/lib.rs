@@ -14,17 +14,13 @@
 
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
-extern {}
-
-extern crate fnv;
-extern crate nom;
-extern crate phf;
+extern "C" {}
 
 mod error;
 pub use crate::error::{Error, Result};
 
 /// Parsers for various formats.
-pub mod parser;
+mod parser;
 
 /// String capability expansion.
 #[macro_use]

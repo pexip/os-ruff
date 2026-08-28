@@ -1,58 +1,80 @@
-use std::{
-    sync::atomic::{AtomicBool, Ordering},
-    thread::ThreadId,
-};
+use rustc_hash::FxHashMap;
 
-use crate::{
-    hash::FxDashMap, key::DatabaseKeyIndex, runtime::WaitResult, zalsa::Zalsa,
-    zalsa_local::ZalsaLocal, Database, Id,
-};
+use crate::key::DatabaseKeyIndex;
+use crate::runtime::{BlockResult, Running, WaitResult};
+use crate::sync::thread::{self, ThreadId};
+use crate::sync::Mutex;
+use crate::zalsa::Zalsa;
+use crate::{Id, IngredientIndex};
 
-#[derive(Default)]
-pub(super) struct SyncMap {
-    sync_map: FxDashMap<Id, SyncState>,
+pub(crate) type SyncGuard<'me> = crate::sync::MutexGuard<'me, FxHashMap<Id, SyncState>>;
+
+/// Tracks the keys that are currently being processed; used to coordinate between
+/// worker threads.
+pub(crate) struct SyncTable {
+    syncs: Mutex<FxHashMap<Id, SyncState>>,
+    ingredient: IngredientIndex,
 }
 
-struct SyncState {
+pub(crate) enum ClaimResult<'a> {
+    /// Can't claim the query because it is running on an other thread.
+    Running(Running<'a>),
+    /// Claiming the query results in a cycle.
+    Cycle { same_thread: bool },
+    /// Successfully claimed the query.
+    Claimed(ClaimGuard<'a>),
+}
+
+pub(crate) struct SyncState {
     id: ThreadId,
 
     /// Set to true if any other queries are blocked,
     /// waiting for this query to complete.
-    anyone_waiting: AtomicBool,
+    anyone_waiting: bool,
 }
 
-impl SyncMap {
-    pub(super) fn claim<'me>(
-        &'me self,
-        db: &'me dyn Database,
-        local_state: &ZalsaLocal,
-        database_key_index: DatabaseKeyIndex,
-    ) -> Option<ClaimGuard<'me>> {
-        let zalsa = db.zalsa();
-        let thread_id = std::thread::current().id();
-        match self.sync_map.entry(database_key_index.key_index) {
-            dashmap::mapref::entry::Entry::Vacant(entry) => {
-                entry.insert(SyncState {
-                    id: thread_id,
-                    anyone_waiting: AtomicBool::new(false),
-                });
-                Some(ClaimGuard {
-                    database_key: database_key_index,
-                    zalsa,
-                    sync_map: &self.sync_map,
-                })
-            }
-            dashmap::mapref::entry::Entry::Occupied(entry) => {
+impl SyncTable {
+    pub(crate) fn new(ingredient: IngredientIndex) -> Self {
+        Self {
+            syncs: Default::default(),
+            ingredient,
+        }
+    }
+
+    pub(crate) fn try_claim<'me>(&'me self, zalsa: &'me Zalsa, key_index: Id) -> ClaimResult<'me> {
+        let mut write = self.syncs.lock();
+        match write.entry(key_index) {
+            std::collections::hash_map::Entry::Occupied(occupied_entry) => {
+                let &mut SyncState {
+                    id,
+                    ref mut anyone_waiting,
+                } = occupied_entry.into_mut();
                 // NB: `Ordering::Relaxed` is sufficient here,
                 // as there are no loads that are "gated" on this
                 // value. Everything that is written is also protected
                 // by a lock that must be acquired. The role of this
                 // boolean is to decide *whether* to acquire the lock,
                 // not to gate future atomic reads.
-                entry.get().anyone_waiting.store(true, Ordering::Relaxed);
-                let other_id = entry.get().id;
-                zalsa.block_on_or_unwind(db, local_state, database_key_index, other_id, entry);
-                None
+                *anyone_waiting = true;
+                match zalsa.runtime().block(
+                    DatabaseKeyIndex::new(self.ingredient, key_index),
+                    id,
+                    write,
+                ) {
+                    BlockResult::Running(blocked_on) => ClaimResult::Running(blocked_on),
+                    BlockResult::Cycle { same_thread } => ClaimResult::Cycle { same_thread },
+                }
+            }
+            std::collections::hash_map::Entry::Vacant(vacant_entry) => {
+                vacant_entry.insert(SyncState {
+                    id: thread::current().id(),
+                    anyone_waiting: false,
+                });
+                ClaimResult::Claimed(ClaimGuard {
+                    key_index,
+                    zalsa,
+                    sync_table: self,
+                })
             }
         }
     }
@@ -61,33 +83,40 @@ impl SyncMap {
 /// Marks an active 'claim' in the synchronization map. The claim is
 /// released when this value is dropped.
 #[must_use]
-pub(super) struct ClaimGuard<'me> {
-    database_key: DatabaseKeyIndex,
+pub(crate) struct ClaimGuard<'me> {
+    key_index: Id,
     zalsa: &'me Zalsa,
-    sync_map: &'me FxDashMap<Id, SyncState>,
+    sync_table: &'me SyncTable,
 }
 
-impl<'me> ClaimGuard<'me> {
-    fn remove_from_map_and_unblock_queries(&self, wait_result: WaitResult) {
-        let (_, SyncState { anyone_waiting, .. }) =
-            self.sync_map.remove(&self.database_key.key_index).unwrap();
+impl ClaimGuard<'_> {
+    fn remove_from_map_and_unblock_queries(&self) {
+        let mut syncs = self.sync_table.syncs.lock();
 
-        // NB: `Ordering::Relaxed` is sufficient here,
-        // see `store` above for explanation.
-        if anyone_waiting.load(Ordering::Relaxed) {
-            self.zalsa
-                .unblock_queries_blocked_on(self.database_key, wait_result)
+        let SyncState { anyone_waiting, .. } =
+            syncs.remove(&self.key_index).expect("key claimed twice?");
+
+        if anyone_waiting {
+            self.zalsa.runtime().unblock_queries_blocked_on(
+                DatabaseKeyIndex::new(self.sync_table.ingredient, self.key_index),
+                if thread::panicking() {
+                    WaitResult::Panicked
+                } else {
+                    WaitResult::Completed
+                },
+            )
         }
     }
 }
 
-impl<'me> Drop for ClaimGuard<'me> {
+impl Drop for ClaimGuard<'_> {
     fn drop(&mut self) {
-        let wait_result = if std::thread::panicking() {
-            WaitResult::Panicked
-        } else {
-            WaitResult::Completed
-        };
-        self.remove_from_map_and_unblock_queries(wait_result)
+        self.remove_from_map_and_unblock_queries()
+    }
+}
+
+impl std::fmt::Debug for SyncTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SyncTable").finish()
     }
 }

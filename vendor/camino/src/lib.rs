@@ -108,8 +108,6 @@ mod tests;
 /// Which method works best depends on what kind of situation you're in.
 // NB: Internal PathBuf must only contain utf8 data
 #[derive(Clone, Default)]
-#[cfg_attr(feature = "serde1", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde1", serde(transparent))]
 #[repr(transparent)]
 pub struct Utf8PathBuf(PathBuf);
 
@@ -701,10 +699,10 @@ impl Utf8Path {
     /// the current directory.
     ///
     /// * On Unix, a path is absolute if it starts with the root, so
-    /// `is_absolute` and [`has_root`] are equivalent.
+    ///   `is_absolute` and [`has_root`] are equivalent.
     ///
     /// * On Windows, a path is absolute if it has a prefix and starts with the
-    /// root: `c:\windows` is absolute, while `c:temp` and `\temp` are not.
+    ///   root: `c:\windows` is absolute, while `c:temp` and `\temp` are not.
     ///
     /// # Examples
     ///
@@ -1567,7 +1565,7 @@ impl fmt::Debug for Utf8Path {
 #[repr(transparent)]
 pub struct Utf8Ancestors<'a>(Ancestors<'a>);
 
-impl<'a> fmt::Debug for Utf8Ancestors<'a> {
+impl fmt::Debug for Utf8Ancestors<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)
     }
@@ -1586,7 +1584,7 @@ impl<'a> Iterator for Utf8Ancestors<'a> {
     }
 }
 
-impl<'a> FusedIterator for Utf8Ancestors<'a> {}
+impl FusedIterator for Utf8Ancestors<'_> {}
 
 /// An iterator over the [`Utf8Component`]s of a [`Utf8Path`].
 ///
@@ -1646,9 +1644,9 @@ impl<'a> Iterator for Utf8Components<'a> {
     }
 }
 
-impl<'a> FusedIterator for Utf8Components<'a> {}
+impl FusedIterator for Utf8Components<'_> {}
 
-impl<'a> DoubleEndedIterator for Utf8Components<'a> {
+impl DoubleEndedIterator for Utf8Components<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back().map(|component| {
@@ -1659,7 +1657,7 @@ impl<'a> DoubleEndedIterator for Utf8Components<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Utf8Components<'a> {
+impl fmt::Debug for Utf8Components<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)
     }
@@ -1891,13 +1889,13 @@ impl<'a> Utf8Component<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Utf8Component<'a> {
+impl fmt::Debug for Utf8Component<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(self.as_os_str(), f)
     }
 }
 
-impl<'a> fmt::Display for Utf8Component<'a> {
+impl fmt::Display for Utf8Component<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(self.as_str(), f)
     }
@@ -1999,7 +1997,7 @@ pub enum Utf8Prefix<'a> {
     Disk(u8),
 }
 
-impl<'a> Utf8Prefix<'a> {
+impl Utf8Prefix<'_> {
     /// Determines if the prefix is verbatim, i.e., begins with `\\?\`.
     ///
     /// # Examples
@@ -2105,13 +2103,13 @@ impl<'a> Utf8PrefixComponent<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Utf8PrefixComponent<'a> {
+impl fmt::Debug for Utf8PrefixComponent<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)
     }
 }
 
-impl<'a> fmt::Display for Utf8PrefixComponent<'a> {
+impl fmt::Display for Utf8PrefixComponent<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(self.as_str(), f)
     }
@@ -3064,12 +3062,110 @@ impl_cmp_os_str!(&'a Utf8Path, Cow<'b, OsStr>);
 impl_cmp_os_str!(&'a Utf8Path, OsString);
 // NOTE: impls for Cow<'a, Utf8Path> cannot be defined because of the orphan rule (E0117)
 
+/// Makes the path absolute without accessing the filesystem, converting it to a [`Utf8PathBuf`].
+///
+/// If the path is relative, the current directory is used as the base directory. All intermediate
+/// components will be resolved according to platform-specific rules, but unlike
+/// [`canonicalize`][Utf8Path::canonicalize] or [`canonicalize_utf8`](Utf8Path::canonicalize_utf8),
+/// this does not resolve symlinks and may succeed even if the path does not exist.
+///
+/// *Requires Rust 1.79 or newer.*
+///
+/// # Errors
+///
+/// Errors if:
+///
+/// * The path is empty.
+/// * The [current directory][std::env::current_dir] cannot be determined.
+/// * The path is not valid UTF-8.
+///
+/// # Examples
+///
+/// ## POSIX paths
+///
+/// ```
+/// # #[cfg(unix)]
+/// fn main() -> std::io::Result<()> {
+///     use camino::Utf8Path;
+///
+///     // Relative to absolute
+///     let absolute = camino::absolute_utf8("foo/./bar")?;
+///     assert!(absolute.ends_with("foo/bar"));
+///
+///     // Absolute to absolute
+///     let absolute = camino::absolute_utf8("/foo//test/.././bar.rs")?;
+///     assert_eq!(absolute, Utf8Path::new("/foo/test/../bar.rs"));
+///     Ok(())
+/// }
+/// # #[cfg(not(unix))]
+/// # fn main() {}
+/// ```
+///
+/// The path is resolved using [POSIX semantics][posix-semantics] except that it stops short of
+/// resolving symlinks. This means it will keep `..` components and trailing slashes.
+///
+/// ## Windows paths
+///
+/// ```
+/// # #[cfg(windows)]
+/// fn main() -> std::io::Result<()> {
+///     use camino::Utf8Path;
+///
+///     // Relative to absolute
+///     let absolute = camino::absolute_utf8("foo/./bar")?;
+///     assert!(absolute.ends_with(r"foo\bar"));
+///
+///     // Absolute to absolute
+///     let absolute = camino::absolute_utf8(r"C:\foo//test\..\./bar.rs")?;
+///
+///     assert_eq!(absolute, Utf8Path::new(r"C:\foo\bar.rs"));
+///     Ok(())
+/// }
+/// # #[cfg(not(windows))]
+/// # fn main() {}
+/// ```
+///
+/// For verbatim paths this will simply return the path as given. For other paths this is currently
+/// equivalent to calling [`GetFullPathNameW`][windows-path].
+///
+/// Note that this [may change in the future][changes].
+///
+/// [changes]: io#platform-specific-behavior
+/// [posix-semantics]:
+///     https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_13
+/// [windows-path]:
+///     https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfullpathnamew
+#[cfg(absolute_path)]
+pub fn absolute_utf8<P: AsRef<Path>>(path: P) -> io::Result<Utf8PathBuf> {
+    // Note that even if the passed in path is valid UTF-8, it is not guaranteed that the absolute
+    // path will be valid UTF-8. For example, the current directory may not be valid UTF-8.
+    //
+    // That's why we take `AsRef<Path>` instead of `AsRef<Utf8Path>` here -- we have to pay the cost
+    // of checking for valid UTF-8 anyway.
+    let path = path.as_ref();
+    #[allow(clippy::incompatible_msrv)]
+    Utf8PathBuf::try_from(std::path::absolute(path)?).map_err(|error| error.into_io_error())
+}
+
 // invariant: OsStr must be guaranteed to be utf8 data
 #[inline]
 unsafe fn str_assume_utf8(string: &OsStr) -> &str {
-    // Adapted from the source code for Option::unwrap_unchecked.
-    match string.to_str() {
-        Some(val) => val,
-        None => std::hint::unreachable_unchecked(),
+    #[cfg(os_str_bytes)]
+    {
+        // SAFETY: OsStr is guaranteed to be utf8 data from the invariant
+        unsafe {
+            std::str::from_utf8_unchecked(
+                #[allow(clippy::incompatible_msrv)]
+                string.as_encoded_bytes(),
+            )
+        }
+    }
+    #[cfg(not(os_str_bytes))]
+    {
+        // Adapted from the source code for Option::unwrap_unchecked.
+        match string.to_str() {
+            Some(val) => val,
+            None => std::hint::unreachable_unchecked(),
+        }
     }
 }

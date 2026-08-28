@@ -85,6 +85,14 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Crypto`, `WorkerGlobalScope`*"]
     pub fn crypto(this: &WorkerGlobalScope) -> Result<Crypto, JsValue>;
+    #[cfg(feature = "IdbFactory")]
+    # [wasm_bindgen (structural , catch , method , getter , js_class = "WorkerGlobalScope" , js_name = indexedDB)]
+    #[doc = "Getter for the `indexedDB` field of this object."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/WorkerGlobalScope/indexedDB)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `IdbFactory`, `WorkerGlobalScope`*"]
+    pub fn indexed_db(this: &WorkerGlobalScope) -> Result<Option<IdbFactory>, JsValue>;
     #[cfg(feature = "Performance")]
     # [wasm_bindgen (structural , method , getter , js_class = "WorkerGlobalScope" , js_name = performance)]
     #[doc = "Getter for the `performance` field of this object."]
@@ -99,7 +107,7 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/WorkerGlobalScope/origin)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `WorkerGlobalScope`*"]
-    pub fn origin(this: &WorkerGlobalScope) -> String;
+    pub fn origin(this: &WorkerGlobalScope) -> ::alloc::string::String;
     # [wasm_bindgen (structural , method , getter , js_class = "WorkerGlobalScope" , js_name = isSecureContext)]
     #[doc = "Getter for the `isSecureContext` field of this object."]
     #[doc = ""]
@@ -107,14 +115,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `WorkerGlobalScope`*"]
     pub fn is_secure_context(this: &WorkerGlobalScope) -> bool;
-    #[cfg(feature = "IdbFactory")]
-    # [wasm_bindgen (structural , catch , method , getter , js_class = "WorkerGlobalScope" , js_name = indexedDB)]
-    #[doc = "Getter for the `indexedDB` field of this object."]
-    #[doc = ""]
-    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/WorkerGlobalScope/indexedDB)"]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `IdbFactory`, `WorkerGlobalScope`*"]
-    pub fn indexed_db(this: &WorkerGlobalScope) -> Result<Option<IdbFactory>, JsValue>;
     #[cfg(feature = "CacheStorage")]
     # [wasm_bindgen (structural , catch , method , getter , js_class = "WorkerGlobalScope" , js_name = caches)]
     #[doc = "Getter for the `caches` field of this object."]
@@ -243,14 +243,14 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/WorkerGlobalScope/atob)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `WorkerGlobalScope`*"]
-    pub fn atob(this: &WorkerGlobalScope, atob: &str) -> Result<String, JsValue>;
+    pub fn atob(this: &WorkerGlobalScope, atob: &str) -> Result<::alloc::string::String, JsValue>;
     # [wasm_bindgen (catch , method , structural , js_class = "WorkerGlobalScope" , js_name = btoa)]
     #[doc = "The `btoa()` method."]
     #[doc = ""]
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/WorkerGlobalScope/btoa)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `WorkerGlobalScope`*"]
-    pub fn btoa(this: &WorkerGlobalScope, btoa: &str) -> Result<String, JsValue>;
+    pub fn btoa(this: &WorkerGlobalScope, btoa: &str) -> Result<::alloc::string::String, JsValue>;
     # [wasm_bindgen (method , structural , js_class = "WorkerGlobalScope" , js_name = clearInterval)]
     #[doc = "The `clearInterval()` method."]
     #[doc = ""]
@@ -820,6 +820,13 @@ extern "C" {
         input: &str,
         init: &RequestInit,
     ) -> ::js_sys::Promise;
+    # [wasm_bindgen (method , structural , js_class = "WorkerGlobalScope" , js_name = queueMicrotask)]
+    #[doc = "The `queueMicrotask()` method."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/WorkerGlobalScope/queueMicrotask)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `WorkerGlobalScope`*"]
+    pub fn queue_microtask(this: &WorkerGlobalScope, callback: &::js_sys::Function);
     # [wasm_bindgen (catch , method , structural , js_class = "WorkerGlobalScope" , js_name = setInterval)]
     #[doc = "The `setInterval()` method."]
     #[doc = ""]

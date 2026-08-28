@@ -1,4 +1,19 @@
-//! See [IndicatifLayer] for the main documentation.
+//! A [tracing](https://docs.rs/tracing/latest/tracing/) layer that automatically creates and manages [indicatif](https://docs.rs/indicatif/latest/indicatif/index.html) progress bars for active spans.
+//!
+//! Progress bars are a great way to make your CLIs feel more responsive. However,
+//! adding and managing progress bars in your libraries can be invasive, unergonomic,
+//! and difficult to keep track of.
+//!
+//! This library aims to make it easy to show progress bars for your CLI by tying
+//! progress bars to [tracing spans](https://docs.rs/tracing/latest/tracing/#spans).
+//! For CLIs/libraries already using tracing spans, this allow for a dead simple (3
+//! line) code change to enable a smooth progress bar experience for your program.
+//! This eliminates having to have code in your libraries to manually manage
+//! progress bar instances.
+//!
+//! This ends up working quite well as progress bars are fundamentally tracking the
+//! lifetime of some "span" (whether that "span" is defined explicitly or implicitly),
+//! so might as well make that relationship explicit.
 //!
 //! An easy quick start for this crate is:
 //! ```
@@ -13,17 +28,20 @@
 //!     .with(indicatif_layer)
 //!     .init();
 //! ```
+//! See [`IndicatifLayer`] for additional documentation.
 //!
-//! And see the `examples` folder for examples of how to customize the layer / progress bar
+//! See the [`examples`](https://github.com/emersonford/tracing-indicatif/tree/main/examples) folder for examples of how to customize the layer / progress bar
 //! appearance.
 //!
-//! It is highly recommended you pass `indicatif_layer.get_stderr_writer()` or
+//! Note: it is highly recommended you pass `indicatif_layer.get_stderr_writer()` or
 //! `indicatif_layer.get_stdout_writer()` to your `fmt::layer()` (depending on where you want to
 //! emit tracing logs) to prevent progress bars from clobbering any console logs.
 use std::any::TypeId;
 use std::marker::PhantomData;
 use std::sync::Mutex;
 
+/// Re-export of [`indicatif`]'s style module for ease of use.
+pub use indicatif::style;
 use indicatif::style::ProgressStyle;
 use indicatif::style::ProgressTracker;
 use indicatif::MultiProgress;
@@ -43,6 +61,8 @@ pub mod util;
 pub mod writer;
 
 use pb_manager::ProgressBarManager;
+pub use pb_manager::TickSettings;
+#[doc(inline)]
 pub use writer::IndicatifWriter;
 
 #[derive(Clone)]
@@ -275,6 +295,12 @@ impl IndicatifSpanContext {
             *pb_len += len;
         }
     }
+
+    fn progress_bar_tick(&mut self) {
+        if let Some(ref pb) = self.progress_bar {
+            pb.tick()
+        }
+    }
 }
 
 /// The layer that handles creating and managing indicatif progress bars for active spans. This
@@ -284,7 +310,7 @@ impl IndicatifSpanContext {
 /// attaches [filters to this
 /// layer](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/layer/index.html#filtering-with-layers)
 /// to control which spans actually have progress bars generated for them. See
-/// [filter::IndicatifFilter] for a rudimentary filter.
+/// [`filter::IndicatifFilter`] for a rudimentary filter.
 ///
 /// Progress bars will be started the very first time a span is [entered](tracing::Span::enter)
 /// or when one of its child spans is entered for the first time, and will finish when the span
@@ -292,8 +318,8 @@ impl IndicatifSpanContext {
 ///
 /// Progress bars are emitted to stderr.
 ///
-/// Under the hood, this just uses indicatif's [MultiProgress](indicatif::MultiProgress) struct to
-/// manage individual [ProgressBar](indicatif::ProgressBar) instances per span.
+/// Under the hood, this just uses indicatif's [`MultiProgress`] struct to
+/// manage individual [`ProgressBar`] instances per span.
 pub struct IndicatifLayer<S, F = DefaultFields> {
     pb_manager: Mutex<ProgressBarManager>,
     // Allows us to fetch the `MultiProgress` without taking a lock.
@@ -346,6 +372,7 @@ where
                 )
                 .unwrap(),
             ),
+            TickSettings::default(),
         );
         let mp = pb_manager.mp.clone();
 
@@ -369,33 +396,36 @@ where
 }
 
 // pub methods
-impl<S, F> IndicatifLayer<S, F> {
+impl<S, F> IndicatifLayer<S, F>
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+{
     #[deprecated(since = "0.2.3", note = "use get_stderr_writer() instead")]
     pub fn get_fmt_writer(&self) -> IndicatifWriter<writer::Stderr> {
         self.get_stderr_writer()
     }
 
-    /// Returns the a writer for [std::io::Stderr] that ensures its output will not be clobbered by
+    /// Returns the a writer for [`std::io::Stderr`] that ensures its output will not be clobbered by
     /// active progress bars.
     ///
     /// Instead of `eprintln!(...)` prefer `writeln!(indicatif_layer.get_stderr_writer(), ...)`
     /// instead to ensure your output is not clobbered by active progress bars.
     ///
     /// If one wishes tracing logs to be output to stderr, this should be passed into
-    /// [fmt::Layer::with_writer](tracing_subscriber::fmt::Layer::with_writer).
+    /// [`fmt::Layer::with_writer`](tracing_subscriber::fmt::Layer::with_writer).
     pub fn get_stderr_writer(&self) -> IndicatifWriter<writer::Stderr> {
         // `MultiProgress` is merely a wrapper over an `Arc`, so we can clone here.
         IndicatifWriter::new(self.mp.clone())
     }
 
-    /// Returns the a writer for [std::io::Stdout] that ensures its output will not be clobbered by
+    /// Returns the a writer for [`std::io::Stdout`] that ensures its output will not be clobbered by
     /// active progress bars.
     ///
     /// Instead of `println!(...)` prefer `writeln!(indicatif_layer.get_stdout_writer(), ...)`
     /// instead to ensure your output is not clobbered by active progress bars.
     ///
     /// If one wishes tracing logs to be output to stdout, this should be passed into
-    /// [fmt::Layer::with_writer](tracing_subscriber::fmt::Layer::with_writer).
+    /// [`fmt::Layer::with_writer`](tracing_subscriber::fmt::Layer::with_writer).
     pub fn get_stdout_writer(&self) -> IndicatifWriter<writer::Stdout> {
         // `MultiProgress` is merely a wrapper over an `Arc`, so we can clone here.
         IndicatifWriter::new(self.mp.clone())
@@ -404,7 +434,7 @@ impl<S, F> IndicatifLayer<S, F> {
     /// Set the formatter for span fields, the result of which will be available as the
     /// progress bar template key `span_fields`.
     ///
-    /// The default is the [DefaultFields] formatter.
+    /// The default is the [`DefaultFields`] formatter.
     pub fn with_span_field_formatter<F2>(self, formatter: F2) -> IndicatifLayer<S, F2>
     where
         F2: for<'writer> FormatFields<'writer> + 'static,
@@ -416,10 +446,16 @@ impl<S, F> IndicatifLayer<S, F> {
             progress_style: self.progress_style,
             span_child_prefix_indent: self.span_child_prefix_indent,
             span_child_prefix_symbol: self.span_child_prefix_symbol,
-            get_context: self.get_context,
-            get_stderr_writer_context: self.get_stderr_writer_context,
-            get_stdout_writer_context: self.get_stdout_writer_context,
-            get_multi_progress_context: self.get_multi_progress_context,
+            get_context: WithContext(IndicatifLayer::<S, F2>::get_context),
+            get_stderr_writer_context: WithStderrWriter(
+                IndicatifLayer::<S, F2>::get_stderr_writer_context,
+            ),
+            get_stdout_writer_context: WithStdoutWriter(
+                IndicatifLayer::<S, F2>::get_stdout_writer_context,
+            ),
+            get_multi_progress_context: WithMultiProgress(
+                IndicatifLayer::<S, F2>::get_multi_progress_context,
+            ),
             inner: self.inner,
         }
     }
@@ -469,14 +505,20 @@ impl<S, F> IndicatifLayer<S, F> {
         max_progress_bars: u64,
         footer_style: Option<ProgressStyle>,
     ) -> Self {
-        // TODO(emersonford): refactor this so we don't need to create a new pb_manager and can
-        // just edit the existing one in place.
-        let pb_manager = ProgressBarManager::new(max_progress_bars, footer_style);
-        let mp = pb_manager.mp.clone();
+        self.pb_manager
+            .get_mut()
+            .unwrap()
+            .set_max_progress_bars(max_progress_bars, footer_style);
 
-        self.pb_manager = Mutex::new(pb_manager);
-        self.mp = mp;
+        self
+    }
 
+    /// Configures how often progress bars are recalcuated and redrawn to the terminal.
+    pub fn with_tick_settings(mut self, tick_settings: TickSettings) -> Self {
+        self.pb_manager
+            .get_mut()
+            .unwrap()
+            .set_tick_settings(tick_settings);
         self
     }
 }
@@ -535,6 +577,38 @@ where
             .expect("subscriber should downcast to expected type; this is a bug!");
 
         f(layer.mp.clone())
+    }
+
+    fn handle_on_enter(
+        &self,
+        pb_manager: &mut ProgressBarManager,
+        id: &span::Id,
+        ctx: &layer::Context<'_, S>,
+    ) -> Option<ProgressBar> {
+        let span = ctx
+            .span(id)
+            .expect("Span not found in context, this is a bug");
+        let mut ext = span.extensions_mut();
+
+        if let Some(indicatif_ctx) = ext.get_mut::<IndicatifSpanContext>() {
+            // Start the progress bar when we enter the span for the first time.
+            if indicatif_ctx.progress_bar.is_none() {
+                indicatif_ctx.make_progress_bar(&self.progress_style);
+
+                if let Some(ref parent_span_with_pb) = indicatif_ctx.parent_span {
+                    // Recursively start parent PBs if parent spans have not been entered yet.
+                    let parent_pb = self.handle_on_enter(pb_manager, parent_span_with_pb, ctx);
+
+                    indicatif_ctx.parent_progress_bar = parent_pb;
+                }
+
+                pb_manager.show_progress_bar(indicatif_ctx, id);
+            }
+
+            return indicatif_ctx.progress_bar.to_owned();
+        }
+
+        None
     }
 }
 
@@ -599,49 +673,7 @@ where
     fn on_enter(&self, id: &span::Id, ctx: layer::Context<'_, S>) {
         let mut pb_manager_lock = self.pb_manager.lock().unwrap();
 
-        let span = ctx
-            .span(id)
-            .expect("Span not found in context, this is a bug");
-        let mut ext = span.extensions_mut();
-
-        if let Some(indicatif_ctx) = ext.get_mut::<IndicatifSpanContext>() {
-            // Start the progress bar when we enter the span for the first time.
-            if indicatif_ctx.progress_bar.is_none() {
-                indicatif_ctx.make_progress_bar(&self.progress_style);
-
-                if let Some(ref parent_span_with_pb) = indicatif_ctx.parent_span {
-                    let parent_span = ctx
-                        .span(parent_span_with_pb)
-                        .expect("Parent span not found in context, this is a bug");
-                    let mut parent_span_ext = parent_span.extensions_mut();
-                    let parent_indicatif_ctx = parent_span_ext
-                        .get_mut::<IndicatifSpanContext>()
-                        .expect(
-                        "IndicatifSpanContext not found in parent span extensions, this is a bug",
-                    );
-
-                    // If the parent span has not been entered once, start the parent progress bar
-                    // for it. We are guaranteed that the parent span has not yet closed because a
-                    // child span for the parent is still open.
-                    //
-                    // NOTE: there's a bug here. if the parent of the parent hasn't started their
-                    // PB, we don't start the parent of the parent's PB. It'd be pretty bad to have
-                    // to iterate up the whole span scope to fix this, so I'm hoping this is a non
-                    // issue for the most part. :(
-                    if parent_indicatif_ctx.progress_bar.is_none() {
-                        parent_indicatif_ctx.make_progress_bar(&self.progress_style);
-
-                        pb_manager_lock.show_progress_bar(parent_indicatif_ctx, id);
-                    }
-
-                    // We can safely unwrap here now since we know a parent progress bar exists.
-                    indicatif_ctx.parent_progress_bar =
-                        Some(parent_indicatif_ctx.progress_bar.to_owned().unwrap());
-                }
-
-                pb_manager_lock.show_progress_bar(indicatif_ctx, id);
-            }
-        }
+        self.handle_on_enter(&mut pb_manager_lock, id, &ctx);
     }
 
     fn on_close(&self, id: span::Id, ctx: layer::Context<'_, S>) {
@@ -709,6 +741,48 @@ pub fn suspend_tracing_indicatif<F: FnOnce() -> R, R>(f: F) -> R {
         mp.suspend(f)
     } else {
         f()
+    }
+}
+
+/// Helper macro that allows you to print to stdout without interfering with the progress bars
+/// created by tracing-indicatif.
+///
+/// Args are directly forwarded to `writeln!`. Do not call this macro inside of
+/// `suspend_tracing_indicatif` or you will trigger a deadlock.
+#[macro_export]
+macro_rules! indicatif_println {
+    ($($arg:tt)*) => {
+        {
+            use std::io::Write;
+
+            if let Some(mut writer) = $crate::writer::get_indicatif_stdout_writer() {
+                writeln!(writer, $($arg)*).unwrap();
+            } else {
+                #[allow(clippy::explicit_write)]
+                writeln!(std::io::stdout(), $($arg)*).unwrap();
+            }
+        }
+    }
+}
+
+/// Helper macro that allows you to print to stderr without interfering with the progress bars
+/// created by tracing-indicatif.
+///
+/// Args are directly forwarded to `writeln!`. Do not call this macro inside of
+/// `suspend_tracing_indicatif` or you will trigger a deadlock.
+#[macro_export]
+macro_rules! indicatif_eprintln {
+    ($($arg:tt)*) => {
+        {
+            use std::io::Write;
+
+            if let Some(mut writer) = $crate::writer::get_indicatif_stderr_writer() {
+                writeln!(writer, $($arg)*).unwrap();
+            } else {
+                #[allow(clippy::explicit_write)]
+                writeln!(std::io::stderr(), $($arg)*).unwrap();
+            }
+        }
     }
 }
 

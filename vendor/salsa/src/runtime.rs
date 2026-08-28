@@ -1,30 +1,21 @@
-use std::{
-    panic::panic_any,
-    sync::{atomic::AtomicUsize, Arc},
-    thread::ThreadId,
-};
-
-use crossbeam::atomic::AtomicCell;
-use parking_lot::Mutex;
-
-use crate::{
-    active_query::ActiveQuery, cycle::CycleRecoveryStrategy, durability::Durability,
-    key::DatabaseKeyIndex, revision::AtomicRevision, zalsa_local::ZalsaLocal, Cancelled, Cycle,
-    Database, Event, EventKind, Revision,
-};
-
 use self::dependency_graph::DependencyGraph;
+use crate::durability::Durability;
+use crate::function::SyncGuard;
+use crate::key::DatabaseKeyIndex;
+use crate::sync::atomic::{AtomicBool, Ordering};
+use crate::sync::thread::{self, ThreadId};
+use crate::sync::Mutex;
+use crate::table::Table;
+use crate::zalsa::Zalsa;
+use crate::{Cancelled, Event, EventKind, Revision};
 
 mod dependency_graph;
 
 pub struct Runtime {
-    /// Stores the next id to use for a snapshotted runtime (starts at 1).
-    next_id: AtomicUsize,
-
     /// Set to true when the current revision has been canceled.
     /// This is done when we an input is being changed. The flag
     /// is set back to false once the input has been changed.
-    revision_canceled: AtomicCell<bool>,
+    revision_canceled: AtomicBool,
 
     /// Stores the "last change" revision for values of each duration.
     /// This vector is always of length at least 1 (for Durability 0)
@@ -35,55 +26,115 @@ pub struct Runtime {
     /// revisions[i + 1]`, for all `i`. This is because when you
     /// modify a value with durability D, that implies that values
     /// with durability less than D may have changed too.
-    revisions: Vec<AtomicRevision>,
+    revisions: [Revision; Durability::LEN],
 
     /// The dependency graph tracks which runtimes are blocked on one
     /// another, waiting for queries to terminate.
     dependency_graph: Mutex<DependencyGraph>,
-}
 
-#[derive(Clone, Debug)]
-pub(crate) enum WaitResult {
-    Completed,
-    Panicked,
-    Cycle(Cycle),
+    /// Data for instances
+    table: Table,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct StampedValue<V> {
-    pub value: V,
+pub(super) enum WaitResult {
+    Completed,
+    Panicked,
+}
+
+#[derive(Debug)]
+pub(crate) enum BlockResult<'me> {
+    /// The query is running on another thread.
+    Running(Running<'me>),
+
+    /// Blocking resulted in a cycle.
+    ///
+    /// The lock is hold by the current thread or there's another thread that is waiting on the current thread,
+    /// and blocking this thread on the other thread would result in a deadlock/cycle.
+    Cycle { same_thread: bool },
+}
+
+pub struct Running<'me>(Box<BlockedOnInner<'me>>);
+
+struct BlockedOnInner<'me> {
+    dg: crate::sync::MutexGuard<'me, DependencyGraph>,
+    query_mutex_guard: SyncGuard<'me>,
+    database_key: DatabaseKeyIndex,
+    other_id: ThreadId,
+    thread_id: ThreadId,
+}
+
+impl Running<'_> {
+    pub(crate) fn database_key(&self) -> DatabaseKeyIndex {
+        self.0.database_key
+    }
+
+    /// Blocks on the other thread to complete the computation.
+    pub(crate) fn block_on(self, zalsa: &Zalsa) {
+        let BlockedOnInner {
+            dg,
+            query_mutex_guard,
+            database_key,
+            other_id,
+            thread_id,
+        } = *self.0;
+
+        zalsa.event(&|| {
+            Event::new(EventKind::WillBlockOn {
+                other_thread_id: other_id,
+                database_key,
+            })
+        });
+
+        tracing::debug!(
+            "block_on: thread {thread_id:?} is blocking on {database_key:?} in thread {other_id:?}",
+        );
+
+        let result =
+            DependencyGraph::block_on(dg, thread_id, database_key, other_id, query_mutex_guard);
+
+        match result {
+            WaitResult::Panicked => {
+                // If the other thread panicked, then we consider this thread
+                // cancelled. The assumption is that the panic will be detected
+                // by the other thread and responded to appropriately.
+                Cancelled::PropagatedPanic.throw()
+            }
+            WaitResult::Completed => {}
+        }
+    }
+}
+
+impl std::fmt::Debug for Running<'_> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt.debug_struct("Running")
+            .field("database_key", &self.0.database_key)
+            .field("other_id", &self.0.other_id)
+            .field("thread_id", &self.0.thread_id)
+            .finish()
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Stamp {
     pub durability: Durability,
     pub changed_at: Revision,
 }
 
-pub type Stamp = StampedValue<()>;
-
 pub fn stamp(revision: Revision, durability: Durability) -> Stamp {
-    StampedValue {
-        value: (),
+    Stamp {
         durability,
         changed_at: revision,
-    }
-}
-
-impl<V> StampedValue<V> {
-    // FIXME: Use or remove this.
-    #[allow(dead_code)]
-    pub(crate) fn merge_revision_info<U>(&mut self, other: &StampedValue<U>) {
-        self.durability = self.durability.min(other.durability);
-        self.changed_at = self.changed_at.max(other.changed_at);
     }
 }
 
 impl Default for Runtime {
     fn default() -> Self {
         Runtime {
-            revisions: (0..Durability::LEN)
-                .map(|_| AtomicRevision::start())
-                .collect(),
-            next_id: AtomicUsize::new(1),
+            revisions: [Revision::start(); Durability::LEN],
             revision_canceled: Default::default(),
             dependency_graph: Default::default(),
+            table: Default::default(),
         }
     }
 }
@@ -92,7 +143,6 @@ impl std::fmt::Debug for Runtime {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fmt.debug_struct("Runtime")
             .field("revisions", &self.revisions)
-            .field("next_id", &self.next_id)
             .field("revision_canceled", &self.revision_canceled)
             .field("dependency_graph", &self.dependency_graph)
             .finish()
@@ -100,8 +150,9 @@ impl std::fmt::Debug for Runtime {
 }
 
 impl Runtime {
+    #[inline]
     pub(crate) fn current_revision(&self) -> Revision {
-        self.revisions[0].load()
+        self.revisions[0]
     }
 
     /// Reports that an input with durability `durability` changed.
@@ -109,9 +160,7 @@ impl Runtime {
     /// less than or equal to `durability` to the current revision.
     pub(crate) fn report_tracked_write(&mut self, durability: Durability) {
         let new_revision = self.current_revision();
-        for rev in &self.revisions[1..=durability.index()] {
-            rev.store(new_revision);
-        }
+        self.revisions[1..=durability.index()].fill(new_revision);
     }
 
     /// The revision in which values with durability `d` may have last
@@ -123,15 +172,30 @@ impl Runtime {
     /// dependencies.
     #[inline]
     pub(crate) fn last_changed_revision(&self, d: Durability) -> Revision {
-        self.revisions[d.index()].load()
+        self.revisions[d.index()]
     }
 
     pub(crate) fn load_cancellation_flag(&self) -> bool {
-        self.revision_canceled.load()
+        self.revision_canceled.load(Ordering::Acquire)
     }
 
     pub(crate) fn set_cancellation_flag(&self) {
-        self.revision_canceled.store(true);
+        tracing::trace!("set_cancellation_flag");
+        self.revision_canceled.store(true, Ordering::Release);
+    }
+
+    pub(crate) fn reset_cancellation_flag(&mut self) {
+        *self.revision_canceled.get_mut() = false;
+    }
+
+    /// Returns the [`Table`] used to store the value of salsa structs
+    #[inline]
+    pub(crate) fn table(&self) -> &Table {
+        &self.table
+    }
+
+    pub(crate) fn table_mut(&mut self) -> &mut Table {
+        &mut self.table
     }
 
     /// Increments the "current revision" counter and clears
@@ -141,13 +205,13 @@ impl Runtime {
     pub(crate) fn new_revision(&mut self) -> Revision {
         let r_old = self.current_revision();
         let r_new = r_old.next();
-        self.revisions[0].store(r_new);
-        self.revision_canceled.store(false);
+        self.revisions[0] = r_new;
+        tracing::debug!("new_revision: {r_old:?} -> {r_new:?}");
         r_new
     }
 
-    /// Block until `other_id` completes executing `database_key`;
-    /// panic or unwind in the case of a cycle.
+    /// Block until `other_id` completes executing `database_key`, or return `BlockResult::Cycle`
+    /// immediately in case of a cycle.
     ///
     /// `query_mutex_guard` is the guard for the current query's state;
     /// it will be dropped after we have successfully registered the
@@ -157,181 +221,32 @@ impl Runtime {
     ///
     /// If the thread `other_id` panics, then our thread is considered
     /// cancelled, so this function will panic with a `Cancelled` value.
-    ///
-    /// # Cycle handling
-    ///
-    /// If the thread `other_id` already depends on the current thread,
-    /// and hence there is a cycle in the query graph, then this function
-    /// will unwind instead of returning normally. The method of unwinding
-    /// depends on the [`Self::mutual_cycle_recovery_strategy`]
-    /// of the cycle participants:
-    ///
-    /// * [`CycleRecoveryStrategy::Panic`]: panic with the [`Cycle`] as the value.
-    /// * [`CycleRecoveryStrategy::Fallback`]: initiate unwinding with [`CycleParticipant::unwind`].
-    pub(crate) fn block_on_or_unwind<QueryMutexGuard>(
-        &self,
-        db: &dyn Database,
-        local_state: &ZalsaLocal,
+    pub(crate) fn block<'a>(
+        &'a self,
         database_key: DatabaseKeyIndex,
         other_id: ThreadId,
-        query_mutex_guard: QueryMutexGuard,
-    ) {
-        let mut dg = self.dependency_graph.lock();
-        let thread_id = std::thread::current().id();
+        query_mutex_guard: SyncGuard<'a>,
+    ) -> BlockResult<'a> {
+        let thread_id = thread::current().id();
+        // Cycle in the same thread.
+        if thread_id == other_id {
+            return BlockResult::Cycle { same_thread: true };
+        }
+
+        let dg = self.dependency_graph.lock();
 
         if dg.depends_on(other_id, thread_id) {
-            self.unblock_cycle_and_maybe_throw(db, local_state, &mut dg, database_key, other_id);
-
-            // If the above fn returns, then (via cycle recovery) it has unblocked the
-            // cycle, so we can continue.
-            assert!(!dg.depends_on(other_id, thread_id));
+            tracing::debug!("block_on: cycle detected for {database_key:?} in thread {thread_id:?} on {other_id:?}");
+            return BlockResult::Cycle { same_thread: false };
         }
 
-        db.salsa_event(&|| Event {
-            thread_id,
-            kind: EventKind::WillBlockOn {
-                other_thread_id: other_id,
-                database_key,
-            },
-        });
-
-        let stack = local_state.take_query_stack();
-
-        let (stack, result) = DependencyGraph::block_on(
+        BlockResult::Running(Running(Box::new(BlockedOnInner {
             dg,
-            thread_id,
+            query_mutex_guard,
             database_key,
             other_id,
-            stack,
-            query_mutex_guard,
-        );
-
-        local_state.restore_query_stack(stack);
-
-        match result {
-            WaitResult::Completed => (),
-
-            // If the other thread panicked, then we consider this thread
-            // cancelled. The assumption is that the panic will be detected
-            // by the other thread and responded to appropriately.
-            WaitResult::Panicked => Cancelled::PropagatedPanic.throw(),
-
-            WaitResult::Cycle(c) => c.throw(),
-        }
-    }
-
-    /// Handles a cycle in the dependency graph that was detected when the
-    /// current thread tried to block on `database_key_index` which is being
-    /// executed by `to_id`. If this function returns, then `to_id` no longer
-    /// depends on the current thread, and so we should continue executing
-    /// as normal. Otherwise, the function will throw a `Cycle` which is expected
-    /// to be caught by some frame on our stack. This occurs either if there is
-    /// a frame on our stack with cycle recovery (possibly the top one!) or if there
-    /// is no cycle recovery at all.
-    fn unblock_cycle_and_maybe_throw(
-        &self,
-        db: &dyn Database,
-        local_state: &ZalsaLocal,
-        dg: &mut DependencyGraph,
-        database_key_index: DatabaseKeyIndex,
-        to_id: ThreadId,
-    ) {
-        tracing::debug!(
-            "unblock_cycle_and_maybe_throw(database_key={:?})",
-            database_key_index
-        );
-
-        let mut from_stack = local_state.take_query_stack();
-        let from_id = std::thread::current().id();
-
-        // Make a "dummy stack frame". As we iterate through the cycle, we will collect the
-        // inputs from each participant. Then, if we are participating in cycle recovery, we
-        // will propagate those results to all participants.
-        let mut cycle_query = ActiveQuery::new(database_key_index);
-
-        // Identify the cycle participants:
-        let cycle = {
-            let mut v = vec![];
-            dg.for_each_cycle_participant(
-                from_id,
-                &mut from_stack,
-                database_key_index,
-                to_id,
-                |aqs| {
-                    aqs.iter_mut().for_each(|aq| {
-                        cycle_query.add_from(aq);
-                        v.push(aq.database_key_index);
-                    });
-                },
-            );
-
-            // We want to give the participants in a deterministic order
-            // (at least for this execution, not necessarily across executions),
-            // no matter where it started on the stack. Find the minimum
-            // key and rotate it to the front.
-            let min = v
-                .iter()
-                .map(|key| (key.ingredient_index.debug_name(db), key))
-                .min()
-                .unwrap()
-                .1;
-            let index = v.iter().position(|p| p == min).unwrap();
-            v.rotate_left(index);
-
-            // No need to store extra memory.
-            v.shrink_to_fit();
-
-            Cycle::new(Arc::new(v))
-        };
-        tracing::debug!("cycle {cycle:?}, cycle_query {cycle_query:#?}");
-
-        // We can remove the cycle participants from the list of dependencies;
-        // they are a strongly connected component (SCC) and we only care about
-        // dependencies to things outside the SCC that control whether it will
-        // form again.
-        cycle_query.remove_cycle_participants(&cycle);
-
-        // Mark each cycle participant that has recovery set, along with
-        // any frames that come after them on the same thread. Those frames
-        // are going to be unwound so that fallback can occur.
-        dg.for_each_cycle_participant(from_id, &mut from_stack, database_key_index, to_id, |aqs| {
-            aqs.iter_mut()
-                .skip_while(|aq| {
-                    match db
-                        .zalsa()
-                        .lookup_ingredient(aq.database_key_index.ingredient_index)
-                        .cycle_recovery_strategy()
-                    {
-                        CycleRecoveryStrategy::Panic => true,
-                        CycleRecoveryStrategy::Fallback => false,
-                    }
-                })
-                .for_each(|aq| {
-                    tracing::debug!("marking {:?} for fallback", aq.database_key_index);
-                    aq.take_inputs_from(&cycle_query);
-                    assert!(aq.cycle.is_none());
-                    aq.cycle = Some(cycle.clone());
-                });
-        });
-
-        // Unblock every thread that has cycle recovery with a `WaitResult::Cycle`.
-        // They will throw the cycle, which will be caught by the frame that has
-        // cycle recovery so that it can execute that recovery.
-        let (me_recovered, others_recovered) =
-            dg.maybe_unblock_runtimes_in_cycle(from_id, &from_stack, database_key_index, to_id);
-
-        local_state.restore_query_stack(from_stack);
-
-        if me_recovered {
-            // If the current thread has recovery, we want to throw
-            // so that it can begin.
-            cycle.throw()
-        } else if others_recovered {
-            // If other threads have recovery but we didn't: return and we will block on them.
-        } else {
-            // if nobody has recover, then we panic
-            panic_any(cycle);
-        }
+            thread_id,
+        })))
     }
 
     /// Invoked when this runtime completed computing `database_key` with

@@ -2,8 +2,8 @@ use std::fmt::{Debug, Display};
 use std::io::{self, Read, Write};
 use std::sync::{Arc, Mutex, RwLock};
 
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, RawFd};
+#[cfg(any(unix, all(target_os = "wasi", target_env = "p1")))]
+use std::os::fd::{AsRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawHandle, RawHandle};
 
@@ -38,7 +38,7 @@ pub enum TermTarget {
 }
 
 #[derive(Debug)]
-pub struct TermInner {
+struct TermInner {
     target: TermTarget,
     buffer: Option<Mutex<Vec<u8>>>,
     prompt: RwLock<String>,
@@ -62,7 +62,7 @@ pub enum TermFamily {
 #[derive(Debug, Clone)]
 pub struct TermFeatures<'a>(&'a Term);
 
-impl<'a> TermFeatures<'a> {
+impl TermFeatures<'_> {
     /// Check if this is a real user attended terminal (`isatty`)
     #[inline]
     pub fn is_attended(&self) -> bool {
@@ -336,8 +336,10 @@ impl Term {
             loop {
                 match slf.read_key()? {
                     Key::Backspace => {
-                        if prefix_len < chars.len() && chars.pop().is_some() {
-                            slf.clear_chars(1)?;
+                        if prefix_len < chars.len() {
+                            if let Some(ch) = chars.pop() {
+                                slf.clear_chars(crate::utils::char_width(ch))?;
+                            }
                         }
                         slf.flush()?;
                     }
@@ -587,12 +589,13 @@ pub fn user_attended_stderr() -> bool {
     Term::stderr().features().is_attended()
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, all(target_os = "wasi", target_env = "p1")))]
 impl AsRawFd for Term {
     fn as_raw_fd(&self) -> RawFd {
         match self.inner.target {
             TermTarget::Stdout => libc::STDOUT_FILENO,
             TermTarget::Stderr => libc::STDERR_FILENO,
+            #[cfg(unix)]
             TermTarget::ReadWritePair(ReadWritePair { ref write, .. }) => {
                 write.lock().unwrap().as_raw_fd()
             }
@@ -630,7 +633,7 @@ impl Write for Term {
     }
 }
 
-impl<'a> Write for &'a Term {
+impl Write for &Term {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self.inner.buffer {
             Some(ref buffer) => buffer.lock().unwrap().write_all(buf),
@@ -650,15 +653,15 @@ impl Read for Term {
     }
 }
 
-impl<'a> Read for &'a Term {
+impl Read for &Term {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         io::stdin().read(buf)
     }
 }
 
 #[cfg(all(unix, not(target_arch = "wasm32")))]
-pub use crate::unix_term::*;
+pub(crate) use crate::unix_term::*;
 #[cfg(target_arch = "wasm32")]
-pub use crate::wasm_term::*;
+pub(crate) use crate::wasm_term::*;
 #[cfg(windows)]
-pub use crate::windows_term::*;
+pub(crate) use crate::windows_term::*;

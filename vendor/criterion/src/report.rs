@@ -11,6 +11,7 @@ use crate::stats::univariate::Sample;
 use crate::stats::Distribution;
 use crate::{PlotConfiguration, Throughput};
 use anes::{Attribute, ClearLine, Color, ResetAttributes, SetAttribute, SetForegroundColor};
+use serde::{Deserialize, Serialize};
 use std::cmp;
 use std::collections::HashSet;
 use std::fmt;
@@ -395,12 +396,12 @@ impl CliReport {
 
     fn text_overwrite(&self) {
         if self.enable_text_overwrite {
-            eprint!("\r{}", ClearLine::All)
+            eprint!("\r{}", ClearLine::All);
         }
     }
 
     // Passing a String is the common case here.
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
+    #[allow(clippy::needless_pass_by_value)]
     fn print_overwritable(&self, s: String) {
         if self.enable_text_overwrite {
             eprint!("{}", s);
@@ -590,7 +591,7 @@ impl Report for CliReport {
                     throughput,
                     typical_estimate.confidence_interval.lower_bound
                 )),
-            )
+            );
         }
 
         if !matches!(self.verbosity, CliVerbosity::Quiet) {

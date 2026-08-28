@@ -12,12 +12,18 @@
 [package]
 edition = "2018"
 name = "mimalloc"
-version = "0.1.43"
+version = "0.1.47"
 authors = [
     "Octavian Oncescu <octavonce@gmail.com>",
     "Vincent Rouillé <vincent@speedy37.fr>",
     "Thom Chiovoloni <chiovolonit@gmail.com>",
 ]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Performance and security oriented drop-in allocator"
 readme = "README.md"
 keywords = [
@@ -33,8 +39,12 @@ categories = [
 license = "MIT"
 repository = "https://github.com/purpleprotocol/mimalloc_rust"
 
+[lib]
+name = "mimalloc"
+path = "src/lib.rs"
+
 [dependencies.libmimalloc-sys]
-version = "0.1.39"
+version = "0.1.43"
 default-features = false
 
 [features]

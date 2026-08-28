@@ -4,8 +4,8 @@
 //! Serialize a `Report`.
 
 use crate::{
-    NonSuccessKind, Output, Property, Report, SerializeError, TestCase, TestCaseStatus, TestRerun,
-    TestSuite,
+    NonSuccessKind, Property, Report, SerializeError, TestCase, TestCaseStatus, TestRerun,
+    TestSuite, XmlString,
 };
 use chrono::{DateTime, FixedOffset};
 use quick_xml::{
@@ -154,10 +154,7 @@ pub(crate) fn serialize_test_suite(
     Ok(())
 }
 
-fn serialize_property(
-    property: &Property,
-    writer: &mut Writer<impl io::Write>,
-) -> quick_xml::Result<()> {
+fn serialize_property(property: &Property, writer: &mut Writer<impl io::Write>) -> io::Result<()> {
     let mut property_tag = BytesStart::new(PROPERTY_TAG);
     property_tag.extend_attributes([
         ("name", property.name.as_str()),
@@ -382,7 +379,7 @@ fn serialize_rerun(
 }
 
 fn serialize_output(
-    output: &Output,
+    output: &XmlString,
     tag_name: &'static str,
     writer: &mut Writer<impl io::Write>,
 ) -> quick_xml::Result<()> {
@@ -399,7 +396,7 @@ fn serialize_output(
 fn serialize_empty_start_tag(
     tag_name: &'static str,
     writer: &mut Writer<impl io::Write>,
-) -> quick_xml::Result<()> {
+) -> io::Result<()> {
     let tag = BytesStart::new(tag_name);
     writer.write_event(Event::Start(tag))
 }
@@ -407,7 +404,7 @@ fn serialize_empty_start_tag(
 fn serialize_end_tag(
     tag_name: &'static str,
     writer: &mut Writer<impl io::Write>,
-) -> quick_xml::Result<()> {
+) -> io::Result<()> {
     let end_tag = BytesEnd::new(tag_name);
     writer.write_event(Event::End(end_tag))
 }

@@ -1,12 +1,12 @@
-use crate::ir::{
-    Diagnostic, Expression, Function, FunctionId, Program, Span, StatementData, VariableId,
-};
-use derive_new::new;
 #[cfg(test)]
 use expect_test::expect;
 use salsa::Accumulator;
 #[cfg(test)]
 use test_log::test;
+
+use crate::ir::{
+    Diagnostic, Expression, Function, FunctionId, Program, Span, StatementData, VariableId,
+};
 
 // ANCHOR: parse_statements
 #[salsa::tracked]
@@ -44,11 +44,24 @@ pub fn find_function<'db>(
         .next()
 }
 
-#[derive(new)]
 struct CheckExpression<'input, 'db> {
     db: &'db dyn crate::Db,
     program: Program<'db>,
     names_in_scope: &'input [VariableId<'db>],
+}
+
+impl<'input, 'db> CheckExpression<'input, 'db> {
+    pub fn new(
+        db: &'db dyn crate::Db,
+        program: Program<'db>,
+        names_in_scope: &'input [VariableId<'db>],
+    ) -> Self {
+        CheckExpression {
+            db,
+            program,
+            names_in_scope,
+        }
+    }
 }
 
 impl<'db> CheckExpression<'_, 'db> {
@@ -96,11 +109,13 @@ impl<'db> CheckExpression<'_, 'db> {
 fn check_string(
     source_text: &str,
     expected_diagnostics: expect_test::Expect,
-    edits: &[(&str, expect_test::Expect, expect_test::Expect)],
+    edits: &[(&str, expect_test::Expect)],
 ) {
     use salsa::{Database, Setter};
 
-    use crate::{db::CalcDatabaseImpl, ir::SourceProgram, parser::parse_statements};
+    use crate::db::CalcDatabaseImpl;
+    use crate::ir::SourceProgram;
+    use crate::parser::parse_statements;
 
     // Create the database
     let mut db = CalcDatabaseImpl::default();
@@ -123,11 +138,8 @@ fn check_string(
         expected_diagnostics.assert_eq(&rendered_diagnostics);
     });
 
-    // Clear logs
-    db.take_logs();
-
     // Apply edits and check diagnostics/logs after each one
-    for (new_source_text, expected_diagnostics, expected_logs) in edits {
+    for (new_source_text, expected_diagnostics) in edits {
         source_program
             .set_text(&mut db)
             .to(new_source_text.to_string());
@@ -137,8 +149,6 @@ fn check_string(
             expected_diagnostics
                 .assert_debug_eq(&type_check_program::accumulated::<Diagnostic>(db, program));
         });
-
-        expected_logs.assert_debug_eq(&db.take_logs());
     }
 }
 
@@ -194,12 +204,10 @@ fn check_bad_variable_in_function() {
             error: the variable `b` is not declared
              --> input:4:33
               |
-            3 |   
             4 |               fn add_one(a) = a + b
               |  _________________________________^
             5 | |             print add_one(22)
               | |____________^ here
-            6 |           
               |"#]],
         &[],
     );
@@ -216,21 +224,16 @@ fn check_bad_function_in_function() {
             error: the function `add_two` is not declared
              --> input:4:29
               |
-            3 | 
             4 |             fn add_one(a) = add_two(a) + b
               |                             ^^^^^^^^^^ here
-            5 |             print add_one(22)
-            6 |         
               |
             error: the variable `b` is not declared
              --> input:4:42
               |
-            3 |   
             4 |               fn add_one(a) = add_two(a) + b
               |  __________________________________________^
             5 | |             print add_one(22)
               | |____________^ here
-            6 |           
               |"#]],
         &[],
     );
@@ -248,13 +251,10 @@ fn fix_bad_variable_in_function() {
             error: the variable `b` is not declared
              --> input:4:32
               |
-            3 |   
             4 |               fn double(a) = a * b
               |  ________________________________^
             5 | |             fn quadruple(a) = double(double(a))
               | |____________^ here
-            6 |               print quadruple(2)
-            7 |           
               |"#]],
         &[(
             "
@@ -264,12 +264,6 @@ fn fix_bad_variable_in_function() {
             ",
             expect![[r#"
                 []
-            "#]],
-            expect![[r#"
-                [
-                    "Event: Event { thread_id: ThreadId(11), kind: WillExecute { database_key: parse_statements(0) } }",
-                    "Event: Event { thread_id: ThreadId(11), kind: WillExecute { database_key: type_check_function(0) } }",
-                ]
             "#]],
         )],
     );

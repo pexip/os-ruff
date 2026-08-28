@@ -1,50 +1,55 @@
-use arc_swap::ArcSwap;
-use crossbeam::queue::SegQueue;
+use std::ptr::NonNull;
 
-use crate::{zalsa_local::QueryOrigin, Id};
-
-use super::{memo, Configuration, IngredientImpl};
-
-impl<C> IngredientImpl<C>
-where
-    C: Configuration,
-{
-    /// Removes the memoized value for `key` from the memo-map.
-    /// Pushes the memo onto `deleted_entries` to ensure that any references into that memo which were handed out remain valid.
-    pub(super) fn delete_memo(&self, key: Id) -> Option<QueryOrigin> {
-        if let Some(memo) = self.memo_map.remove(key) {
-            let origin = memo.load().revisions.origin.clone();
-            self.deleted_entries.push(memo);
-            Some(origin)
-        } else {
-            None
-        }
-    }
-}
+use crate::function::memo::Memo;
+use crate::function::Configuration;
 
 /// Stores the list of memos that have been deleted so they can be freed
 /// once the next revision starts. See the comment on the field
 /// `deleted_entries` of [`FunctionIngredient`][] for more details.
 pub(super) struct DeletedEntries<C: Configuration> {
-    seg_queue: SegQueue<ArcSwap<memo::Memo<C::Output<'static>>>>,
+    memos: boxcar::Vec<SharedBox<Memo<C::Output<'static>>>>,
 }
+
+#[allow(clippy::undocumented_unsafe_blocks)] // TODO(#697) document safety
+unsafe impl<T: Send> Send for SharedBox<T> {}
+#[allow(clippy::undocumented_unsafe_blocks)] // TODO(#697) document safety
+unsafe impl<T: Sync> Sync for SharedBox<T> {}
 
 impl<C: Configuration> Default for DeletedEntries<C> {
     fn default() -> Self {
         Self {
-            seg_queue: Default::default(),
+            memos: Default::default(),
         }
     }
 }
 
 impl<C: Configuration> DeletedEntries<C> {
-    pub(super) fn push<'db>(&'db self, memo: ArcSwap<memo::Memo<C::Output<'db>>>) {
+    /// # Safety
+    ///
+    /// The memo must be valid and safe to free when the `DeletedEntries` list is cleared or dropped.
+    pub(super) unsafe fn push(&self, memo: NonNull<Memo<C::Output<'_>>>) {
+        // Safety: The memo must be valid and safe to free when the `DeletedEntries` list is cleared or dropped.
         let memo = unsafe {
-            std::mem::transmute::<
-                ArcSwap<memo::Memo<C::Output<'db>>>,
-                ArcSwap<memo::Memo<C::Output<'static>>>,
-            >(memo)
+            std::mem::transmute::<NonNull<Memo<C::Output<'_>>>, NonNull<Memo<C::Output<'static>>>>(
+                memo,
+            )
         };
-        self.seg_queue.push(memo);
+
+        self.memos.push(SharedBox(memo));
+    }
+
+    /// Free all deleted memos, keeping the list available for reuse.
+    pub(super) fn clear(&mut self) {
+        self.memos.clear();
+    }
+}
+
+/// A wrapper around `NonNull` that frees the allocation when it is dropped.
+struct SharedBox<T>(NonNull<T>);
+
+impl<T> Drop for SharedBox<T> {
+    fn drop(&mut self) {
+        // SAFETY: Guaranteed by the caller of `DeletedEntries::push`.
+        unsafe { drop(Box::from_raw(self.0.as_ptr())) };
     }
 }

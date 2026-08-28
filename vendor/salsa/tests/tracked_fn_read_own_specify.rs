@@ -3,12 +3,12 @@ mod common;
 use common::LogDatabase;
 use salsa::Database;
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct MyInput {
     field: u32,
 }
 
-#[salsa::tracked]
+#[salsa::tracked(debug)]
 struct MyTracked<'db> {
     field: u32,
 }
@@ -22,7 +22,7 @@ fn tracked_fn(db: &dyn LogDatabase, input: MyInput) -> u32 {
 }
 
 #[salsa::tracked(specify)]
-fn tracked_fn_extra<'db>(db: &dyn LogDatabase, input: MyTracked<'db>) -> u32 {
+fn tracked_fn_extra<'db>(db: &'db dyn LogDatabase, input: MyTracked<'db>) -> u32 {
     db.push_log(format!("tracked_fn_extra({input:?})"));
     0
 }

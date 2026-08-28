@@ -5,36 +5,37 @@
 
 mod common;
 use common::LogDatabase;
-
 use expect_test::expect;
 use salsa::Setter;
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct MyInput {
     field: u32,
 }
 
 #[salsa::tracked]
 fn final_result_depends_on_x(db: &dyn LogDatabase, input: MyInput) -> u32 {
-    db.push_log(format!("final_result_depends_on_x({:?})", input));
+    db.push_log(format!("final_result_depends_on_x({input:?})"));
     intermediate_result(db, input).x(db) * 2
 }
 
 #[salsa::tracked]
 fn final_result_depends_on_y(db: &dyn LogDatabase, input: MyInput) -> u32 {
-    db.push_log(format!("final_result_depends_on_y({:?})", input));
+    db.push_log(format!("final_result_depends_on_y({input:?})"));
     intermediate_result(db, input).y(db) * 2
 }
 
 #[salsa::tracked]
 struct MyTracked<'db> {
+    #[tracked]
     x: u32,
+    #[tracked]
     y: u32,
 }
 
 #[salsa::tracked]
 fn intermediate_result(db: &dyn LogDatabase, input: MyInput) -> MyTracked<'_> {
-    MyTracked::new(db, (input.field(db) + 1) / 2, input.field(db) / 2)
+    MyTracked::new(db, input.field(db).div_ceil(2), input.field(db) / 2)
 }
 
 #[test]

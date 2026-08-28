@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.2.1] - 2025-01-14
+
+Updated MSRV in readme.
+
+## [1.2.0] - 2025-01-14
+
+### Added
+
+- New, optional feature `proptest1` enables support for generating random instances of UUIDs. Currently, v4 UUIDs are always generated.
+
+### Changed
+
+- MSRV updated to Rust 1.67.
+
+## [1.1.3] - 2024-11-07
+
+### Added
+
+- Add a `Default` implementation for `TypedUuid`. This implementation resolves
+  to `TypedUuid::nil()`.
+
+## [1.1.2] - 2024-10-07
+
+### Added
+
+More const constructors for typed UUIDs, mirrored from the `uuid` crate: `from_fields`,
+`from_fields_le`, `from_u128`, `from_u128_le`, `from_u64_pair`, `from_bytes`, and `from_bytes_le`.
+
+### Fixed
+
+Correct doc for `as_untyped_uuid`. Thanks [@Dr-Emann](https://github.com/Dr-Emann) for your first contribution!
+
+## [1.1.1] - 2024-10-07
+
+(This version was not released due to a publishing issue.)
+
 ## [1.1.0] - 2024-04-12
 
 ### Added
@@ -53,6 +89,11 @@ Documentation improvements.
 
 Initial release.
 
+[1.2.1]: https://github.com/oxidecomputer/newtype-uuid/releases/newtype-uuid-1.2.1
+[1.2.0]: https://github.com/oxidecomputer/newtype-uuid/releases/newtype-uuid-1.2.0
+[1.1.3]: https://github.com/oxidecomputer/newtype-uuid/releases/newtype-uuid-1.1.3
+[1.1.2]: https://github.com/oxidecomputer/newtype-uuid/releases/newtype-uuid-1.1.2
+[1.1.1]: https://github.com/oxidecomputer/newtype-uuid/releases/newtype-uuid-1.1.1
 [1.1.0]: https://github.com/oxidecomputer/newtype-uuid/releases/newtype-uuid-1.1.0
 [1.0.1]: https://github.com/oxidecomputer/newtype-uuid/releases/newtype-uuid-1.0.1
 [1.0.0]: https://github.com/oxidecomputer/newtype-uuid/releases/newtype-uuid-1.0.0

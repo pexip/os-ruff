@@ -22,9 +22,10 @@ use test_log::test;
 // }
 
 #[salsa::accumulator]
+#[derive(Debug)]
 struct Log(#[allow(dead_code)] String);
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct MyInput {
     n: u32,
 }
@@ -99,6 +100,6 @@ fn accumulate_no_duplicates() {
                     "log e",
                 ),
             ]"#]]
-        .assert_eq(&format!("{:#?}", logs));
+        .assert_eq(&format!("{logs:#?}"));
     })
 }

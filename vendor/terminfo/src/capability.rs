@@ -153,9 +153,9 @@ macro_rules! define {
 			}
 		}
 
-		impl Into<bool> for $ident {
-			fn into(self) -> bool {
-				self.0
+		impl From<$ident> for bool {
+			fn from(cap: $ident) -> Self {
+				cap.0
 			}
 		}
 	);
@@ -186,9 +186,9 @@ macro_rules! define {
 			}
 		}
 
-		impl Into<i32> for $ident {
-			fn into(self) -> i32 {
-				self.0
+		impl From<$ident> for i32 {
+			fn from(cap: $ident) -> Self {
+				cap.0
 			}
 		}
 	);
@@ -254,14 +254,6 @@ macro_rules! define {
 
 	(string $ident:ident => $capability:expr) => (
 		define!(string define $ident => $capability);
-
-		impl<'a> Expansion<'a, $ident<'a>> {
-			/// Pass all expansion parameters at once.
-			#[inline]
-			pub fn parameters(self) -> Self {
-				self
-			}
-		}
 	);
 
 	(string $ident:ident => $capability:expr; $($rest:tt)+) => (
@@ -275,6 +267,8 @@ macro_rules! define {
 			/// Pass all expansion parameters at once.
 			#[allow(unused_assignments)]
 			#[inline]
+            // https://github.com/meh/rust-terminfo/issues/28
+            #[allow(clippy::too_many_arguments)]
 			pub fn parameters(mut self, $($name: $ty),*) -> Self {
 				let mut index = 0;
 

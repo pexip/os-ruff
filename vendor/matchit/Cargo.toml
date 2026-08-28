@@ -12,8 +12,14 @@
 [package]
 edition = "2021"
 name = "matchit"
-version = "0.8.4"
+version = "0.8.6"
 authors = ["Ibraheem Ahmed <ibraheem@ibraheem.ca>"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A high performance, zero-copy URL router."
 readme = "README.md"
 keywords = [
@@ -35,36 +41,71 @@ opt-level = 3
 lto = true
 codegen-units = 1
 
+[lib]
+name = "matchit"
+path = "src/lib.rs"
+
+[[example]]
+name = "hyper"
+path = "examples/hyper.rs"
+
+[[test]]
+name = "insert"
+path = "tests/insert.rs"
+
+[[test]]
+name = "match"
+path = "tests/match.rs"
+
+[[test]]
+name = "merge"
+path = "tests/merge.rs"
+
+[[test]]
+name = "remove"
+path = "tests/remove.rs"
+
 [[bench]]
 name = "bench"
+path = "benches/bench.rs"
 harness = false
 
 [dependencies]
 
 [dev-dependencies.actix-router]
-version = "0.2.7"
+version = "0.5"
 
 [dev-dependencies.criterion]
-version = "0.3.4"
+version = "0.5"
 
 [dev-dependencies.gonzales]
 version = "0.0.3-beta"
 
+[dev-dependencies.http-body-util]
+version = "0.1"
+
 [dev-dependencies.hyper]
-version = "0.14"
-features = ["full"]
+version = "1"
+features = [
+    "http1",
+    "server",
+]
+
+[dev-dependencies.hyper-util]
+version = "0.1"
+features = ["tokio"]
 
 [dev-dependencies.path-tree]
-version = "0.2.2"
+version = "0.8"
 
 [dev-dependencies.regex]
-version = "1.5.4"
+version = "1"
 
 [dev-dependencies.route-recognizer]
-version = "0.3.0"
+version = "0.3"
 
 [dev-dependencies.routefinder]
-version = "0.5.2"
+version = "0.5"
 
 [dev-dependencies.tokio]
 version = "1"
@@ -76,6 +117,9 @@ features = [
     "make",
     "util",
 ]
+
+[dev-dependencies.wayfind]
+version = "0.7"
 
 [features]
 __test_helpers = []

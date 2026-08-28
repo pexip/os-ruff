@@ -14,12 +14,13 @@
 
 mod macro_if;
 mod maybe_backdate;
-mod maybe_clone;
 mod maybe_default;
+mod return_mode;
 mod setup_accumulator_impl;
 mod setup_input_struct;
 mod setup_interned_struct;
-mod setup_method_body;
+mod setup_tracked_assoc_fn_body;
 mod setup_tracked_fn;
+mod setup_tracked_method_body;
 mod setup_tracked_struct;
 mod unexpected_cycle_recovery;

@@ -8,7 +8,7 @@ pub type FxHashMapSeed<K, V> = std::collections::HashMap<K, V, FxSeededState>;
 #[cfg(feature = "std")]
 pub type FxHashSetSeed<V> = std::collections::HashSet<V, FxSeededState>;
 
-/// [`FxSetState`] is an alternative state for `HashMap` types, allowing to use [`FxHasher`] with a set seed.
+/// [`FxSeededState`] is an alternative state for `HashMap` types, allowing to use [`FxHasher`] with a set seed.
 ///
 /// ```
 /// # use std::collections::HashMap;
@@ -18,6 +18,7 @@ pub type FxHashSetSeed<V> = std::collections::HashSet<V, FxSeededState>;
 /// map.insert(15, 610);
 /// assert_eq!(map[&15], 610);
 /// ```
+#[derive(Clone)]
 pub struct FxSeededState {
     seed: usize,
 }
@@ -42,6 +43,28 @@ mod tests {
     use core::hash::BuildHasher;
 
     use crate::FxSeededState;
+
+    #[test]
+    fn cloned_seeded_states_are_equal() {
+        let seed = 2;
+        let a = FxSeededState::with_seed(seed);
+        let b = a.clone();
+
+        assert_eq!(a.seed, b.seed);
+        assert_eq!(a.seed, seed);
+
+        assert_eq!(a.build_hasher().hash, b.build_hasher().hash);
+    }
+
+    #[test]
+    fn same_seed_produces_same_hasher() {
+        let seed = 1;
+        let a = FxSeededState::with_seed(seed);
+        let b = FxSeededState::with_seed(seed);
+
+        // The hashers should be the same, as they have the same seed.
+        assert_eq!(a.build_hasher().hash, b.build_hasher().hash);
+    }
 
     #[test]
     fn different_states_are_different() {

@@ -5,12 +5,11 @@
 
 mod common;
 use common::{LogDatabase, LoggerDatabase};
-
 use expect_test::expect;
 use salsa::{Accumulator, Setter};
 use test_log::test;
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct List {
     value: u32,
     next: Option<List>,
@@ -21,7 +20,7 @@ struct Integers(u32);
 
 #[salsa::tracked]
 fn compute(db: &dyn LogDatabase, input: List) -> u32 {
-    db.push_log(format!("compute({:?})", input,));
+    db.push_log(format!("compute({input:?})",));
 
     // always pushes 0
     Integers(0).accumulate(db);

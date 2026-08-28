@@ -9,7 +9,7 @@
 /// let style = Style::new().bold().on(Color::Black);
 /// println!("{}", style.paint("Bold on black"));
 /// ```
-#[derive(Eq, PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy)]
 #[cfg_attr(
     feature = "derive_serde_style",
     derive(serde::Deserialize, serde::Serialize)
@@ -44,9 +44,6 @@ pub struct Style {
 
     /// Whether this style is struckthrough.
     pub is_strikethrough: bool,
-
-    /// Wether this style is always displayed starting with a reset code to clear any remaining style artifacts
-    pub prefix_with_reset: bool,
 }
 
 impl Style {
@@ -64,23 +61,6 @@ impl Style {
         Style::default()
     }
 
-    /// Returns a [`Style`] with the `Style.prefix_with_reset` property set.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use nu_ansi_term::Style;
-    ///
-    /// let style = Style::new().reset_before_style();
-    /// println!("{}", style.paint("hey"));
-    /// ```
-    pub const fn reset_before_style(&self) -> Style {
-        Style {
-            prefix_with_reset: true,
-            ..*self
-        }
-    }
-
     /// Returns a `Style` with the bold property set.
     ///
     /// # Examples
@@ -91,7 +71,7 @@ impl Style {
     /// let style = Style::new().bold();
     /// println!("{}", style.paint("hey"));
     /// ```
-    pub const fn bold(&self) -> Style {
+    pub fn bold(&self) -> Style {
         Style {
             is_bold: true,
             ..*self
@@ -108,7 +88,7 @@ impl Style {
     /// let style = Style::new().dimmed();
     /// println!("{}", style.paint("sup"));
     /// ```
-    pub const fn dimmed(&self) -> Style {
+    pub fn dimmed(&self) -> Style {
         Style {
             is_dimmed: true,
             ..*self
@@ -125,7 +105,7 @@ impl Style {
     /// let style = Style::new().italic();
     /// println!("{}", style.paint("greetings"));
     /// ```
-    pub const fn italic(&self) -> Style {
+    pub fn italic(&self) -> Style {
         Style {
             is_italic: true,
             ..*self
@@ -142,7 +122,7 @@ impl Style {
     /// let style = Style::new().underline();
     /// println!("{}", style.paint("salutations"));
     /// ```
-    pub const fn underline(&self) -> Style {
+    pub fn underline(&self) -> Style {
         Style {
             is_underline: true,
             ..*self
@@ -158,7 +138,7 @@ impl Style {
     /// let style = Style::new().blink();
     /// println!("{}", style.paint("wazzup"));
     /// ```
-    pub const fn blink(&self) -> Style {
+    pub fn blink(&self) -> Style {
         Style {
             is_blink: true,
             ..*self
@@ -175,7 +155,7 @@ impl Style {
     /// let style = Style::new().reverse();
     /// println!("{}", style.paint("aloha"));
     /// ```
-    pub const fn reverse(&self) -> Style {
+    pub fn reverse(&self) -> Style {
         Style {
             is_reverse: true,
             ..*self
@@ -192,7 +172,7 @@ impl Style {
     /// let style = Style::new().hidden();
     /// println!("{}", style.paint("ahoy"));
     /// ```
-    pub const fn hidden(&self) -> Style {
+    pub fn hidden(&self) -> Style {
         Style {
             is_hidden: true,
             ..*self
@@ -209,7 +189,7 @@ impl Style {
     /// let style = Style::new().strikethrough();
     /// println!("{}", style.paint("yo"));
     /// ```
-    pub const fn strikethrough(&self) -> Style {
+    pub fn strikethrough(&self) -> Style {
         Style {
             is_strikethrough: true,
             ..*self
@@ -226,7 +206,7 @@ impl Style {
     /// let style = Style::new().fg(Color::Yellow);
     /// println!("{}", style.paint("hi"));
     /// ```
-    pub const fn fg(&self, foreground: Color) -> Style {
+    pub fn fg(&self, foreground: Color) -> Style {
         Style {
             foreground: Some(foreground),
             ..*self
@@ -243,7 +223,7 @@ impl Style {
     /// let style = Style::new().on(Color::Blue);
     /// println!("{}", style.paint("eyyyy"));
     /// ```
-    pub const fn on(&self, background: Color) -> Style {
+    pub fn on(&self, background: Color) -> Style {
         Style {
             background: Some(background),
             ..*self
@@ -289,7 +269,6 @@ impl Default for Style {
             is_reverse: false,
             is_hidden: false,
             is_strikethrough: false,
-            prefix_with_reset: false,
         }
     }
 }
@@ -301,7 +280,7 @@ impl Default for Style {
 ///
 /// These use the standard numeric sequences.
 /// See <http://invisible-island.net/xterm/ctlseqs/ctlseqs.html>
-#[derive(Eq, PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(
     feature = "derive_serde_style",
     derive(serde::Deserialize, serde::Serialize)
@@ -389,8 +368,13 @@ pub enum Color {
     Rgb(u8, u8, u8),
 
     /// The default color (foreground code `39`, background codr `49`).
-    #[default]
     Default,
+}
+
+impl Default for Color {
+    fn default() -> Self {
+        Color::White
+    }
 }
 
 impl Color {
@@ -563,25 +547,6 @@ impl Color {
         }
     }
 
-    /// Returns a `Style` thats resets all styling before applying
-    /// the foreground color set to this color.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use nu_ansi_term::Color;
-    ///
-    /// let style = Color::Fixed(244).reset_before_style();
-    /// println!("{}", style.paint("yo"));
-    /// ```
-    pub fn reset_before_style(self) -> Style {
-        Style {
-            foreground: Some(self),
-            prefix_with_reset: true,
-            ..Style::default()
-        }
-    }
-
     /// Returns a `Style` with the foreground color set to this color and the
     /// background color property set to the given color.
     ///
@@ -634,7 +599,7 @@ mod serde_json_tests {
 
         assert_eq!(
             serde_json::to_string(&colors).unwrap(),
-            "[\"Red\",\"Blue\",{\"Rgb\":[123,123,123]},{\"Fixed\":255}]"
+            String::from("[\"Red\",\"Blue\",{\"Rgb\":[123,123,123]},{\"Fixed\":255}]")
         );
     }
 
@@ -659,6 +624,6 @@ mod serde_json_tests {
     fn style_serialization() {
         let style = Style::default();
 
-        assert_eq!(serde_json::to_string(&style).unwrap(), "{\"foreground\":null,\"background\":null,\"is_bold\":false,\"is_dimmed\":false,\"is_italic\":false,\"is_underline\":false,\"is_blink\":false,\"is_reverse\":false,\"is_hidden\":false,\"is_strikethrough\":false,\"prefix_with_reset\":false}".to_string());
+        assert_eq!(serde_json::to_string(&style).unwrap(), "{\"foreground\":null,\"background\":null,\"is_bold\":false,\"is_dimmed\":false,\"is_italic\":false,\"is_underline\":false,\"is_blink\":false,\"is_reverse\":false,\"is_hidden\":false,\"is_strikethrough\":false}".to_string());
     }
 }

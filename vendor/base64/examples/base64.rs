@@ -2,40 +2,60 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process;
+use std::str::FromStr;
 
-use base64::{alphabet, engine, read, write};
-use clap::Parser;
+use base64::{read, write};
+use structopt::StructOpt;
 
-#[derive(Clone, Debug, Parser, strum::EnumString, Default)]
-#[strum(serialize_all = "kebab-case")]
-enum Alphabet {
-    #[default]
+#[derive(Debug, StructOpt)]
+enum CharacterSet {
     Standard,
     UrlSafe,
 }
 
+impl Default for CharacterSet {
+    fn default() -> Self {
+        CharacterSet::Standard
+    }
+}
+
+impl Into<base64::Config> for CharacterSet {
+    fn into(self) -> base64::Config {
+        match self {
+            CharacterSet::Standard => base64::STANDARD,
+            CharacterSet::UrlSafe => base64::URL_SAFE,
+        }
+    }
+}
+
+impl FromStr for CharacterSet {
+    type Err = String;
+    fn from_str(s: &str) -> Result<CharacterSet, String> {
+        match s {
+            "standard" => Ok(CharacterSet::Standard),
+            "urlsafe" => Ok(CharacterSet::UrlSafe),
+            _ => Err(format!("charset '{}' unrecognized", s)),
+        }
+    }
+}
+
 /// Base64 encode or decode FILE (or standard input), to standard output.
-#[derive(Debug, Parser)]
+#[derive(Debug, StructOpt)]
 struct Opt {
-    /// Decode the base64-encoded input (default: encode the input as base64).
-    #[structopt(short = 'd', long = "decode")]
+    /// decode data
+    #[structopt(short = "d", long = "decode")]
     decode: bool,
-
-    /// The encoding alphabet: "standard" (default) or "url-safe".
-    #[structopt(long = "alphabet")]
-    alphabet: Option<Alphabet>,
-
-    /// Omit padding characters while encoding, and reject them while decoding.
-    #[structopt(short = 'p', long = "no-padding")]
-    no_padding: bool,
-
-    /// The file to encode or decode.
-    #[structopt(name = "FILE", parse(from_os_str))]
+    /// The character set to choose. Defaults to the standard base64 character set.
+    /// Supported character sets include "standard" and "urlsafe".
+    #[structopt(long = "charset")]
+    charset: Option<CharacterSet>,
+    /// The file to encode/decode.
+    #[structopt(parse(from_os_str))]
     file: Option<PathBuf>,
 }
 
 fn main() {
-    let opt = Opt::parse();
+    let opt = Opt::from_args();
     let stdin;
     let mut input: Box<dyn Read> = match opt.file {
         None => {
@@ -48,26 +68,14 @@ fn main() {
         }
         Some(f) => Box::new(File::open(f).unwrap()),
     };
-
-    let alphabet = opt.alphabet.unwrap_or_default();
-    let engine = engine::GeneralPurpose::new(
-        &match alphabet {
-            Alphabet::Standard => alphabet::STANDARD,
-            Alphabet::UrlSafe => alphabet::URL_SAFE,
-        },
-        match opt.no_padding {
-            true => engine::general_purpose::NO_PAD,
-            false => engine::general_purpose::PAD,
-        },
-    );
-
+    let config = opt.charset.unwrap_or_default().into();
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     let r = if opt.decode {
-        let mut decoder = read::DecoderReader::new(&mut input, &engine);
+        let mut decoder = read::DecoderReader::new(&mut input, config);
         io::copy(&mut decoder, &mut stdout)
     } else {
-        let mut encoder = write::EncoderWriter::new(&mut stdout, &engine);
+        let mut encoder = write::EncoderWriter::new(&mut stdout, config);
         io::copy(&mut input, &mut encoder)
     };
     if let Err(e) = r {

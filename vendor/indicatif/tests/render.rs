@@ -169,6 +169,7 @@ fn multi_progress_single_bar_and_clear() {
     drop(pb1);
     assert_eq!(in_mem.contents(), "");
 }
+
 #[test]
 fn multi_progress_two_bars() {
     let in_mem = InMemoryTerm::new(10, 80);
@@ -414,6 +415,78 @@ And so is this
 
 Another line printed"#
             .trim()
+    );
+}
+
+#[test]
+fn multi_progress_move_cursor() {
+    let in_mem = InMemoryTerm::new(10, 80);
+    let mp =
+        MultiProgress::with_draw_target(ProgressDrawTarget::term_like(Box::new(in_mem.clone())));
+    mp.set_move_cursor(true);
+
+    let pb1 = mp.add(ProgressBar::new(10));
+    pb1.tick();
+    assert_eq!(
+        in_mem.moves_since_last_check(),
+        r#"Str("\r")
+Str("░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0/10")
+Str("")
+Flush
+"#
+    );
+
+    let pb2 = mp.add(ProgressBar::new(10));
+    pb2.tick();
+    assert_eq!(
+        in_mem.moves_since_last_check(),
+        r#"Str("\r")
+Str("░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0/10")
+Str("")
+NewLine
+Str("░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0/10")
+Str("")
+Flush
+"#
+    );
+
+    pb1.inc(1);
+    assert_eq!(
+        in_mem.moves_since_last_check(),
+        r#"Up(1)
+Str("\r")
+Str("███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 1/10")
+Str("")
+NewLine
+Str("░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 0/10")
+Str("")
+Flush
+"#
+    );
+}
+
+#[test]
+fn multi_progress_println_bar_with_target() {
+    let in_mem = InMemoryTerm::new(10, 80);
+    let mp =
+        MultiProgress::with_draw_target(ProgressDrawTarget::term_like(Box::new(in_mem.clone())));
+
+    let pb = mp.add(ProgressBar::with_draw_target(
+        Some(10),
+        ProgressDrawTarget::term_like(Box::new(in_mem.clone())),
+    ));
+
+    assert_eq!(in_mem.contents(), "");
+
+    pb.println("message printed :)");
+    pb.inc(2);
+    assert_eq!(
+        in_mem.contents(),
+        r#"
+message printed :)
+███████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 2/10
+            "#
+        .trim()
     );
 }
 
@@ -664,7 +737,7 @@ fn basic_tab_expansion() {
     let mp =
         MultiProgress::with_draw_target(ProgressDrawTarget::term_like(Box::new(in_mem.clone())));
 
-    let mut spinner = mp.add(ProgressBar::new_spinner().with_message("Test\t:)"));
+    let spinner = mp.add(ProgressBar::new_spinner().with_message("Test\t:)"));
     spinner.tick();
 
     // 8 is the default number of spaces
@@ -680,7 +753,7 @@ fn tab_expansion_in_template() {
     let mp =
         MultiProgress::with_draw_target(ProgressDrawTarget::term_like(Box::new(in_mem.clone())));
 
-    let mut spinner = mp.add(
+    let spinner = mp.add(
         ProgressBar::new_spinner()
             .with_message("Test\t:)")
             .with_prefix("Pre\tfix!")
@@ -1240,7 +1313,6 @@ Str("⠁ 1")
 Str("")
 NewLine
 Str("⠁ 2")
-Str("")
 Flush
 Up(3)
 Clear
@@ -1261,7 +1333,6 @@ Str("⠁ 1")
 Str("")
 NewLine
 Str("⠁ 2")
-Str("")
 Flush
 Up(3)
 Clear
@@ -1282,7 +1353,6 @@ Str("⠁ 1")
 Str("")
 NewLine
 Str("⠁ 2")
-Str("")
 Flush
 Up(3)
 Clear
@@ -1303,7 +1373,6 @@ Str("⠁ 1")
 Str("")
 NewLine
 Str("⠁ 2")
-Str("")
 Flush
 "#
     );
@@ -1339,7 +1408,6 @@ Str("⠁ 1")
 Str("")
 NewLine
 Str("⠁ 2")
-Str("")
 Flush
 "#
     );
@@ -1366,7 +1434,6 @@ Str("⠁ 3")
 Str("")
 NewLine
 Str("⠁ 4")
-Str("")
 Flush
 Up(3)
 Clear
@@ -1387,7 +1454,6 @@ Str("⠁ 4")
 Str("")
 NewLine
 Str("⠁ 5")
-Str("")
 Flush
 Up(3)
 Clear
@@ -1450,7 +1516,6 @@ Str("⠁ 6")
 Str("                                                                             ")
 Flush
 Clear
-Str("")
 Flush
 "#
     );
@@ -1560,7 +1625,6 @@ Str("⠁ 1")
 Str("")
 NewLine
 Str("⠁ 2")
-Str("")
 Flush
 Up(3)
 Clear
@@ -1581,7 +1645,6 @@ Str("⠁ 1")
 Str("")
 NewLine
 Str("⠁ 2")
-Str("")
 Flush
 Up(3)
 Clear
@@ -1602,7 +1665,6 @@ Str("⠁ 1")
 Str("")
 NewLine
 Str("⠁ 2")
-Str("")
 Flush
 Up(3)
 Clear
@@ -1623,7 +1685,6 @@ Str("⠁ 1")
 Str("")
 NewLine
 Str("⠁ 2")
-Str("")
 Flush
 "#
     );
@@ -1661,7 +1722,6 @@ Str("⠁ 1")
 Str("")
 NewLine
 Str("⠁ 2")
-Str("")
 Flush
 "#
     );
@@ -1698,7 +1758,6 @@ Str("⠁ 1")
 Str("")
 NewLine
 Str("⠁ 2")
-Str("")
 Flush
 "#
     );
@@ -1730,7 +1789,6 @@ Str("⠁ 2")
 Str("")
 NewLine
 Str("⠁ 4")
-Str("")
 Flush
 Up(3)
 Clear
@@ -1869,4 +1927,30 @@ fn orphan_lines_message_above_progress_bar_test(pb: &ProgressBar, in_mem: &InMem
     }
 
     pb.finish();
+}
+
+/// Test proper wrapping of the text lines before a bar is added. #447 on github.
+#[test]
+fn barless_text_wrapping() {
+    let lorem: &str= "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec nec viverra massa. Nunc nisl lectus, auctor in lorem eu, maximus elementum est.";
+
+    let in_mem = InMemoryTerm::new(40, 80);
+    let mp = indicatif::MultiProgress::with_draw_target(ProgressDrawTarget::term_like(Box::new(
+        in_mem.clone(),
+    )));
+    assert_eq!(in_mem.contents(), String::new());
+
+    for _ in 0..=1 {
+        mp.println(lorem).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100)); // This is primordial. The bug
+                                                                   // came from writing multiple text lines in a row on different ticks.
+    }
+
+    assert_eq!(
+        in_mem.contents(),
+        r#"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec nec viverra massa
+. Nunc nisl lectus, auctor in lorem eu, maximus elementum est.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec nec viverra massa
+. Nunc nisl lectus, auctor in lorem eu, maximus elementum est."#
+    );
 }

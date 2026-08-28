@@ -3,19 +3,18 @@
 
 mod common;
 use common::LogDatabase;
-
 use expect_test::expect;
 use salsa::Setter;
 use test_log::test;
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct MyInput {
     field: u32,
 }
 
 #[salsa::tracked]
 fn final_result(db: &dyn LogDatabase, input: MyInput) -> u32 {
-    db.push_log(format!("final_result({:?})", input));
+    db.push_log(format!("final_result({input:?})"));
     intermediate_result(db, input).field(db) * 2
 }
 
@@ -26,7 +25,7 @@ struct MyTracked<'db> {
 
 #[salsa::tracked]
 fn intermediate_result(db: &dyn LogDatabase, input: MyInput) -> MyTracked<'_> {
-    db.push_log(format!("intermediate_result({:?})", input));
+    db.push_log(format!("intermediate_result({input:?})"));
     MyTracked::new(db, input.field(db) / 2)
 }
 

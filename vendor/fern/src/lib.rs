@@ -1,42 +1,17 @@
 #![deny(missing_docs)]
-#![doc(html_root_url = "https://docs.rs/fern/0.6.2")]
+#![doc(html_root_url = "https://docs.rs/fern/0.7.1")]
 //! Efficient, configurable logging in Rust.
 //!
 //! # fern 0.4.4, 0.5.\*, 0.6.\* security warning - `colored` feature + global allocator
 //!
 //! One of our downstream dependencies, [atty](https://docs.rs/atty/), through
-//! [colored], has an unsoundness issue:
-//! <https://rustsec.org/advisories/RUSTSEC-2021-0145.html>
+//! [colored](https://docs.rs/colored/), has an unsoundness issue:
+//! <https://rustsec.org/advisories/RUSTSEC-2021-0145.html>.
 //!
-//! This shows up in one situation: if you're using `colored` (the crate, or our
+//! This shows up in one situation: if you're using `colored` 0.1.0 (the crate, or our
 //! feature), and a custom global allocator.
 //!
-//! I will be releasing `fern` 0.7.0, removing `colored` as a dependency. This
-//! may add another color crate, or may just document usage of alternatives
-//! (such as [`owo-colors`](https://docs.rs/owo-colors/) +
-//! [`enable-ansi-support`](https://docs.rs/enable-ansi-support/0.2.1/enable_ansi_support/)).
-//!
-//! In the meantime, if you're using `#[global_allocator]`, I highly recommend
-//! removing the `fern/colored` feature.
-//!
-//! Or, for minimal code changes, you can also enable the `colored/no-colors`
-//! feature:
-//!
-//! ```text
-//! cargo add colored --features no-color
-//! ```
-//!
-//! With the `no-color` feature, the vulnerable code will still be present, but
-//! unless you use any of the following APIs manually, it will never be called:
-//!
-//! - [`colored::control::set_override`]
-//! - [`colored::control::unset_override`]
-//! - [`colored::control::ShouldColorize::from_env`]
-//! - [`colored::control::SHOULD_COLORIZE`][struct@colored::control::SHOULD_COLORIZE]
-//!   (referencing this `lazy_static!` variable will initialize it, running the
-//!   vulnerable code)
-//!
-//! See <https://github.com/daboross/fern/issues/113> for further discussion.
+//! Upgrade to `fern` 0.7.0, and `colored` 0.2.0 if you depend on it directly, to fix this issue.
 //!
 //! # Depending on fern
 //!
@@ -45,7 +20,7 @@
 //! ```toml
 //! [dependencies]
 //! log = "0.4"
-//! fern = "0.6"
+//! fern = "0.7"
 //! ```
 //!
 //! # Example setup
@@ -144,7 +119,7 @@
 //!
 //! `humantime` is a nice light dependency, but only offers this one format.
 //! For more custom time formatting, I recommend
-//! [`chrono`](https://docs.rs/chrono/) or [`time`](https://docs.rs/time/).
+//! [`jiff`](https://docs.rs/jiff/).
 //!
 //! Now, back to the [`Dispatch`] methods:
 //!
@@ -249,8 +224,8 @@
 //! [`Stdout`]: std::io::Stdout
 //! [`Stderr`]: std::io::Stderr
 //! [`File`]: std::fs::File
-//! [full example program]: https://github.com/daboross/fern/tree/fern-0.6.2/examples/cmd-program.rs
-//! [syslog full example program]: https://github.com/daboross/fern/tree/fern-0.6.2/examples/syslog.rs
+//! [full example program]: https://github.com/daboross/fern/tree/fern-0.7.0/examples/cmd-program.rs
+//! [syslog full example program]: https://github.com/daboross/fern/tree/fern-0.7.0/examples/syslog.rs
 //! [`humantime::format_rfc3339_seconds`]: https://docs.rs/humantime/2/humantime/fn.format_rfc3339_seconds.html
 use std::{
     convert::AsRef,
@@ -262,6 +237,9 @@ use std::{
 
 #[cfg(all(not(windows), any(feature = "syslog-4", feature = "syslog-6")))]
 use std::collections::HashMap;
+
+#[cfg(all(not(windows), feature = "syslog-7"))]
+use std::collections::BTreeMap;
 
 pub use crate::{
     builders::{Dispatch, Output, Panic},
@@ -316,6 +294,12 @@ type Syslog6Rfc3164Logger = syslog6::Logger<syslog6::LoggerBackend, syslog6::For
 #[cfg(all(not(windows), feature = "syslog-6"))]
 type Syslog6Rfc5424Logger = syslog6::Logger<syslog6::LoggerBackend, syslog6::Formatter5424>;
 
+#[cfg(all(not(windows), feature = "syslog-7"))]
+type Syslog7Rfc3164Logger = syslog7::Logger<syslog7::LoggerBackend, syslog7::Formatter3164>;
+
+#[cfg(all(not(windows), feature = "syslog-7"))]
+type Syslog7Rfc5424Logger = syslog7::Logger<syslog7::LoggerBackend, syslog7::Formatter5424>;
+
 #[cfg(all(not(windows), feature = "syslog-4"))]
 type Syslog4TransformFn =
     dyn Fn(&log::Record) -> (i32, HashMap<String, HashMap<String, String>>, String) + Send + Sync;
@@ -323,6 +307,10 @@ type Syslog4TransformFn =
 #[cfg(all(not(windows), feature = "syslog-6"))]
 type Syslog6TransformFn =
     dyn Fn(&log::Record) -> (u32, HashMap<String, HashMap<String, String>>, String) + Send + Sync;
+
+#[cfg(all(not(windows), feature = "syslog-7"))]
+type Syslog7TransformFn =
+    dyn Fn(&log::Record) -> (u32, BTreeMap<String, BTreeMap<String, String>>, String) + Send + Sync;
 
 /// Convenience method for opening a log file with common options.
 ///
@@ -342,11 +330,7 @@ type Syslog6TransformFn =
 /// [`OpenOptions`]: https://doc.rust-lang.org/std/fs/struct.OpenOptions.html
 #[inline]
 pub fn log_file<P: AsRef<Path>>(path: P) -> io::Result<File> {
-    OpenOptions::new()
-        .write(true)
-        .create(true)
-        .append(true)
-        .open(path)
+    OpenOptions::new().create(true).append(true).open(path)
 }
 
 /// Convenience method for opening a re-openable log file with common options.

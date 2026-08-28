@@ -1,7 +1,8 @@
+#![deny(clippy::undocumented_unsafe_blocks)]
+#![forbid(unsafe_op_in_unsafe_fn)]
+
 mod accumulator;
 mod active_query;
-mod alloc;
-mod array;
 mod attach;
 mod cancelled;
 mod cycle;
@@ -13,50 +14,53 @@ mod function;
 mod hash;
 mod id;
 mod ingredient;
-mod ingredient_list;
 mod input;
 mod interned;
 mod key;
+mod memo_ingredient_indices;
 mod nonce;
+#[cfg(feature = "rayon")]
+mod parallel;
+mod return_mode;
 mod revision;
 mod runtime;
 mod salsa_struct;
 mod storage;
+mod sync;
+mod table;
 mod tracked_struct;
 mod update;
 mod views;
 mod zalsa;
 mod zalsa_local;
 
+#[cfg(feature = "rayon")]
+pub use parallel::{join, par_map};
+#[cfg(feature = "macros")]
+pub use salsa_macros::{accumulator, db, input, interned, tracked, Supertype, Update};
+
 pub use self::accumulator::Accumulator;
+pub use self::active_query::Backtrace;
 pub use self::cancelled::Cancelled;
-pub use self::cycle::Cycle;
-pub use self::database::AsDynDatabase;
-pub use self::database::Database;
+pub use self::cycle::CycleRecoveryAction;
+pub use self::database::{AsDynDatabase, Database};
 pub use self::database_impl::DatabaseImpl;
 pub use self::durability::Durability;
-pub use self::event::Event;
-pub use self::event::EventKind;
+pub use self::event::{Event, EventKind};
 pub use self::id::Id;
 pub use self::input::setter::Setter;
 pub use self::key::DatabaseKeyIndex;
+pub use self::return_mode::SalsaAsDeref;
+pub use self::return_mode::SalsaAsRef;
 pub use self::revision::Revision;
 pub use self::runtime::Runtime;
-pub use self::storage::Storage;
+pub use self::storage::{Storage, StorageHandle};
 pub use self::update::Update;
 pub use self::zalsa::IngredientIndex;
-pub use crate::attach::with_attached_database;
-pub use salsa_macros::accumulator;
-pub use salsa_macros::db;
-pub use salsa_macros::input;
-pub use salsa_macros::interned;
-pub use salsa_macros::tracked;
-pub use salsa_macros::Update;
+pub use crate::attach::{attach, with_attached_database};
 
 pub mod prelude {
-    pub use crate::Accumulator;
-    pub use crate::Database;
-    pub use crate::Setter;
+    pub use crate::{Accumulator, Database, Setter};
 }
 
 /// Internal names used by salsa macros.
@@ -64,88 +68,68 @@ pub mod prelude {
 /// # WARNING
 ///
 /// The contents of this module are NOT subject to semver.
+#[doc(hidden)]
 pub mod plumbing {
+    pub use std::any::TypeId;
+    pub use std::option::Option::{self, None, Some};
+
+    pub use salsa_macro_rules::{
+        macro_if, maybe_backdate, maybe_default, maybe_default_tt, return_mode_expression,
+        return_mode_ty, setup_accumulator_impl, setup_input_struct, setup_interned_struct,
+        setup_tracked_assoc_fn_body, setup_tracked_fn, setup_tracked_method_body,
+        setup_tracked_struct, unexpected_cycle_initial, unexpected_cycle_recovery,
+    };
+
     pub use crate::accumulator::Accumulator;
-    pub use crate::array::Array;
-    pub use crate::attach::attach;
-    pub use crate::attach::with_attached_database;
-    pub use crate::cycle::Cycle;
-    pub use crate::cycle::CycleRecoveryStrategy;
-    pub use crate::database::current_revision;
-    pub use crate::database::Database;
-    pub use crate::function::should_backdate_value;
-    pub use crate::id::AsId;
-    pub use crate::id::FromId;
-    pub use crate::id::Id;
-    pub use crate::id::LookupId;
-    pub use crate::ingredient::Ingredient;
-    pub use crate::ingredient::Jar;
+    pub use crate::attach::{attach, with_attached_database};
+    pub use crate::cycle::{CycleRecoveryAction, CycleRecoveryStrategy};
+    pub use crate::database::{current_revision, Database};
+    pub use crate::durability::Durability;
+    pub use crate::id::{AsId, FromId, FromIdWithDb, Id};
+    pub use crate::ingredient::{Ingredient, Jar, Location};
     pub use crate::key::DatabaseKeyIndex;
+    pub use crate::memo_ingredient_indices::{
+        IngredientIndices, MemoIngredientIndices, MemoIngredientMap, MemoIngredientSingletonIndex,
+        NewMemoIngredientIndices,
+    };
     pub use crate::revision::Revision;
-    pub use crate::runtime::stamp;
-    pub use crate::runtime::Runtime;
-    pub use crate::runtime::Stamp;
-    pub use crate::runtime::StampedValue;
+    pub use crate::runtime::{stamp, Runtime, Stamp};
     pub use crate::salsa_struct::SalsaStructInDb;
-    pub use crate::storage::HasStorage;
-    pub use crate::storage::Storage;
+    pub use crate::storage::{HasStorage, Storage};
     pub use crate::tracked_struct::TrackedStructInDb;
-    pub use crate::update::always_update;
-    pub use crate::update::helper::Dispatch as UpdateDispatch;
-    pub use crate::update::helper::Fallback as UpdateFallback;
-    pub use crate::update::Update;
-    pub use crate::zalsa::views;
-    pub use crate::zalsa::IngredientCache;
-    pub use crate::zalsa::IngredientIndex;
-    pub use crate::zalsa::Zalsa;
-    pub use crate::zalsa::ZalsaDatabase;
+    pub use crate::update::helper::{Dispatch as UpdateDispatch, Fallback as UpdateFallback};
+    pub use crate::update::{always_update, Update};
+    pub use crate::zalsa::{
+        transmute_data_ptr, views, IngredientCache, IngredientIndex, Zalsa, ZalsaDatabase,
+    };
     pub use crate::zalsa_local::ZalsaLocal;
 
-    pub use salsa_macro_rules::macro_if;
-    pub use salsa_macro_rules::maybe_backdate;
-    pub use salsa_macro_rules::maybe_clone;
-    pub use salsa_macro_rules::maybe_cloned_ty;
-    pub use salsa_macro_rules::maybe_default;
-    pub use salsa_macro_rules::maybe_default_tt;
-    pub use salsa_macro_rules::setup_accumulator_impl;
-    pub use salsa_macro_rules::setup_input_struct;
-    pub use salsa_macro_rules::setup_interned_struct;
-    pub use salsa_macro_rules::setup_method_body;
-    pub use salsa_macro_rules::setup_tracked_fn;
-    pub use salsa_macro_rules::setup_tracked_struct;
-    pub use salsa_macro_rules::unexpected_cycle_recovery;
-
     pub mod accumulator {
-        pub use crate::accumulator::IngredientImpl;
-        pub use crate::accumulator::JarImpl;
+        pub use crate::accumulator::{IngredientImpl, JarImpl};
     }
 
     pub mod input {
         pub use crate::input::input_field::FieldIngredientImpl;
         pub use crate::input::setter::SetterImpl;
-        pub use crate::input::Configuration;
-        pub use crate::input::HasBuilder;
-        pub use crate::input::IngredientImpl;
-        pub use crate::input::JarImpl;
+        pub use crate::input::singleton::{NotSingleton, Singleton};
+        pub use crate::input::{Configuration, HasBuilder, IngredientImpl, JarImpl, Value};
     }
 
     pub mod interned {
-        pub use crate::interned::Configuration;
-        pub use crate::interned::IngredientImpl;
-        pub use crate::interned::JarImpl;
-        pub use crate::interned::Value;
+        pub use crate::interned::{
+            Configuration, HashEqLike, IngredientImpl, JarImpl, Lookup, Value,
+        };
     }
 
     pub mod function {
         pub use crate::function::Configuration;
         pub use crate::function::IngredientImpl;
+        pub use crate::function::Memo;
+        pub use crate::table::memo::MemoEntryType;
     }
 
     pub mod tracked_struct {
         pub use crate::tracked_struct::tracked_field::FieldIngredientImpl;
-        pub use crate::tracked_struct::Configuration;
-        pub use crate::tracked_struct::IngredientImpl;
-        pub use crate::tracked_struct::JarImpl;
-        pub use crate::tracked_struct::Value;
+        pub use crate::tracked_struct::{Configuration, IngredientImpl, JarImpl, Value};
     }
 }

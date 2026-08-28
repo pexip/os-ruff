@@ -13,9 +13,14 @@
 edition = "2021"
 rust-version = "1.60"
 name = "schemars"
-version = "0.8.21"
+version = "0.8.22"
 authors = ["Graham Esau <gesau@hotmail.co.uk>"]
 build = "build.rs"
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Generate JSON Schemas from Rust code"
 homepage = "https://graham.cool/schemars/"
 readme = "README.md"
@@ -31,75 +36,266 @@ repository = "https://github.com/GREsau/schemars"
 [package.metadata.docs.rs]
 all-features = true
 
-[[test]]
-name = "chrono"
-required-features = ["chrono"]
+[lib]
+name = "schemars"
+path = "src/lib.rs"
 
-[[test]]
-name = "indexmap"
-required-features = ["indexmap"]
+[[example]]
+name = "custom_serialization"
+path = "examples/custom_serialization.rs"
 
-[[test]]
-name = "indexmap2"
-required-features = ["indexmap2"]
+[[example]]
+name = "custom_settings"
+path = "examples/custom_settings.rs"
 
-[[test]]
-name = "either"
-required-features = ["either"]
+[[example]]
+name = "doc_comments"
+path = "examples/doc_comments.rs"
 
-[[test]]
-name = "uuid"
-required-features = [
-    "uuid08",
-    "uuid1",
-]
+[[example]]
+name = "enum_repr"
+path = "examples/enum_repr.rs"
 
-[[test]]
-name = "smallvec"
-required-features = ["smallvec"]
+[[example]]
+name = "from_value"
+path = "examples/from_value.rs"
 
-[[test]]
-name = "bytes"
-required-features = ["bytes"]
+[[example]]
+name = "main"
+path = "examples/main.rs"
+
+[[example]]
+name = "remote_derive"
+path = "examples/remote_derive.rs"
+
+[[example]]
+name = "schemars_attrs"
+path = "examples/schemars_attrs.rs"
+
+[[example]]
+name = "serde_attrs"
+path = "examples/serde_attrs.rs"
+
+[[example]]
+name = "validate"
+path = "examples/validate.rs"
 
 [[test]]
 name = "arrayvec"
+path = "tests/arrayvec.rs"
 required-features = [
     "arrayvec05",
     "arrayvec07",
 ]
 
 [[test]]
-name = "schema_for_schema"
-required-features = ["impl_json_schema"]
+name = "bound"
+path = "tests/bound.rs"
 
 [[test]]
-name = "ui"
-required-features = ["ui_test"]
+name = "bytes"
+path = "tests/bytes.rs"
+required-features = ["bytes"]
 
 [[test]]
-name = "url"
-required-features = ["url"]
+name = "chrono"
+path = "tests/chrono.rs"
+required-features = ["chrono"]
 
 [[test]]
-name = "enumset"
-required-features = ["enumset"]
-
-[[test]]
-name = "smol_str"
-required-features = ["smol_str"]
-
-[[test]]
-name = "semver"
-required-features = ["semver"]
+name = "crate_alias"
+path = "tests/crate_alias.rs"
 
 [[test]]
 name = "decimal"
+path = "tests/decimal.rs"
 required-features = [
     "rust_decimal",
     "bigdecimal03",
     "bigdecimal04",
 ]
+
+[[test]]
+name = "default"
+path = "tests/default.rs"
+
+[[test]]
+name = "deprecated"
+path = "tests/deprecated.rs"
+
+[[test]]
+name = "dereference"
+path = "tests/dereference.rs"
+
+[[test]]
+name = "docs"
+path = "tests/docs.rs"
+
+[[test]]
+name = "either"
+path = "tests/either.rs"
+required-features = ["either"]
+
+[[test]]
+name = "enum"
+path = "tests/enum.rs"
+
+[[test]]
+name = "enum_deny_unknown_fields"
+path = "tests/enum_deny_unknown_fields.rs"
+
+[[test]]
+name = "enum_repr"
+path = "tests/enum_repr.rs"
+
+[[test]]
+name = "enumset"
+path = "tests/enumset.rs"
+required-features = ["enumset"]
+
+[[test]]
+name = "examples"
+path = "tests/examples.rs"
+
+[[test]]
+name = "ffi"
+path = "tests/ffi.rs"
+
+[[test]]
+name = "flatten"
+path = "tests/flatten.rs"
+
+[[test]]
+name = "from_value"
+path = "tests/from_value.rs"
+
+[[test]]
+name = "indexmap"
+path = "tests/indexmap.rs"
+required-features = ["indexmap"]
+
+[[test]]
+name = "indexmap2"
+path = "tests/indexmap2.rs"
+required-features = ["indexmap2"]
+
+[[test]]
+name = "inline_subschemas"
+path = "tests/inline_subschemas.rs"
+
+[[test]]
+name = "macro"
+path = "tests/macro.rs"
+
+[[test]]
+name = "nonzero_ints"
+path = "tests/nonzero_ints.rs"
+
+[[test]]
+name = "property_name"
+path = "tests/property_name.rs"
+
+[[test]]
+name = "range"
+path = "tests/range.rs"
+
+[[test]]
+name = "remote_derive"
+path = "tests/remote_derive.rs"
+
+[[test]]
+name = "remote_derive_generic"
+path = "tests/remote_derive_generic.rs"
+
+[[test]]
+name = "result"
+path = "tests/result.rs"
+
+[[test]]
+name = "same_name"
+path = "tests/same_name.rs"
+
+[[test]]
+name = "schema_for_schema"
+path = "tests/schema_for_schema.rs"
+required-features = ["impl_json_schema"]
+
+[[test]]
+name = "schema_name"
+path = "tests/schema_name.rs"
+
+[[test]]
+name = "schema_settings"
+path = "tests/schema_settings.rs"
+
+[[test]]
+name = "schema_with_enum"
+path = "tests/schema_with_enum.rs"
+
+[[test]]
+name = "schema_with_struct"
+path = "tests/schema_with_struct.rs"
+
+[[test]]
+name = "semver"
+path = "tests/semver.rs"
+required-features = ["semver"]
+
+[[test]]
+name = "skip"
+path = "tests/skip.rs"
+
+[[test]]
+name = "smallvec"
+path = "tests/smallvec.rs"
+required-features = ["smallvec"]
+
+[[test]]
+name = "smol_str"
+path = "tests/smol_str.rs"
+required-features = ["smol_str"]
+
+[[test]]
+name = "struct"
+path = "tests/struct.rs"
+
+[[test]]
+name = "struct_additional_properties"
+path = "tests/struct_additional_properties.rs"
+
+[[test]]
+name = "time"
+path = "tests/time.rs"
+
+[[test]]
+name = "transparent"
+path = "tests/transparent.rs"
+
+[[test]]
+name = "ui"
+path = "tests/ui.rs"
+required-features = ["ui_test"]
+
+[[test]]
+name = "url"
+path = "tests/url.rs"
+required-features = ["url"]
+
+[[test]]
+name = "uuid"
+path = "tests/uuid.rs"
+required-features = [
+    "uuid08",
+    "uuid1",
+]
+
+[[test]]
+name = "validate"
+path = "tests/validate.rs"
+
+[[test]]
+name = "validate_inner"
+path = "tests/validate_inner.rs"
 
 [dependencies.arrayvec05]
 version = "0.5"
@@ -163,7 +359,7 @@ optional = true
 default-features = false
 
 [dependencies.schemars_derive]
-version = "=0.8.21"
+version = "=0.8.22"
 optional = true
 
 [dependencies.semver]

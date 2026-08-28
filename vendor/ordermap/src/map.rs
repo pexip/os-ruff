@@ -49,7 +49,7 @@ use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::collections::hash_map::RandomState;
 
-use crate::{Equivalent, TryReserveError};
+use crate::{Equivalent, GetDisjointMutError, TryReserveError};
 
 /// A hash table where the iteration order of the key-value pairs is independent
 /// of the hash values of the keys.
@@ -274,6 +274,7 @@ impl<K, V, S> OrderMap<K, V, S> {
     ///
     /// ***Panics*** if the starting point is greater than the end point or if
     /// the end point is greater than the length of the map.
+    #[track_caller]
     pub fn drain<R>(&mut self, range: R) -> Drain<'_, K, V>
     where
         R: RangeBounds<usize>,
@@ -288,6 +289,7 @@ impl<K, V, S> OrderMap<K, V, S> {
     /// the elements `[0, at)` with its previous capacity unchanged.
     ///
     /// ***Panics*** if `at > len`.
+    #[track_caller]
     pub fn split_off(&mut self, at: usize) -> Self
     where
         S: Clone,
@@ -393,7 +395,7 @@ where
     ///
     /// This is equivalent to finding the position with
     /// [`binary_search_keys`][Self::binary_search_keys], then either updating
-    /// it or calling [`shift_insert`][Self::shift_insert] for a new key.
+    /// it or calling [`insert_before`][Self::insert_before] for a new key.
     ///
     /// If the sorted key is found in the map, its corresponding value is
     /// updated with `value`, and the older value is returned inside
@@ -415,21 +417,117 @@ where
         self.inner.insert_sorted(key, value)
     }
 
-    /// Insert a key-value pair in the map at the given index.
+    /// Insert a key-value pair in the map before the entry at the given index, or at the end.
     ///
     /// If an equivalent key already exists in the map: the key remains and
     /// is moved to the new position in the map, its corresponding value is updated
-    /// with `value`, and the older value is returned inside `Some(_)`.
+    /// with `value`, and the older value is returned inside `Some(_)`. The returned index
+    /// will either be the given index or one less, depending on how the entry moved.
+    /// (See [`shift_insert`](Self::shift_insert) for different behavior here.)
     ///
     /// If no equivalent key existed in the map: the new key-value pair is
-    /// inserted at the given index, and `None` is returned.
+    /// inserted exactly at the given index, and `None` is returned.
     ///
     /// ***Panics*** if `index` is out of bounds.
+    /// Valid indices are `0..=map.len()` (inclusive).
     ///
     /// Computes in **O(n)** time (average).
     ///
     /// See also [`entry`][Self::entry] if you want to insert *or* modify,
     /// perhaps only using the index for new entries with [`VacantEntry::shift_insert`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ordermap::OrderMap;
+    /// let mut map: OrderMap<char, ()> = ('a'..='z').map(|c| (c, ())).collect();
+    ///
+    /// // The new key '*' goes exactly at the given index.
+    /// assert_eq!(map.get_index_of(&'*'), None);
+    /// assert_eq!(map.insert_before(10, '*', ()), (10, None));
+    /// assert_eq!(map.get_index_of(&'*'), Some(10));
+    ///
+    /// // Moving the key 'a' up will shift others down, so this moves *before* 10 to index 9.
+    /// assert_eq!(map.insert_before(10, 'a', ()), (9, Some(())));
+    /// assert_eq!(map.get_index_of(&'a'), Some(9));
+    /// assert_eq!(map.get_index_of(&'*'), Some(10));
+    ///
+    /// // Moving the key 'z' down will shift others up, so this moves to exactly 10.
+    /// assert_eq!(map.insert_before(10, 'z', ()), (10, Some(())));
+    /// assert_eq!(map.get_index_of(&'z'), Some(10));
+    /// assert_eq!(map.get_index_of(&'*'), Some(11));
+    ///
+    /// // Moving or inserting before the endpoint is also valid.
+    /// assert_eq!(map.len(), 27);
+    /// assert_eq!(map.insert_before(map.len(), '*', ()), (26, Some(())));
+    /// assert_eq!(map.get_index_of(&'*'), Some(26));
+    /// assert_eq!(map.insert_before(map.len(), '+', ()), (27, None));
+    /// assert_eq!(map.get_index_of(&'+'), Some(27));
+    /// assert_eq!(map.len(), 28);
+    /// ```
+    #[track_caller]
+    pub fn insert_before(&mut self, index: usize, key: K, value: V) -> (usize, Option<V>) {
+        self.inner.insert_before(index, key, value)
+    }
+
+    /// Insert a key-value pair in the map at the given index.
+    ///
+    /// If an equivalent key already exists in the map: the key remains and
+    /// is moved to the given index in the map, its corresponding value is updated
+    /// with `value`, and the older value is returned inside `Some(_)`.
+    /// Note that existing entries **cannot** be moved to `index == map.len()`!
+    /// (See [`insert_before`](Self::insert_before) for different behavior here.)
+    ///
+    /// If no equivalent key existed in the map: the new key-value pair is
+    /// inserted at the given index, and `None` is returned.
+    ///
+    /// ***Panics*** if `index` is out of bounds.
+    /// Valid indices are `0..map.len()` (exclusive) when moving an existing entry, or
+    /// `0..=map.len()` (inclusive) when inserting a new key.
+    ///
+    /// Computes in **O(n)** time (average).
+    ///
+    /// See also [`entry`][Self::entry] if you want to insert *or* modify,
+    /// perhaps only using the index for new entries with [`VacantEntry::shift_insert`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ordermap::OrderMap;
+    /// let mut map: OrderMap<char, ()> = ('a'..='z').map(|c| (c, ())).collect();
+    ///
+    /// // The new key '*' goes exactly at the given index.
+    /// assert_eq!(map.get_index_of(&'*'), None);
+    /// assert_eq!(map.shift_insert(10, '*', ()), None);
+    /// assert_eq!(map.get_index_of(&'*'), Some(10));
+    ///
+    /// // Moving the key 'a' up to 10 will shift others down, including the '*' that was at 10.
+    /// assert_eq!(map.shift_insert(10, 'a', ()), Some(()));
+    /// assert_eq!(map.get_index_of(&'a'), Some(10));
+    /// assert_eq!(map.get_index_of(&'*'), Some(9));
+    ///
+    /// // Moving the key 'z' down to 9 will shift others up, including the '*' that was at 9.
+    /// assert_eq!(map.shift_insert(9, 'z', ()), Some(()));
+    /// assert_eq!(map.get_index_of(&'z'), Some(9));
+    /// assert_eq!(map.get_index_of(&'*'), Some(10));
+    ///
+    /// // Existing keys can move to len-1 at most, but new keys can insert at the endpoint.
+    /// assert_eq!(map.len(), 27);
+    /// assert_eq!(map.shift_insert(map.len() - 1, '*', ()), Some(()));
+    /// assert_eq!(map.get_index_of(&'*'), Some(26));
+    /// assert_eq!(map.shift_insert(map.len(), '+', ()), None);
+    /// assert_eq!(map.get_index_of(&'+'), Some(27));
+    /// assert_eq!(map.len(), 28);
+    /// ```
+    ///
+    /// ```should_panic
+    /// use ordermap::OrderMap;
+    /// let mut map: OrderMap<char, ()> = ('a'..='z').map(|c| (c, ())).collect();
+    ///
+    /// // This is an invalid index for moving an existing key!
+    /// map.shift_insert(map.len(), 'a', ());
+    /// ```
+    #[track_caller]
     pub fn shift_insert(&mut self, index: usize, key: K, value: V) -> Option<V> {
         self.inner.shift_insert(index, key, value)
     }
@@ -472,12 +570,42 @@ where
     /// assert!(map.into_iter().eq([(0, '_'), (1, 'A'), (5, 'E'), (3, 'C'), (2, 'B'), (4, 'D')]));
     /// assert_eq!(removed, &[(2, 'b'), (3, 'c')]);
     /// ```
+    #[track_caller]
     pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter, K, V, S>
     where
         R: RangeBounds<usize>,
         I: IntoIterator<Item = (K, V)>,
     {
         self.inner.splice(range, replace_with)
+    }
+
+    /// Moves all key-value pairs from `other` into `self`, leaving `other` empty.
+    ///
+    /// This is equivalent to calling [`insert`][Self::insert] for each
+    /// key-value pair from `other` in order, which means that for keys that
+    /// already exist in `self`, their value is updated in the current position.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ordermap::OrderMap;
+    ///
+    /// // Note: Key (3) is present in both maps.
+    /// let mut a = OrderMap::from([(3, "c"), (2, "b"), (1, "a")]);
+    /// let mut b = OrderMap::from([(3, "d"), (4, "e"), (5, "f")]);
+    /// let old_capacity = b.capacity();
+    ///
+    /// a.append(&mut b);
+    ///
+    /// assert_eq!(a.len(), 5);
+    /// assert_eq!(b.len(), 0);
+    /// assert_eq!(b.capacity(), old_capacity);
+    ///
+    /// assert!(a.keys().eq(&[3, 2, 1, 4, 5]));
+    /// assert_eq!(a[&3], "d"); // "c" was overwritten.
+    /// ```
+    pub fn append<S2>(&mut self, other: &mut OrderMap<K, V, S2>) {
+        self.inner.append(&mut other.inner);
     }
 }
 
@@ -547,6 +675,21 @@ where
         Q: ?Sized + Hash + Equivalent<K>,
     {
         self.inner.get_full_mut(key)
+    }
+
+    /// Return the values for `N` keys. If any key is duplicated, this function will panic.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut map = ordermap::OrderMap::from([(1, 'a'), (3, 'b'), (2, 'c')]);
+    /// assert_eq!(map.get_disjoint_mut([&2, &1]), [Some(&mut 'c'), Some(&mut 'a')]);
+    /// ```
+    pub fn get_disjoint_mut<Q, const N: usize>(&mut self, keys: [&Q; N]) -> [Option<&mut V>; N]
+    where
+        Q: ?Sized + Hash + Equivalent<K>,
+    {
+        self.inner.get_disjoint_mut(keys)
     }
 
     /// Remove the key-value pair equivalent to `key` and return its value.
@@ -658,6 +801,7 @@ impl<K, V, S> OrderMap<K, V, S> {
     /// This preserves the order of the remaining elements.
     ///
     /// Computes in **O(1)** time (average).
+    #[doc(alias = "pop_last")] // like `BTreeMap`
     pub fn pop(&mut self) -> Option<(K, V)> {
         self.inner.pop()
     }
@@ -857,7 +1001,7 @@ impl<K, V, S> OrderMap<K, V, S> {
 
     /// Get a key-value pair by index
     ///
-    /// Valid indices are *0 <= index < self.len()*
+    /// Valid indices are `0 <= index < self.len()`.
     ///
     /// Computes in **O(1)** time.
     pub fn get_index(&self, index: usize) -> Option<(&K, &V)> {
@@ -866,7 +1010,7 @@ impl<K, V, S> OrderMap<K, V, S> {
 
     /// Get a key-value pair by index
     ///
-    /// Valid indices are *0 <= index < self.len()*
+    /// Valid indices are `0 <= index < self.len()`.
     ///
     /// Computes in **O(1)** time.
     pub fn get_index_mut(&mut self, index: usize) -> Option<(&K, &mut V)> {
@@ -875,16 +1019,33 @@ impl<K, V, S> OrderMap<K, V, S> {
 
     /// Get an entry in the map by index for in-place manipulation.
     ///
-    /// Valid indices are *0 <= index < self.len()*
+    /// Valid indices are `0 <= index < self.len()`.
     ///
     /// Computes in **O(1)** time.
     pub fn get_index_entry(&mut self, index: usize) -> Option<IndexedEntry<'_, K, V>> {
         self.inner.get_index_entry(index).map(IndexedEntry::new)
     }
 
+    /// Get an array of `N` key-value pairs by `N` indices
+    ///
+    /// Valid indices are *0 <= index < self.len()* and each index needs to be unique.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut map = ordermap::OrderMap::from([(1, 'a'), (3, 'b'), (2, 'c')]);
+    /// assert_eq!(map.get_disjoint_indices_mut([2, 0]), Ok([(&2, &mut 'c'), (&1, &mut 'a')]));
+    /// ```
+    pub fn get_disjoint_indices_mut<const N: usize>(
+        &mut self,
+        indices: [usize; N],
+    ) -> Result<[(&K, &mut V); N], GetDisjointMutError> {
+        self.as_mut_slice().get_disjoint_mut(indices)
+    }
+
     /// Returns a slice of key-value pairs in the given range of indices.
     ///
-    /// Valid indices are *0 <= index < self.len()*
+    /// Valid indices are `0 <= index < self.len()`.
     ///
     /// Computes in **O(1)** time.
     pub fn get_range<R: RangeBounds<usize>>(&self, range: R) -> Option<&Slice<K, V>> {
@@ -893,7 +1054,7 @@ impl<K, V, S> OrderMap<K, V, S> {
 
     /// Returns a mutable slice of key-value pairs in the given range of indices.
     ///
-    /// Valid indices are *0 <= index < self.len()*
+    /// Valid indices are `0 <= index < self.len()`.
     ///
     /// Computes in **O(1)** time.
     pub fn get_range_mut<R: RangeBounds<usize>>(&mut self, range: R) -> Option<&mut Slice<K, V>> {
@@ -903,6 +1064,7 @@ impl<K, V, S> OrderMap<K, V, S> {
     /// Get the first key-value pair
     ///
     /// Computes in **O(1)** time.
+    #[doc(alias = "first_key_value")] // like `BTreeMap`
     pub fn first(&self) -> Option<(&K, &V)> {
         self.inner.first()
     }
@@ -914,9 +1076,17 @@ impl<K, V, S> OrderMap<K, V, S> {
         self.inner.first_mut()
     }
 
+    /// Get the first entry in the map for in-place manipulation.
+    ///
+    /// Computes in **O(1)** time.
+    pub fn first_entry(&mut self) -> Option<IndexedEntry<'_, K, V>> {
+        self.inner.first_entry().map(IndexedEntry::new)
+    }
+
     /// Get the last key-value pair
     ///
     /// Computes in **O(1)** time.
+    #[doc(alias = "last_key_value")] // like `BTreeMap`
     pub fn last(&self) -> Option<(&K, &V)> {
         self.inner.last()
     }
@@ -928,9 +1098,16 @@ impl<K, V, S> OrderMap<K, V, S> {
         self.inner.last_mut()
     }
 
+    /// Get the last entry in the map for in-place manipulation.
+    ///
+    /// Computes in **O(1)** time.
+    pub fn last_entry(&mut self) -> Option<IndexedEntry<'_, K, V>> {
+        self.inner.last_entry().map(IndexedEntry::new)
+    }
+
     /// Remove the key-value pair by index
     ///
-    /// Valid indices are *0 <= index < self.len()*
+    /// Valid indices are `0 <= index < self.len()`
     ///
     /// **NOTE:** This is equivalent to [`IndexMap::shift_remove_index`], and
     /// like [`Vec::remove`], the pair is removed by shifting all of the
@@ -944,7 +1121,7 @@ impl<K, V, S> OrderMap<K, V, S> {
 
     /// Remove the key-value pair by index
     ///
-    /// Valid indices are *0 <= index < self.len()*
+    /// Valid indices are `0 <= index < self.len()`.
     ///
     /// Like [`Vec::swap_remove`], the pair is removed by swapping it with the
     /// last element of the map and popping it off. **This perturbs
@@ -964,6 +1141,7 @@ impl<K, V, S> OrderMap<K, V, S> {
     /// ***Panics*** if `from` or `to` are out of bounds.
     ///
     /// Computes in **O(n)** time (average).
+    #[track_caller]
     pub fn move_index(&mut self, from: usize, to: usize) {
         self.inner.move_index(from, to)
     }
@@ -973,6 +1151,7 @@ impl<K, V, S> OrderMap<K, V, S> {
     /// ***Panics*** if `a` or `b` are out of bounds.
     ///
     /// Computes in **O(1)** time (average).
+    #[track_caller]
     pub fn swap_indices(&mut self, a: usize, b: usize) {
         self.inner.swap_indices(a, b)
     }
@@ -1011,7 +1190,7 @@ where
     ///
     /// ***Panics*** if `key` is not present in the map.
     fn index(&self, key: &Q) -> &V {
-        self.get(key).expect("OrderMap: key not found")
+        self.get(key).expect("no entry found for key")
     }
 }
 
@@ -1053,7 +1232,7 @@ where
     ///
     /// ***Panics*** if `key` is not present in the map.
     fn index_mut(&mut self, key: &Q) -> &mut V {
-        self.get_mut(key).expect("OrderMap: key not found")
+        self.get_mut(key).expect("no entry found for key")
     }
 }
 
@@ -1097,7 +1276,12 @@ impl<K, V, S> Index<usize> for OrderMap<K, V, S> {
     /// ***Panics*** if `index` is out of bounds.
     fn index(&self, index: usize) -> &V {
         self.get_index(index)
-            .expect("OrderMap: index out of bounds")
+            .unwrap_or_else(|| {
+                panic!(
+                    "index out of bounds: the len is {len} but the index is {index}",
+                    len = self.len()
+                );
+            })
             .1
     }
 }
@@ -1136,8 +1320,12 @@ impl<K, V, S> IndexMut<usize> for OrderMap<K, V, S> {
     ///
     /// ***Panics*** if `index` is out of bounds.
     fn index_mut(&mut self, index: usize) -> &mut V {
+        let len: usize = self.len();
+
         self.get_index_mut(index)
-            .expect("OrderMap: index out of bounds")
+            .unwrap_or_else(|| {
+                panic!("index out of bounds: the len is {len} but the index is {index}");
+            })
             .1
     }
 }

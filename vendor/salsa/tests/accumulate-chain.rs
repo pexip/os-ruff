@@ -8,6 +8,7 @@ use salsa::{Accumulator, Database, DatabaseImpl};
 use test_log::test;
 
 #[salsa::accumulator]
+#[derive(Debug)]
 struct Log(#[allow(dead_code)] String);
 
 #[salsa::tracked]
@@ -52,6 +53,6 @@ fn accumulate_chain() {
                     "log d",
                 ),
             ]"#]]
-        .assert_eq(&format!("{:#?}", logs));
+        .assert_eq(&format!("{logs:#?}"));
     })
 }

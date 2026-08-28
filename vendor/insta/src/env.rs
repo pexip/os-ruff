@@ -4,32 +4,61 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::{env, fmt, fs};
 
-use crate::content::{yaml, Content};
 use crate::utils::is_ci;
+use crate::{
+    content::{yaml, Content},
+    elog,
+};
 
-lazy_static::lazy_static! {
-    static ref WORKSPACES: Mutex<BTreeMap<String, Arc<PathBuf>>> = Mutex::new(BTreeMap::new());
-    static ref TOOL_CONFIGS: Mutex<BTreeMap<String, Arc<ToolConfig>>> = Mutex::new(BTreeMap::new());
-}
+use once_cell::sync::Lazy;
 
-pub fn get_tool_config(manifest_dir: &str) -> Arc<ToolConfig> {
-    let mut configs = TOOL_CONFIGS.lock().unwrap();
-    if let Some(rv) = configs.get(manifest_dir) {
-        return rv.clone();
-    }
-    let config =
-        Arc::new(ToolConfig::from_manifest_dir(manifest_dir).expect("failed to load tool config"));
-    configs.insert(manifest_dir.to_string(), config.clone());
-    config
+static WORKSPACES: Lazy<Mutex<BTreeMap<String, Arc<PathBuf>>>> =
+    Lazy::new(|| Mutex::new(BTreeMap::new()));
+static TOOL_CONFIGS: Lazy<Mutex<BTreeMap<PathBuf, Arc<ToolConfig>>>> =
+    Lazy::new(|| Mutex::new(BTreeMap::new()));
+
+pub fn get_tool_config(workspace_dir: &Path) -> Arc<ToolConfig> {
+    TOOL_CONFIGS
+        .lock()
+        .unwrap()
+        .entry(workspace_dir.to_path_buf())
+        .or_insert_with(|| {
+            ToolConfig::from_workspace(workspace_dir)
+                .unwrap_or_else(|e| panic!("Error building config from {:?}: {}", workspace_dir, e))
+                .into()
+        })
+        .clone()
 }
 
 /// The test runner to use.
 #[cfg(feature = "_cargo_insta_internal")]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
 pub enum TestRunner {
     Auto,
     CargoTest,
     Nextest,
+}
+
+#[cfg(feature = "_cargo_insta_internal")]
+impl TestRunner {
+    /// Fall back to `cargo test` if `cargo nextest` isn't installed and
+    /// `test_runner_fallback` is true
+    pub fn resolve_fallback(&self, test_runner_fallback: bool) -> &TestRunner {
+        use crate::utils::get_cargo;
+        if self == &TestRunner::Nextest
+            && test_runner_fallback
+            && std::process::Command::new(get_cargo())
+                .arg("nextest")
+                .arg("--version")
+                .output()
+                .map(|output| !output.status.success())
+                .unwrap_or(true)
+        {
+            &TestRunner::Auto
+        } else {
+            self
+        }
+    }
 }
 
 /// Controls how information is supposed to be displayed.
@@ -46,8 +75,8 @@ pub enum OutputBehavior {
 }
 
 /// Unreferenced snapshots flag
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg(feature = "_cargo_insta_internal")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
 pub enum UnreferencedSnapshots {
     Auto,
     Reject,
@@ -64,6 +93,7 @@ pub enum SnapshotUpdate {
     Unseen,
     New,
     No,
+    Force,
 }
 
 #[derive(Debug)]
@@ -94,15 +124,16 @@ impl std::error::Error for Error {
 }
 
 /// Represents a tool configuration.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ToolConfig {
-    force_update_snapshots: bool,
     force_pass: bool,
     require_full_match: bool,
     output: OutputBehavior,
     snapshot_update: SnapshotUpdate,
     #[cfg(feature = "glob")]
     glob_fail_fast: bool,
+    #[cfg(feature = "_cargo_insta_internal")]
+    test_runner_fallback: bool,
     #[cfg(feature = "_cargo_insta_internal")]
     test_runner: TestRunner,
     #[cfg(feature = "_cargo_insta_internal")]
@@ -120,11 +151,6 @@ pub struct ToolConfig {
 }
 
 impl ToolConfig {
-    /// Loads the tool config for a specific manifest.
-    pub fn from_manifest_dir(manifest_dir: &str) -> Result<ToolConfig, Error> {
-        ToolConfig::from_workspace(&get_cargo_workspace(manifest_dir))
-    }
-
     /// Loads the tool config from a cargo workspace.
     pub fn from_workspace(workspace_dir: &Path) -> Result<ToolConfig, Error> {
         let mut cfg = None;
@@ -144,26 +170,44 @@ impl ToolConfig {
         }
         let cfg = cfg.unwrap_or_else(|| Content::Map(Default::default()));
 
-        // support for the deprecated environment variable.  This is implemented in a way that
-        // cargo-insta can support older and newer insta versions alike.  It will set both
-        // variables.  However if only `INSTA_FORCE_UPDATE_SNAPSHOTS` is set, we will emit
-        // a deprecation warning.
-        if env::var("INSTA_FORCE_UPDATE").is_err() {
-            if let Ok("1") = env::var("INSTA_FORCE_UPDATE_SNAPSHOTS").as_deref() {
-                eprintln!("INSTA_FORCE_UPDATE_SNAPSHOTS is deprecated, use INSTA_FORCE_UPDATE");
-                env::set_var("INSTA_FORCE_UPDATE", "1");
-            }
+        // Support for the deprecated environment variables.  This is
+        // implemented in a way that cargo-insta can support older and newer
+        // insta versions alike. Versions of `cargo-insta` <= 1.39 will set
+        // `INSTA_FORCE_UPDATE_SNAPSHOTS` & `INSTA_FORCE_UPDATE`.
+        //
+        // If `INSTA_FORCE_UPDATE_SNAPSHOTS` is the only env var present we emit
+        // a deprecation warning, later to be expanded to `INSTA_FORCE_UPDATE`.
+        //
+        // Another approach would be to pass the version of `cargo-insta` in a
+        // `INSTA_CARGO_INSTA_VERSION` env var, and then raise a warning unless
+        // running under cargo-insta <= 1.39. Though it would require adding a
+        // `semver` dependency to this crate or doing the version comparison
+        // ourselves (a tractable task...).
+        let force_update_old_env_vars = if let Ok("1") = env::var("INSTA_FORCE_UPDATE").as_deref() {
+            // Don't raise a warning yet, because recent versions of
+            // `cargo-insta` use this, so that it's compatible with older
+            // versions of `insta`.
+            //
+            //   elog!("INSTA_FORCE_UPDATE is deprecated, use
+            //   INSTA_UPDATE=force");
+            true
+        } else if let Ok("1") = env::var("INSTA_FORCE_UPDATE_SNAPSHOTS").as_deref() {
+            // Warn on an old envvar.
+            //
+            // There's some possibility that we're running from within an fairly
+            // old version of `cargo-insta` (before we added an
+            // `INSTA_CARGO_INSTA` env var, so we can't pick that up.) So offer
+            // a caveat in that case.
+            elog!("INSTA_FORCE_UPDATE_SNAPSHOTS is deprecated, use INSTA_UPDATE=force. (If running from `cargo insta`, no action is required; upgrading `cargo-insta` will silence this warning.)");
+            true
+        } else {
+            false
+        };
+        if force_update_old_env_vars {
+            env::set_var("INSTA_UPDATE", "force");
         }
 
         Ok(ToolConfig {
-            force_update_snapshots: match env::var("INSTA_FORCE_UPDATE").as_deref() {
-                Err(_) | Ok("") => resolve(&cfg, &["behavior", "force_update"])
-                    .and_then(|x| x.as_bool())
-                    .unwrap_or(false),
-                Ok("0") => false,
-                Ok("1") => true,
-                _ => return Err(Error::Env("INSTA_FORCE_UPDATE")),
-            },
             require_full_match: match env::var("INSTA_REQUIRE_FULL_MATCH").as_deref() {
                 Err(_) | Ok("") => resolve(&cfg, &["behavior", "require_full_match"])
                     .and_then(|x| x.as_bool())
@@ -201,6 +245,14 @@ impl ToolConfig {
                 let val = match env_var.as_deref() {
                     Err(_) | Ok("") => resolve(&cfg, &["behavior", "update"])
                         .and_then(|x| x.as_str())
+                        // Legacy support for the old force update config
+                        .or(resolve(&cfg, &["behavior", "force_update"]).and_then(|x| {
+                            elog!("`force_update: true` is deprecated in insta config files, use `update: force`");
+                            match x.as_bool() {
+                                Some(true) => Some("force"),
+                                _ => None,
+                            }
+                        }))
                         .unwrap_or("auto"),
                     Ok(val) => val,
                 };
@@ -210,6 +262,7 @@ impl ToolConfig {
                     "new" => SnapshotUpdate::New,
                     "unseen" => SnapshotUpdate::Unseen,
                     "no" => SnapshotUpdate::No,
+                    "force" => SnapshotUpdate::Force,
                     _ => return Err(Error::Env("INSTA_UPDATE")),
                 }
             },
@@ -233,6 +286,15 @@ impl ToolConfig {
                 }
                 .parse::<TestRunner>()
                 .map_err(|_| Error::Env("INSTA_TEST_RUNNER"))?
+            },
+            #[cfg(feature = "_cargo_insta_internal")]
+            test_runner_fallback: match env::var("INSTA_TEST_RUNNER_FALLBACK").as_deref() {
+                Err(_) | Ok("") => resolve(&cfg, &["test", "runner_fallback"])
+                    .and_then(|x| x.as_bool())
+                    .unwrap_or(false),
+                Ok("1") => true,
+                Ok("0") => false,
+                _ => return Err(Error::Env("INSTA_RUNNER_FALLBACK")),
             },
             #[cfg(feature = "_cargo_insta_internal")]
             test_unreferenced: {
@@ -265,10 +327,7 @@ impl ToolConfig {
         })
     }
 
-    /// Is insta told to force update snapshots?
-    pub fn force_update_snapshots(&self) -> bool {
-        self.force_update_snapshots
-    }
+    // TODO: Do we want all these methods, vs. just allowing access to the fields?
 
     /// Should we fail if metadata doesn't match?
     pub fn require_full_match(&self) -> bool {
@@ -290,7 +349,7 @@ impl ToolConfig {
         self.snapshot_update
     }
 
-    /// Returns the value of glob_fail_fast
+    /// Returns whether the glob should fail fast, as snapshot failures within the glob macro will appear only at the end of execution unless `glob_fail_fast` is set.
     #[cfg(feature = "glob")]
     pub fn glob_fail_fast(&self) -> bool {
         self.glob_fail_fast
@@ -302,6 +361,11 @@ impl ToolConfig {
     /// Returns the intended test runner
     pub fn test_runner(&self) -> TestRunner {
         self.test_runner
+    }
+
+    /// Whether to fallback to `cargo test` if the test runner isn't available
+    pub fn test_runner_fallback(&self) -> bool {
+        self.test_runner_fallback
     }
 
     pub fn test_unreferenced(&self) -> UnreferencedSnapshots {
@@ -362,48 +426,103 @@ pub fn snapshot_update_behavior(tool_config: &ToolConfig, unseen: bool) -> Snaps
         }
         SnapshotUpdate::New => SnapshotUpdateBehavior::NewFile,
         SnapshotUpdate::No => SnapshotUpdateBehavior::NoUpdate,
+        SnapshotUpdate::Force => SnapshotUpdateBehavior::InPlace,
     }
 }
 
-/// Returns the cargo workspace for a manifest
-pub fn get_cargo_workspace(manifest_dir: &str) -> Arc<PathBuf> {
-    // we really do not care about poisoning here.
-    let mut workspaces = WORKSPACES.lock().unwrap_or_else(|x| x.into_inner());
-    if let Some(rv) = workspaces.get(manifest_dir) {
-        rv.clone()
-    } else {
-        // If INSTA_WORKSPACE_ROOT environment variable is set, use the value
-        // as-is. This is useful for those users where the compiled in
-        // CARGO_MANIFEST_DIR points to some transient location. This can easily
-        // happen if the user builds the test in one directory but then tries to
-        // run it in another: even if sources are available in the new
-        // directory, in the past we would always go with the compiled-in value.
-        // The compiled-in directory may not even exist anymore.
-        let path = if let Ok(workspace_root) = std::env::var("INSTA_WORKSPACE_ROOT") {
-            Arc::new(PathBuf::from(workspace_root))
-        } else {
+pub enum Workspace {
+    DetectWithCargo(&'static str),
+    UseAsIs(&'static str),
+}
+
+/// Returns the cargo workspace path for a crate manifest, like
+/// `/Users/janedoe/projects/insta` when passed
+/// `/Users/janedoe/projects/insta/insta/Cargo.toml`.
+///
+/// If `INSTA_WORKSPACE_ROOT` environment variable is set at runtime, use the value as-is.
+/// If `INSTA_WORKSPACE_ROOT` environment variable is set at compile time, use the value as-is.
+/// If `INSTA_WORKSPACE_ROOT` environment variable is not set, use `cargo metadata` to find the workspace root.
+pub fn get_cargo_workspace(workspace: Workspace) -> Arc<PathBuf> {
+    // This is useful where CARGO_MANIFEST_DIR at compilation points to some
+    // transient location. This can easily happen when building the test in one
+    // directory but running it in another.
+    if let Ok(workspace_root) = env::var("INSTA_WORKSPACE_ROOT") {
+        return PathBuf::from(workspace_root).into();
+    }
+
+    // Distinguish if we need to run `cargo metadata`` or if we can return the workspace
+    // as is.
+    // This is useful if INSTA_WORKSPACE_ROOT was set at compile time, not pointing to
+    // the cargo manifest directory
+    let manifest_dir = match workspace {
+        Workspace::UseAsIs(workspace_root) => return PathBuf::from(workspace_root).into(),
+        Workspace::DetectWithCargo(manifest_dir) => manifest_dir,
+    };
+
+    let error_message = || {
+        format!(
+            "`cargo metadata --format-version=1 --no-deps` in path `{}`",
+            manifest_dir
+        )
+    };
+
+    WORKSPACES
+        .lock()
+        // we really do not care about poisoning here.
+        .unwrap()
+        .entry(manifest_dir.to_string())
+        .or_insert_with(|| {
             let output = std::process::Command::new(
-                env::var("CARGO")
-                    .ok()
-                    .unwrap_or_else(|| "cargo".to_string()),
+                env::var("CARGO").unwrap_or_else(|_| "cargo".to_string()),
             )
-            .arg("metadata")
-            .arg("--format-version=1")
-            .arg("--no-deps")
+            .args(["metadata", "--format-version=1", "--no-deps"])
             .current_dir(manifest_dir)
             .output()
-            .unwrap();
-            let docs = crate::content::yaml::vendored::yaml::YamlLoader::load_from_str(
+            .unwrap_or_else(|e| panic!("failed to run {}\n\n{}", error_message(), e));
+
+            crate::content::yaml::vendored::yaml::YamlLoader::load_from_str(
                 std::str::from_utf8(&output.stdout).unwrap(),
             )
-            .unwrap();
-            let manifest = docs.first().expect("Unable to parse cargo manifest");
-            let workspace_root = PathBuf::from(manifest["workspace_root"].as_str().unwrap());
-            Arc::new(workspace_root)
-        };
-        workspaces.insert(manifest_dir.to_string(), path.clone());
-        path
-    }
+            .map_err(|e| e.to_string())
+            .and_then(|docs| {
+                docs.into_iter()
+                    .next()
+                    .ok_or_else(|| "No content found in yaml".to_string())
+            })
+            .and_then(|metadata| {
+                metadata["workspace_root"]
+                    .clone()
+                    .into_string()
+                    .ok_or_else(|| "Couldn't find `workspace_root`".to_string())
+            })
+            .map(|path| PathBuf::from(path).into())
+            .unwrap_or_else(|e| {
+                panic!(
+                    "failed to parse cargo metadata output from {}: {}\n\n{:?}",
+                    error_message(),
+                    e,
+                    output.stdout
+                )
+            })
+        })
+        .clone()
+}
+
+#[test]
+fn test_get_cargo_workspace_manifest_dir() {
+    let workspace = get_cargo_workspace(Workspace::DetectWithCargo(env!("CARGO_MANIFEST_DIR")));
+    // The absolute path of the workspace should be a valid directory
+    // In worktrees or other setups, the path might not end with "insta"
+    // but should still be a parent of the manifest directory
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    assert!(manifest_dir.starts_with(&*workspace));
+}
+
+#[test]
+fn test_get_cargo_workspace_insta_workspace() {
+    let workspace = get_cargo_workspace(Workspace::UseAsIs("/tmp/insta_workspace_root"));
+    // The absolute path of the workspace, like `/tmp/insta_workspace_root`
+    assert!(workspace.ends_with("insta_workspace_root"));
 }
 
 #[cfg(feature = "_cargo_insta_internal")]
@@ -436,7 +555,7 @@ impl std::str::FromStr for UnreferencedSnapshots {
     }
 }
 
-/// Memoizes a snapshot file in the reference file.
+/// Memoizes a snapshot file in the reference file, as part of removing unreferenced snapshots.
 pub fn memoize_snapshot_file(snapshot_file: &Path) {
     if let Ok(path) = env::var("INSTA_SNAPSHOT_REFERENCES_FILE") {
         let mut f = fs::OpenOptions::new()

@@ -40,7 +40,7 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/name)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Window`*"]
-    pub fn name(this: &Window) -> Result<String, JsValue>;
+    pub fn name(this: &Window) -> Result<::alloc::string::String, JsValue>;
     # [wasm_bindgen (structural , catch , method , setter , js_class = "Window" , js_name = name)]
     #[doc = "Setter for the `name` field of this object."]
     #[doc = ""]
@@ -126,7 +126,7 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/status)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Window`*"]
-    pub fn status(this: &Window) -> Result<String, JsValue>;
+    pub fn status(this: &Window) -> Result<::alloc::string::String, JsValue>;
     # [wasm_bindgen (structural , catch , method , setter , js_class = "Window" , js_name = status)]
     #[doc = "Setter for the `status` field of this object."]
     #[doc = ""]
@@ -236,6 +236,14 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Screen`, `Window`*"]
     pub fn screen(this: &Window) -> Result<Screen, JsValue>;
+    #[cfg(feature = "VisualViewport")]
+    # [wasm_bindgen (structural , method , getter , js_class = "Window" , js_name = visualViewport)]
+    #[doc = "Getter for the `visualViewport` field of this object."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/visualViewport)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `VisualViewport`, `Window`*"]
+    pub fn visual_viewport(this: &Window) -> Option<VisualViewport>;
     # [wasm_bindgen (structural , catch , method , getter , js_class = "Window" , js_name = innerWidth)]
     #[doc = "Getter for the `innerWidth` field of this object."]
     #[doc = ""]
@@ -518,6 +526,20 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Window`*"]
     pub fn set_onauxclick(this: &Window, value: Option<&::js_sys::Function>);
+    # [wasm_bindgen (structural , method , getter , js_class = "Window" , js_name = onbeforetoggle)]
+    #[doc = "Getter for the `onbeforetoggle` field of this object."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/onbeforetoggle)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `Window`*"]
+    pub fn onbeforetoggle(this: &Window) -> Option<::js_sys::Function>;
+    # [wasm_bindgen (structural , method , setter , js_class = "Window" , js_name = onbeforetoggle)]
+    #[doc = "Setter for the `onbeforetoggle` field of this object."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/onbeforetoggle)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `Window`*"]
+    pub fn set_onbeforetoggle(this: &Window, value: Option<&::js_sys::Function>);
     # [wasm_bindgen (structural , method , getter , js_class = "Window" , js_name = oncanplay)]
     #[doc = "Getter for the `oncanplay` field of this object."]
     #[doc = ""]
@@ -1892,6 +1914,50 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Window`*"]
     pub fn set_onunload(this: &Window, value: Option<&::js_sys::Function>);
+    #[cfg(web_sys_unstable_apis)]
+    # [wasm_bindgen (structural , method , getter , js_class = "Window" , js_name = ongamepadconnected)]
+    #[doc = "Getter for the `ongamepadconnected` field of this object."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/ongamepadconnected)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `Window`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
+    pub fn ongamepadconnected(this: &Window) -> Option<::js_sys::Function>;
+    #[cfg(web_sys_unstable_apis)]
+    # [wasm_bindgen (structural , method , setter , js_class = "Window" , js_name = ongamepadconnected)]
+    #[doc = "Setter for the `ongamepadconnected` field of this object."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/ongamepadconnected)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `Window`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
+    pub fn set_ongamepadconnected(this: &Window, value: Option<&::js_sys::Function>);
+    #[cfg(web_sys_unstable_apis)]
+    # [wasm_bindgen (structural , method , getter , js_class = "Window" , js_name = ongamepaddisconnected)]
+    #[doc = "Getter for the `ongamepaddisconnected` field of this object."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/ongamepaddisconnected)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `Window`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
+    pub fn ongamepaddisconnected(this: &Window) -> Option<::js_sys::Function>;
+    #[cfg(web_sys_unstable_apis)]
+    # [wasm_bindgen (structural , method , setter , js_class = "Window" , js_name = ongamepaddisconnected)]
+    #[doc = "Setter for the `ongamepaddisconnected` field of this object."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/ongamepaddisconnected)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `Window`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
+    pub fn set_ongamepaddisconnected(this: &Window, value: Option<&::js_sys::Function>);
     #[cfg(feature = "Storage")]
     # [wasm_bindgen (structural , catch , method , getter , js_class = "Window" , js_name = localStorage)]
     #[doc = "Getter for the `localStorage` field of this object."]
@@ -1900,6 +1966,14 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Storage`, `Window`*"]
     pub fn local_storage(this: &Window) -> Result<Option<Storage>, JsValue>;
+    #[cfg(feature = "IdbFactory")]
+    # [wasm_bindgen (structural , catch , method , getter , js_class = "Window" , js_name = indexedDB)]
+    #[doc = "Getter for the `indexedDB` field of this object."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/indexedDB)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `IdbFactory`, `Window`*"]
+    pub fn indexed_db(this: &Window) -> Result<Option<IdbFactory>, JsValue>;
     #[cfg(feature = "Performance")]
     # [wasm_bindgen (structural , method , getter , js_class = "Window" , js_name = performance)]
     #[doc = "Getter for the `performance` field of this object."]
@@ -1914,7 +1988,7 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/origin)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Window`*"]
-    pub fn origin(this: &Window) -> String;
+    pub fn origin(this: &Window) -> ::alloc::string::String;
     # [wasm_bindgen (structural , method , getter , js_class = "Window" , js_name = isSecureContext)]
     #[doc = "Getter for the `isSecureContext` field of this object."]
     #[doc = ""]
@@ -1922,14 +1996,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Window`*"]
     pub fn is_secure_context(this: &Window) -> bool;
-    #[cfg(feature = "IdbFactory")]
-    # [wasm_bindgen (structural , catch , method , getter , js_class = "Window" , js_name = indexedDB)]
-    #[doc = "Getter for the `indexedDB` field of this object."]
-    #[doc = ""]
-    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/indexedDB)"]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `IdbFactory`, `Window`*"]
-    pub fn indexed_db(this: &Window) -> Result<Option<IdbFactory>, JsValue>;
     #[cfg(feature = "CacheStorage")]
     # [wasm_bindgen (structural , catch , method , getter , js_class = "Window" , js_name = caches)]
     #[doc = "Getter for the `caches` field of this object."]
@@ -2147,14 +2213,17 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/prompt)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Window`*"]
-    pub fn prompt(this: &Window) -> Result<Option<String>, JsValue>;
+    pub fn prompt(this: &Window) -> Result<Option<::alloc::string::String>, JsValue>;
     # [wasm_bindgen (catch , method , structural , js_class = "Window" , js_name = prompt)]
     #[doc = "The `prompt()` method."]
     #[doc = ""]
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/prompt)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Window`*"]
-    pub fn prompt_with_message(this: &Window, message: &str) -> Result<Option<String>, JsValue>;
+    pub fn prompt_with_message(
+        this: &Window,
+        message: &str,
+    ) -> Result<Option<::alloc::string::String>, JsValue>;
     # [wasm_bindgen (catch , method , structural , js_class = "Window" , js_name = prompt)]
     #[doc = "The `prompt()` method."]
     #[doc = ""]
@@ -2165,7 +2234,7 @@ extern "C" {
         this: &Window,
         message: &str,
         default: &str,
-    ) -> Result<Option<String>, JsValue>;
+    ) -> Result<Option<::alloc::string::String>, JsValue>;
     #[cfg(web_sys_unstable_apis)]
     # [wasm_bindgen (catch , method , structural , js_class = "Window" , js_name = queryLocalFonts)]
     #[doc = "The `queryLocalFonts()` method."]
@@ -2416,14 +2485,14 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/atob)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Window`*"]
-    pub fn atob(this: &Window, atob: &str) -> Result<String, JsValue>;
+    pub fn atob(this: &Window, atob: &str) -> Result<::alloc::string::String, JsValue>;
     # [wasm_bindgen (catch , method , structural , js_class = "Window" , js_name = btoa)]
     #[doc = "The `btoa()` method."]
     #[doc = ""]
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/btoa)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `Window`*"]
-    pub fn btoa(this: &Window, btoa: &str) -> Result<String, JsValue>;
+    pub fn btoa(this: &Window, btoa: &str) -> Result<::alloc::string::String, JsValue>;
     # [wasm_bindgen (method , structural , js_class = "Window" , js_name = clearInterval)]
     #[doc = "The `clearInterval()` method."]
     #[doc = ""]
@@ -2993,6 +3062,13 @@ extern "C" {
         input: &str,
         init: &RequestInit,
     ) -> ::js_sys::Promise;
+    # [wasm_bindgen (method , structural , js_class = "Window" , js_name = queueMicrotask)]
+    #[doc = "The `queueMicrotask()` method."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/queueMicrotask)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `Window`*"]
+    pub fn queue_microtask(this: &Window, callback: &::js_sys::Function);
     # [wasm_bindgen (catch , method , structural , js_class = "Window" , js_name = setInterval)]
     #[doc = "The `setInterval()` method."]
     #[doc = ""]

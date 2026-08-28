@@ -10,11 +10,17 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
-rust-version = "1.56.0"
+edition = "2021"
+rust-version = "1.66"
 name = "console"
-version = "0.15.8"
+version = "0.15.11"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A terminal and console abstraction for Rust"
 homepage = "https://github.com/console-rs/console"
 documentation = "https://docs.rs/console"
@@ -29,14 +35,50 @@ keywords = [
 license = "MIT"
 repository = "https://github.com/console-rs/console"
 
-[dependencies.lazy_static]
-version = "1.4.0"
+[features]
+ansi-parsing = []
+default = [
+    "unicode-width",
+    "ansi-parsing",
+]
+windows-console-colors = ["ansi-parsing"]
+
+[lib]
+name = "console"
+path = "src/lib.rs"
+
+[[example]]
+name = "colors"
+path = "examples/colors.rs"
+
+[[example]]
+name = "colors256"
+path = "examples/colors256.rs"
+
+[[example]]
+name = "cursor_at"
+path = "examples/cursor_at.rs"
+
+[[example]]
+name = "keyboard"
+path = "examples/keyboard.rs"
+
+[[example]]
+name = "term"
+path = "examples/term.rs"
+
+[[bench]]
+name = "ansi_parser"
+path = "benches/ansi_parser.rs"
 
 [dependencies.libc]
 version = "0.2.99"
 
+[dependencies.once_cell]
+version = "1.8"
+
 [dependencies.unicode-width]
-version = "0.1"
+version = "0.2"
 optional = true
 
 [dev-dependencies.proptest]
@@ -51,19 +93,11 @@ default-features = false
 [dev-dependencies.regex]
 version = "1.4.2"
 
-[features]
-ansi-parsing = []
-default = [
-    "unicode-width",
-    "ansi-parsing",
-]
-windows-console-colors = ["ansi-parsing"]
-
 [target."cfg(windows)".dependencies.encode_unicode]
-version = "0.3"
+version = "1"
 
 [target."cfg(windows)".dependencies.windows-sys]
-version = "0.52.0"
+version = "0.59"
 features = [
     "Win32_Foundation",
     "Win32_System_Console",

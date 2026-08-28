@@ -5,11 +5,9 @@ struct Input {
     number: usize,
 }
 
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(returns(ref))]
 fn test(db: &dyn salsa::Database, input: Input) -> Vec<String> {
-    (0..input.number(db))
-        .map(|i| format!("test {}", i))
-        .collect()
+    (0..input.number(db)).map(|i| format!("test {i}")).collect()
 }
 
 #[test]

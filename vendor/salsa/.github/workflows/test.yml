@@ -1,16 +1,15 @@
 name: Test
 
 on:
+  pull_request:
+  merge_group:
   push:
     branches:
       - master
-  pull_request:
-    paths:
-      - "**.rs"
-      - "**/Cargo.*"
-      - ".github/workflows/test.yml"
-      - "tests/compile-fail/**.stderr"
-  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -18,6 +17,7 @@ jobs:
     strategy:
       matrix:
         rust:
+          - 1.85.0
           - stable
           - beta
         experimental:
@@ -36,6 +36,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
           components: rustfmt, clippy
+      - uses: taiki-e/install-action@nextest
       - uses: actions/cache@v4
         with:
           path: |
@@ -51,11 +52,11 @@ jobs:
       - name: Format
         run: cargo fmt -- --check
       - name: Clippy
-        run: cargo clippy --workspace --all-features --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
-        run: cargo test --workspace --all-features --all-targets
+        run: cargo nextest run --workspace --all-targets --no-fail-fast
       - name: Test docs
-        run: cargo test --workspace --all-features --doc
+        run: cargo test --workspace --doc
       - name: Check (without default features)
         run: cargo check --workspace --no-default-features
 
@@ -68,6 +69,7 @@ jobs:
       - name: Install Miri
         uses: dtolnay/rust-toolchain@miri
         id: rust-toolchain
+      - uses: taiki-e/install-action@nextest
       - uses: actions/cache@v4
         with:
           path: |
@@ -84,12 +86,42 @@ jobs:
       - name: Setup Miri
         run: cargo miri setup
       - name: Test with Miri
-        run: cargo miri test --no-fail-fast --all-features
+        run: cargo miri nextest run --no-fail-fast --tests
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-retag-fields
       - name: Run examples with Miri
-        run: |
-          cargo miri run --example calc
+        run: cargo miri run --example calc
+
+  shuttle:
+    name: Shuttle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        id: rust-toolchain
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@nextest
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ steps.rust-toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ steps.rust-toolchain.outputs.cachekey }}-
+            ${{ runner.os }}-cargo-
+      - name: Test with Shuttle
+        run: cargo nextest run --features shuttle --test parallel
 
   benchmarks:
+    # https://github.com/CodSpeedHQ/action/issues/126
+    if: github.event_name != 'merge_group'
     name: Benchmarks
     runs-on: ubuntu-latest
     steps:
@@ -124,7 +156,7 @@ jobs:
         run: cargo codspeed build
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@v2
+        uses: CodSpeedHQ/action@v3
         with:
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}

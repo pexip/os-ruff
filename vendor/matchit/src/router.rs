@@ -1,3 +1,4 @@
+use crate::error::MergeError;
 use crate::tree::Node;
 use crate::{InsertError, MatchError, Params};
 
@@ -55,6 +56,7 @@ impl<T> Router<T> {
     /// # Ok(())
     /// # }
     /// ```
+    #[inline]
     pub fn at<'path>(&self, path: &'path str) -> Result<Match<'_, 'path, &T>, MatchError> {
         match self.root.at(path.as_bytes()) {
             Ok((value, params)) => Ok(Match {
@@ -82,6 +84,7 @@ impl<T> Router<T> {
     /// # Ok(())
     /// # }
     /// ```
+    #[inline]
     pub fn at_mut<'path>(
         &mut self,
         path: &'path str,
@@ -116,12 +119,12 @@ impl<T> Router<T> {
     /// assert_eq!(router.remove("/home/{id}/"), None);
     ///
     /// router.insert("/home/{id}/", "Hello!");
-    /// // the route does not match
+    /// // The route does not match.
     /// assert_eq!(router.remove("/home/{user}"), None);
     /// assert_eq!(router.remove("/home/{id}/"), Some("Hello!"));
     ///
     /// router.insert("/home/{id}/", "Hello!");
-    /// // invalid route
+    /// // Invalid route.
     /// assert_eq!(router.remove("/home/{id"), None);
     /// assert_eq!(router.remove("/home/{id}/"), Some("Hello!"));
     /// ```
@@ -132,6 +135,43 @@ impl<T> Router<T> {
     #[cfg(feature = "__test_helpers")]
     pub fn check_priorities(&self) -> Result<u32, (u32, u32)> {
         self.root.check_priorities()
+    }
+
+    /// Merge a given router into current one.
+    ///
+    /// Returns a list of [`InsertError`] for every failed insertion.
+    /// Note that this can result in a partially successful merge if
+    /// a subset of routes conflict.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use matchit::Router;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut root = Router::new();
+    /// root.insert("/home", "Welcome!")?;
+    ///
+    /// let mut child = Router::new();
+    /// child.insert("/users/{id}", "A User")?;
+    ///
+    /// root.merge(child)?;
+    /// assert!(root.at("/users/1").is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn merge(&mut self, other: Self) -> Result<(), MergeError> {
+        let mut errors = Vec::new();
+        other.root.for_each(|path, value| {
+            if let Err(err) = self.insert(path, value) {
+                errors.push(err);
+            }
+        });
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(MergeError(errors))
+        }
     }
 }
 

@@ -1,12 +1,15 @@
-use std::cell::RefCell;
-use std::future::Future;
-use std::mem::ManuallyDrop;
-use std::pin::Pin;
-use std::rc::Rc;
-use std::sync::atomic::AtomicI32;
-use std::sync::atomic::Ordering::SeqCst;
-use std::sync::Arc;
-use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+#![allow(clippy::incompatible_msrv)]
+
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+use alloc::sync::Arc;
+use core::cell::RefCell;
+use core::future::Future;
+use core::mem::ManuallyDrop;
+use core::pin::Pin;
+use core::sync::atomic::AtomicI32;
+use core::sync::atomic::Ordering::SeqCst;
+use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use wasm_bindgen::prelude::*;
 
 const SLEEPING: i32 = 0;
@@ -36,7 +39,7 @@ impl AtomicWaker {
         // from SLEEPING to AWAKE.
         unsafe {
             core::arch::wasm32::memory_atomic_notify(
-                &self.state as *const AtomicI32 as *mut i32,
+                self.state.as_ptr(),
                 1, // Number of threads to notify
             );
         }
@@ -101,7 +104,7 @@ impl Task {
         *this.inner.borrow_mut() = Some(Inner { future, closure });
 
         // Queue up the Future's work to happen on the next microtask tick.
-        crate::queue::QUEUE.with(move |queue| queue.schedule_task(this));
+        crate::queue::Queue::with(move |queue| queue.schedule_task(this));
     }
 
     pub(crate) fn run(&self) {
@@ -173,7 +176,7 @@ fn wait_async(ptr: &AtomicI32, current_value: i32) -> Option<js_sys::Promise> {
     } else {
         let mem = wasm_bindgen::memory().unchecked_into::<js_sys::WebAssembly::Memory>();
         let array = js_sys::Int32Array::new(&mem.buffer());
-        let result = Atomics::wait_async(&array, ptr as *const AtomicI32 as i32 / 4, current_value);
+        let result = Atomics::wait_async(&array, ptr.as_ptr() as u32 / 4, current_value);
         if result.async_() {
             Some(result.value())
         } else {
@@ -187,7 +190,7 @@ fn wait_async(ptr: &AtomicI32, current_value: i32) -> Option<js_sys::Promise> {
         type WaitAsyncResult;
 
         #[wasm_bindgen(static_method_of = Atomics, js_name = waitAsync)]
-        fn wait_async(buf: &js_sys::Int32Array, index: i32, value: i32) -> WaitAsyncResult;
+        fn wait_async(buf: &js_sys::Int32Array, index: u32, value: i32) -> WaitAsyncResult;
 
         #[wasm_bindgen(static_method_of = Atomics, js_name = waitAsync, getter)]
         fn get_wait_async() -> JsValue;

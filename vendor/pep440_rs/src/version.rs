@@ -1,3 +1,5 @@
+use once_cell::sync::Lazy;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     borrow::Borrow,
     cmp::Ordering,
@@ -6,26 +8,13 @@ use std::{
     sync::Arc,
 };
 
-#[cfg(feature = "pyo3")]
-use pyo3::{
-    basic::CompareOp, exceptions::PyValueError, pyclass, pymethods, Bound, FromPyObject, IntoPy,
-    PyAny, PyObject, PyResult, Python,
-};
-#[cfg(feature = "serde")]
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-
 /// One of `~=` `==` `!=` `<=` `>=` `<` `>` `===`
-#[derive(Eq, PartialEq, Debug, Hash, Clone, Copy)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Debug, Hash, Clone, Copy)]
 #[cfg_attr(
     feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)
+    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize,)
 )]
-#[cfg_attr(feature = "rkyv", archive(check_bytes))]
-#[cfg_attr(
-    feature = "rkyv",
-    archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))
-)]
-#[cfg_attr(feature = "pyo3", pyclass(eq, eq_int))]
+#[cfg_attr(feature = "rkyv", rkyv(derive(Debug, Eq, PartialEq, PartialOrd, Ord)))]
 pub enum Operator {
     /// `== 1.2.3`
     Equal,
@@ -43,6 +32,8 @@ pub enum Operator {
     /// `!= 1.2.*`
     NotEqualStar,
     /// `~=`
+    ///
+    /// Invariant: With `~=`, there are always at least 2 release segments.
     TildeEqual,
     /// `<`
     LessThan,
@@ -55,6 +46,34 @@ pub enum Operator {
 }
 
 impl Operator {
+    /// Negates this operator, if a negation exists, so that it has the
+    /// opposite meaning.
+    ///
+    /// This returns a negated operator in every case except for the `~=`
+    /// operator. In that case, `None` is returned and callers may need to
+    /// handle its negation at a higher level. (For example, if it's negated
+    /// in the context of a marker expression, then the "compatible" version
+    /// constraint can be split into its component parts and turned into a
+    /// disjunction of the negation of each of those parts.)
+    ///
+    /// Note that this routine is not reversible in all cases. For example
+    /// `Operator::ExactEqual` negates to `Operator::NotEqual`, and
+    /// `Operator::NotEqual` in turn negates to `Operator::Equal`.
+    pub fn negate(self) -> Option<Operator> {
+        Some(match self {
+            Operator::Equal => Operator::NotEqual,
+            Operator::EqualStar => Operator::NotEqualStar,
+            Operator::ExactEqual => Operator::NotEqual,
+            Operator::NotEqual => Operator::Equal,
+            Operator::NotEqualStar => Operator::EqualStar,
+            Operator::TildeEqual => return None,
+            Operator::LessThan => Operator::GreaterThanEqual,
+            Operator::LessThanEqual => Operator::GreaterThan,
+            Operator::GreaterThan => Operator::LessThanEqual,
+            Operator::GreaterThanEqual => Operator::LessThan,
+        })
+    }
+
     /// Returns true if and only if this operator can be used in a version
     /// specifier with a version containing a non-empty local segment.
     ///
@@ -63,16 +82,16 @@ impl Operator {
     /// specifiers [spec].
     ///
     /// [spec]: https://packaging.python.org/en/latest/specifications/version-specifiers/
-    pub(crate) fn is_local_compatible(&self) -> bool {
+    pub(crate) fn is_local_compatible(self) -> bool {
         !matches!(
-            *self,
-            Operator::GreaterThan
-                | Operator::GreaterThanEqual
-                | Operator::LessThan
-                | Operator::LessThanEqual
-                | Operator::TildeEqual
-                | Operator::EqualStar
-                | Operator::NotEqualStar
+            self,
+            Self::GreaterThan
+                | Self::GreaterThanEqual
+                | Self::LessThan
+                | Self::LessThanEqual
+                | Self::TildeEqual
+                | Self::EqualStar
+                | Self::NotEqualStar
         )
     }
 
@@ -80,12 +99,17 @@ impl Operator {
     ///
     /// This returns `None` when this operator doesn't have an analogous
     /// wildcard operator.
-    pub(crate) fn to_star(self) -> Option<Operator> {
+    pub(crate) fn to_star(self) -> Option<Self> {
         match self {
-            Operator::Equal => Some(Operator::EqualStar),
-            Operator::NotEqual => Some(Operator::NotEqualStar),
+            Self::Equal => Some(Self::EqualStar),
+            Self::NotEqual => Some(Self::NotEqualStar),
             _ => None,
         }
+    }
+
+    /// Returns `true` if this operator represents a wildcard.
+    pub fn is_star(self) -> bool {
+        matches!(self, Self::EqualStar | Self::NotEqualStar)
     }
 }
 
@@ -124,33 +148,21 @@ impl std::fmt::Display for Operator {
     /// Note the `EqualStar` is also `==`.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let operator = match self {
-            Operator::Equal => "==",
+            Self::Equal => "==",
             // Beware, this doesn't print the star
-            Operator::EqualStar => "==",
+            Self::EqualStar => "==",
             #[allow(deprecated)]
-            Operator::ExactEqual => "===",
-            Operator::NotEqual => "!=",
-            Operator::NotEqualStar => "!=",
-            Operator::TildeEqual => "~=",
-            Operator::LessThan => "<",
-            Operator::LessThanEqual => "<=",
-            Operator::GreaterThan => ">",
-            Operator::GreaterThanEqual => ">=",
+            Self::ExactEqual => "===",
+            Self::NotEqual => "!=",
+            Self::NotEqualStar => "!=",
+            Self::TildeEqual => "~=",
+            Self::LessThan => "<",
+            Self::LessThanEqual => "<=",
+            Self::GreaterThan => ">",
+            Self::GreaterThanEqual => ">=",
         };
 
         write!(f, "{operator}")
-    }
-}
-
-#[cfg(feature = "pyo3")]
-#[pymethods]
-impl Operator {
-    fn __str__(&self) -> String {
-        self.to_string()
-    }
-
-    fn __repr__(&self) -> String {
-        self.to_string()
     }
 }
 
@@ -253,11 +265,7 @@ impl std::fmt::Display for OperatorParseError {
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)
 )]
-#[cfg_attr(feature = "rkyv", archive(check_bytes))]
-#[cfg_attr(
-    feature = "rkyv",
-    archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))
-)]
+#[cfg_attr(feature = "rkyv", rkyv(derive(Debug, Eq, PartialEq, PartialOrd, Ord)))]
 pub struct Version {
     inner: Arc<VersionInner>,
 }
@@ -267,11 +275,7 @@ pub struct Version {
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)
 )]
-#[cfg_attr(feature = "rkyv", archive(check_bytes))]
-#[cfg_attr(
-    feature = "rkyv",
-    archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))
-)]
+#[cfg_attr(feature = "rkyv", rkyv(derive(Debug, Eq, PartialEq, PartialOrd, Ord)))]
 enum VersionInner {
     Small { small: VersionSmall },
     Full { full: VersionFull },
@@ -285,12 +289,12 @@ impl Version {
     ///
     /// When the iterator yields no elements.
     #[inline]
-    pub fn new<I, R>(release_numbers: I) -> Version
+    pub fn new<I, R>(release_numbers: I) -> Self
     where
         I: IntoIterator<Item = R>,
         R: Borrow<u64>,
     {
-        Version {
+        Self {
             inner: Arc::new(VersionInner::Small {
                 small: VersionSmall::new(),
             }),
@@ -302,6 +306,12 @@ impl Version {
     #[inline]
     pub fn any_prerelease(&self) -> bool {
         self.is_pre() || self.is_dev()
+    }
+
+    /// Whether this is a stable version (i.e., _not_ an alpha/beta/rc or dev version)
+    #[inline]
+    pub fn is_stable(&self) -> bool {
+        !self.is_pre() && !self.is_dev()
     }
 
     /// Whether this is an alpha/beta/rc version
@@ -351,7 +361,7 @@ impl Version {
 
     /// Returns the pre-release part of this version, if it exists.
     #[inline]
-    pub fn pre(&self) -> Option<PreRelease> {
+    pub fn pre(&self) -> Option<Prerelease> {
         match *self.inner {
             VersionInner::Small { ref small } => small.pre(),
             VersionInner::Full { ref full } => full.pre,
@@ -385,6 +395,32 @@ impl Version {
         }
     }
 
+    /// Returns the min-release part of this version, if it exists.
+    ///
+    /// The "min" component is internal-only, and does not exist in PEP 440.
+    /// The version `1.0min0` is smaller than all other `1.0` versions,
+    /// like `1.0a1`, `1.0dev0`, etc.
+    #[inline]
+    pub fn min(&self) -> Option<u64> {
+        match *self.inner {
+            VersionInner::Small { ref small } => small.min(),
+            VersionInner::Full { ref full } => full.min,
+        }
+    }
+
+    /// Returns the max-release part of this version, if it exists.
+    ///
+    /// The "max" component is internal-only, and does not exist in PEP 440.
+    /// The version `1.0max0` is larger than all other `1.0` versions,
+    /// like `1.0.post1`, `1.0+local`, etc.
+    #[inline]
+    pub fn max(&self) -> Option<u64> {
+        match *self.inner {
+            VersionInner::Small { ref small } => small.max(),
+            VersionInner::Full { ref full } => full.max,
+        }
+    }
+
     /// Set the release numbers and return the updated version.
     ///
     /// Usually one can just use `Version::new` to create a new version with
@@ -396,7 +432,8 @@ impl Version {
     ///
     /// When the iterator yields no elements.
     #[inline]
-    pub fn with_release<I, R>(mut self, release_numbers: I) -> Version
+    #[must_use]
+    pub fn with_release<I, R>(mut self, release_numbers: I) -> Self
     where
         I: IntoIterator<Item = R>,
         R: Borrow<u64>,
@@ -440,7 +477,8 @@ impl Version {
 
     /// Set the epoch and return the updated version.
     #[inline]
-    pub fn with_epoch(mut self, value: u64) -> Version {
+    #[must_use]
+    pub fn with_epoch(mut self, value: u64) -> Self {
         if let VersionInner::Small { ref mut small } = Arc::make_mut(&mut self.inner) {
             if small.set_epoch(value) {
                 return self;
@@ -452,7 +490,8 @@ impl Version {
 
     /// Set the pre-release component and return the updated version.
     #[inline]
-    pub fn with_pre(mut self, value: Option<PreRelease>) -> Version {
+    #[must_use]
+    pub fn with_pre(mut self, value: Option<Prerelease>) -> Self {
         if let VersionInner::Small { ref mut small } = Arc::make_mut(&mut self.inner) {
             if small.set_pre(value) {
                 return self;
@@ -464,7 +503,8 @@ impl Version {
 
     /// Set the post-release component and return the updated version.
     #[inline]
-    pub fn with_post(mut self, value: Option<u64>) -> Version {
+    #[must_use]
+    pub fn with_post(mut self, value: Option<u64>) -> Self {
         if let VersionInner::Small { ref mut small } = Arc::make_mut(&mut self.inner) {
             if small.set_post(value) {
                 return self;
@@ -476,7 +516,8 @@ impl Version {
 
     /// Set the dev-release component and return the updated version.
     #[inline]
-    pub fn with_dev(mut self, value: Option<u64>) -> Version {
+    #[must_use]
+    pub fn with_dev(mut self, value: Option<u64>) -> Self {
         if let VersionInner::Small { ref mut small } = Arc::make_mut(&mut self.inner) {
             if small.set_dev(value) {
                 return self;
@@ -488,7 +529,8 @@ impl Version {
 
     /// Set the local segments and return the updated version.
     #[inline]
-    pub fn with_local(mut self, value: Vec<LocalSegment>) -> Version {
+    #[must_use]
+    pub fn with_local(mut self, value: Vec<LocalSegment>) -> Self {
         if value.is_empty() {
             self.without_local()
         } else {
@@ -502,13 +544,62 @@ impl Version {
     /// and local version labels MUST be ignored entirely when checking if
     /// candidate versions match a given version specifier."
     #[inline]
-    pub fn without_local(mut self) -> Version {
+    #[must_use]
+    pub fn without_local(mut self) -> Self {
         // A "small" version is already guaranteed not to have a local
         // component, so we only need to do anything if we have a "full"
         // version.
         if let VersionInner::Full { ref mut full } = Arc::make_mut(&mut self.inner) {
             full.local.clear();
         }
+        self
+    }
+
+    /// Return the version with any segments apart from the release removed.
+    #[inline]
+    #[must_use]
+    pub fn only_release(&self) -> Self {
+        Self::new(self.release().iter().copied())
+    }
+
+    /// Set the min-release component and return the updated version.
+    ///
+    /// The "min" component is internal-only, and does not exist in PEP 440.
+    /// The version `1.0min0` is smaller than all other `1.0` versions,
+    /// like `1.0a1`, `1.0dev0`, etc.
+    #[inline]
+    #[must_use]
+    pub fn with_min(mut self, value: Option<u64>) -> Self {
+        debug_assert!(!self.is_pre(), "min is not allowed on pre-release versions");
+        debug_assert!(!self.is_dev(), "min is not allowed on dev versions");
+        if let VersionInner::Small { ref mut small } = Arc::make_mut(&mut self.inner) {
+            if small.set_min(value) {
+                return self;
+            }
+        }
+        self.make_full().min = value;
+        self
+    }
+
+    /// Set the max-release component and return the updated version.
+    ///
+    /// The "max" component is internal-only, and does not exist in PEP 440.
+    /// The version `1.0max0` is larger than all other `1.0` versions,
+    /// like `1.0.post1`, `1.0+local`, etc.
+    #[inline]
+    #[must_use]
+    pub fn with_max(mut self, value: Option<u64>) -> Self {
+        debug_assert!(
+            !self.is_post(),
+            "max is not allowed on post-release versions"
+        );
+        debug_assert!(!self.is_dev(), "max is not allowed on dev versions");
+        if let VersionInner::Small { ref mut small } = Arc::make_mut(&mut self.inner) {
+            if small.set_max(value) {
+                return self;
+            }
+        }
+        self.make_full().max = value;
         self
     }
 
@@ -519,12 +610,14 @@ impl Version {
             let full = VersionFull {
                 epoch: small.epoch(),
                 release: small.release().to_vec(),
+                min: small.min(),
+                max: small.max(),
                 pre: small.pre(),
                 post: small.post(),
                 dev: small.dev(),
                 local: vec![],
             };
-            *self = Version {
+            *self = Self {
                 inner: Arc::new(VersionInner::Full { full }),
             };
         }
@@ -542,7 +635,7 @@ impl Version {
     /// representation.
     #[cold]
     #[inline(never)]
-    fn cmp_slow(&self, other: &Version) -> Ordering {
+    fn cmp_slow(&self, other: &Self) -> Ordering {
         match self.epoch().cmp(&other.epoch()) {
             Ordering::Less => {
                 return Ordering::Less;
@@ -569,7 +662,6 @@ impl Version {
 }
 
 /// <https://github.com/serde-rs/serde/issues/1316#issue-332908452>
-#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Version {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -581,7 +673,6 @@ impl<'de> Deserialize<'de> for Version {
 }
 
 /// <https://github.com/serde-rs/serde/issues/1316#issue-332908452>
-#[cfg(feature = "serde")]
 impl Serialize for Version {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -608,7 +699,7 @@ impl std::fmt::Display for Version {
         let pre = self
             .pre()
             .as_ref()
-            .map(|PreRelease { kind, number }| format!("{kind}{number}"))
+            .map(|Prerelease { kind, number }| format!("{kind}{number}"))
             .unwrap_or_default();
         let post = self
             .post()
@@ -625,7 +716,7 @@ impl std::fmt::Display for Version {
                 "+{}",
                 self.local()
                     .iter()
-                    .map(std::string::ToString::to_string)
+                    .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(".")
             )
@@ -636,7 +727,7 @@ impl std::fmt::Display for Version {
 
 impl std::fmt::Debug for Version {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\"{}\"", self)
+        write!(f, "\"{self}\"")
     }
 }
 
@@ -724,7 +815,7 @@ impl FromStr for Version {
 ///   calendar versions, like `2023.03`, to be represented.)
 /// * There is *at most* one of the following components: pre, dev or post.
 /// * If there is a pre segment, then its numeric value is less than 64.
-/// * If there is a dev or post segment, then its value is less than u8::MAX.
+/// * If there is a dev or post segment, then its value is less than `u8::MAX`.
 /// * There are zero "local" segments.
 ///
 /// The above constraints were chosen as a balancing point between being able
@@ -743,45 +834,41 @@ impl FromStr for Version {
 /// * Bytes 6 and 7 correspond to the first release segment as a `u16`.
 /// * Bytes 5, 4 and 3 correspond to the second, third and fourth release
 ///   segments, respectively.
-/// * Byte 2 corresponds to the post-release segment. If there is no
-///   post-release segment, then byte 2 is set to 0x00. This makes "no
-///   post-release" sort before "has post-release." The numeric value
-///   (constrained to be <u8::MAX) has 1 added to it so that 0x00 is reserved to
-///   indicate absence.
-/// * Byte 1 corresponds to the pre-release segment. If there is no pre-release
-///   segment, then byte 1 is set to 0xFF. This makes "no pre-release" sort
-///   after "has pre-release." The most significant two bits of byte 1 encode
-///   the type of pre-release (alpha, beta, rc) while the low 6 bits encode the
-///   pre-release numeric value.
-/// * Byte 0 corresponds to the dev-release segment. If there is no dev-release
-///   segment, then byte 0 is set to 0xFF. This makes "no dev-release" sort after
-///   "has dev-release." The dev-release value (constrained to be <u8::MAX) is
-///   stored in byte 0 as-is.
+/// * Bytes 2, 1 and 0 represent *one* of the following:
+///   `min, .devN, aN, bN, rcN, <no suffix>, .postN, max`.
+///   Its representation is thus:
+///   * The most significant 3 bits of Byte 2 corresponds to a value in
+///     the range 0-6 inclusive, corresponding to min, dev, pre-a, pre-b, pre-rc,
+///     no-suffix or post releases, respectively. `min` is a special version that
+///     does not exist in PEP 440, but is used here to represent the smallest
+///     possible version, preceding any `dev`, `pre`, `post` or releases. `max` is
+///     an analogous concept for the largest possible version, following any `post`
+///     or local releases.
+///   * The low 5 bits combined with the bits in bytes 1 and 0 correspond
+///     to the release number of the suffix, if one exists. If there is no
+///     suffix, then these bits are always 0.
 ///
-/// The order of the encoding above is significant. For example, the
-/// post-release segment is encoded at a more significant byte in the `u64`
-/// than the pre-release segment because `1.2.3.post1 > 1.2.3rc9999`.
+/// The order of the encoding above is significant. For example, suffixes are
+/// encoded at a less significant location than the release numbers, so that
+/// `1.2.3 < 1.2.3.post4`.
 ///
-/// Notice also that nothing about the representation inherently prohibits
-/// storing any combination of pre, dev or post release components. We
-/// could absolutely store all three (assuming they fit into their various
-/// constraints outlined above). But, if we did that, a simple `u64::cmp` would
-/// no longer be correct. For example, `1.0.post456.dev34 < 1.0.post456`, but
-/// in the representation above, it would treat `1.0.post456.dev34` as greater
-/// than `1.0.post456`. To make comparisons cheap for multi-component versions
-/// like that, we'd need to use more space. Thankfully, such versions are
-/// incredibly rare. Virtually all versions have zero or one pre, dev or post
-/// release components.
+/// In a previous representation, we tried to encode the suffixes in different
+/// locations so that, in theory, you could represent `1.2.3.dev2.post3` in the
+/// packed form. But getting the ordering right for this is difficult (perhaps
+/// impossible without extra space?). So we limited to only storing one suffix.
+/// But even then, we wound up with a bug where `1.0dev1 > 1.0a1`, when of
+/// course, all dev releases should compare less than pre releases. This was
+/// because the encoding recorded the pre-release as "absent", and this in turn
+/// screwed up the order comparisons.
+///
+/// Thankfully, such versions are incredibly rare. Virtually all versions have
+/// zero or one pre, dev or post release components.
 #[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)
 )]
-#[cfg_attr(feature = "rkyv", archive(check_bytes))]
-#[cfg_attr(
-    feature = "rkyv",
-    archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))
-)]
+#[cfg_attr(feature = "rkyv", rkyv(derive(Debug, Eq, PartialEq, PartialOrd, Ord)))]
 struct VersionSmall {
     /// The representation discussed above.
     repr: u64,
@@ -815,21 +902,33 @@ struct VersionSmall {
 }
 
 impl VersionSmall {
+    const SUFFIX_MIN: u64 = 0;
+    const SUFFIX_DEV: u64 = 1;
+    const SUFFIX_PRE_ALPHA: u64 = 2;
+    const SUFFIX_PRE_BETA: u64 = 3;
+    const SUFFIX_PRE_RC: u64 = 4;
+    const SUFFIX_NONE: u64 = 5;
+    const SUFFIX_POST: u64 = 6;
+    const SUFFIX_MAX: u64 = 7;
+    const SUFFIX_MAX_VERSION: u64 = 0x001F_FFFF;
+
     #[inline]
-    fn new() -> VersionSmall {
-        VersionSmall {
-            repr: 0x00000000_0000FFFF,
+    fn new() -> Self {
+        Self {
+            repr: 0x0000_0000_00A0_0000,
             release: [0, 0, 0, 0],
             len: 0,
         }
     }
 
     #[inline]
+    #[allow(clippy::unused_self)]
     fn epoch(&self) -> u64 {
         0
     }
 
     #[inline]
+    #[allow(clippy::unused_self)]
     fn set_epoch(&mut self, value: u64) -> bool {
         if value != 0 {
             return false;
@@ -844,7 +943,7 @@ impl VersionSmall {
 
     #[inline]
     fn clear_release(&mut self) {
-        self.repr &= !0xFFFFFFFF_FF000000;
+        self.repr &= !0xFFFF_FFFF_FF00_0000;
         self.release = [0, 0, 0, 0];
         self.len = 0;
     }
@@ -876,70 +975,89 @@ impl VersionSmall {
 
     #[inline]
     fn post(&self) -> Option<u64> {
-        let v = (self.repr >> 16) & 0xFF;
-        if v == 0 {
-            None
+        if self.suffix_kind() == Self::SUFFIX_POST {
+            Some(self.suffix_version())
         } else {
-            Some(v - 1)
+            None
         }
     }
 
     #[inline]
     fn set_post(&mut self, value: Option<u64>) -> bool {
-        if value.is_some() && (self.pre().is_some() || self.dev().is_some()) {
-            return false;
+        if self.min().is_some()
+            || self.pre().is_some()
+            || self.dev().is_some()
+            || self.max().is_some()
+        {
+            return value.is_none();
         }
         match value {
             None => {
-                self.repr &= !(0xFF << 16);
+                self.set_suffix_kind(Self::SUFFIX_NONE);
             }
             Some(number) => {
-                if number > 0b1111_1110 {
+                if number > Self::SUFFIX_MAX_VERSION {
                     return false;
                 }
-                self.repr &= !(0xFF << 16);
-                self.repr |= (number + 1) << 16;
+                self.set_suffix_kind(Self::SUFFIX_POST);
+                self.set_suffix_version(number);
             }
         }
         true
     }
 
     #[inline]
-    fn pre(&self) -> Option<PreRelease> {
-        let v = (self.repr >> 8) & 0xFF;
-        if v == 0xFF {
-            return None;
+    fn pre(&self) -> Option<Prerelease> {
+        let (kind, number) = (self.suffix_kind(), self.suffix_version());
+        if kind == Self::SUFFIX_PRE_ALPHA {
+            Some(Prerelease {
+                kind: PrereleaseKind::Alpha,
+                number,
+            })
+        } else if kind == Self::SUFFIX_PRE_BETA {
+            Some(Prerelease {
+                kind: PrereleaseKind::Beta,
+                number,
+            })
+        } else if kind == Self::SUFFIX_PRE_RC {
+            Some(Prerelease {
+                kind: PrereleaseKind::Rc,
+                number,
+            })
+        } else {
+            None
         }
-        let number = v & 0b0011_1111;
-        let kind = match v >> 6 {
-            0 => PreReleaseKind::Alpha,
-            1 => PreReleaseKind::Beta,
-            2 => PreReleaseKind::Rc,
-            _ => unreachable!(),
-        };
-        Some(PreRelease { kind, number })
     }
 
     #[inline]
-    fn set_pre(&mut self, value: Option<PreRelease>) -> bool {
-        if value.is_some() && (self.post().is_some() || self.dev().is_some()) {
-            return false;
+    fn set_pre(&mut self, value: Option<Prerelease>) -> bool {
+        if self.min().is_some()
+            || self.dev().is_some()
+            || self.post().is_some()
+            || self.max().is_some()
+        {
+            return value.is_none();
         }
         match value {
             None => {
-                self.repr |= 0xFF << 8;
+                self.set_suffix_kind(Self::SUFFIX_NONE);
             }
-            Some(PreRelease { kind, number }) => {
-                if number > 0b0011_1111 {
+            Some(Prerelease { kind, number }) => {
+                if number > Self::SUFFIX_MAX_VERSION {
                     return false;
                 }
-                let kind = match kind {
-                    PreReleaseKind::Alpha => 0,
-                    PreReleaseKind::Beta => 1,
-                    PreReleaseKind::Rc => 2,
-                };
-                self.repr &= !(0xFF << 8);
-                self.repr |= ((kind << 6) | number) << 8;
+                match kind {
+                    PrereleaseKind::Alpha => {
+                        self.set_suffix_kind(Self::SUFFIX_PRE_ALPHA);
+                    }
+                    PrereleaseKind::Beta => {
+                        self.set_suffix_kind(Self::SUFFIX_PRE_BETA);
+                    }
+                    PrereleaseKind::Rc => {
+                        self.set_suffix_kind(Self::SUFFIX_PRE_RC);
+                    }
+                }
+                self.set_suffix_version(number);
             }
         }
         true
@@ -947,39 +1065,138 @@ impl VersionSmall {
 
     #[inline]
     fn dev(&self) -> Option<u64> {
-        let v = self.repr & 0xFF;
-        if v == 0xFF {
-            None
+        if self.suffix_kind() == Self::SUFFIX_DEV {
+            Some(self.suffix_version())
         } else {
-            Some(v)
+            None
         }
     }
 
     #[inline]
     fn set_dev(&mut self, value: Option<u64>) -> bool {
-        if value.is_some() && (self.pre().is_some() || self.post().is_some()) {
-            return false;
+        if self.min().is_some()
+            || self.pre().is_some()
+            || self.post().is_some()
+            || self.max().is_some()
+        {
+            return value.is_none();
         }
         match value {
             None => {
-                self.repr |= 0xFF;
+                self.set_suffix_kind(Self::SUFFIX_NONE);
             }
             Some(number) => {
-                if number > 0b1111_1110 {
+                if number > Self::SUFFIX_MAX_VERSION {
                     return false;
                 }
-                self.repr &= !0xFF;
-                self.repr |= number;
+                self.set_suffix_kind(Self::SUFFIX_DEV);
+                self.set_suffix_version(number);
             }
         }
         true
     }
 
     #[inline]
+    fn min(&self) -> Option<u64> {
+        if self.suffix_kind() == Self::SUFFIX_MIN {
+            Some(self.suffix_version())
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn set_min(&mut self, value: Option<u64>) -> bool {
+        if self.dev().is_some()
+            || self.pre().is_some()
+            || self.post().is_some()
+            || self.max().is_some()
+        {
+            return value.is_none();
+        }
+        match value {
+            None => {
+                self.set_suffix_kind(Self::SUFFIX_NONE);
+            }
+            Some(number) => {
+                if number > Self::SUFFIX_MAX_VERSION {
+                    return false;
+                }
+                self.set_suffix_kind(Self::SUFFIX_MIN);
+                self.set_suffix_version(number);
+            }
+        }
+        true
+    }
+
+    #[inline]
+    fn max(&self) -> Option<u64> {
+        if self.suffix_kind() == Self::SUFFIX_MAX {
+            Some(self.suffix_version())
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn set_max(&mut self, value: Option<u64>) -> bool {
+        if self.dev().is_some()
+            || self.pre().is_some()
+            || self.post().is_some()
+            || self.min().is_some()
+        {
+            return value.is_none();
+        }
+        match value {
+            None => {
+                self.set_suffix_kind(Self::SUFFIX_NONE);
+            }
+            Some(number) => {
+                if number > Self::SUFFIX_MAX_VERSION {
+                    return false;
+                }
+                self.set_suffix_kind(Self::SUFFIX_MAX);
+                self.set_suffix_version(number);
+            }
+        }
+        true
+    }
+
+    #[inline]
+    #[allow(clippy::unused_self)]
     fn local(&self) -> &[LocalSegment] {
         // A "small" version is never used if the version has a non-zero number
         // of local segments.
         &[]
+    }
+
+    #[inline]
+    fn suffix_kind(&self) -> u64 {
+        let kind = (self.repr >> 21) & 0b111;
+        debug_assert!(kind <= Self::SUFFIX_MAX);
+        kind
+    }
+
+    #[inline]
+    fn set_suffix_kind(&mut self, kind: u64) {
+        debug_assert!(kind <= Self::SUFFIX_MAX);
+        self.repr &= !0x00E0_0000;
+        self.repr |= kind << 21;
+        if kind == Self::SUFFIX_NONE {
+            self.set_suffix_version(0);
+        }
+    }
+
+    #[inline]
+    fn suffix_version(&self) -> u64 {
+        self.repr & 0x001F_FFFF
+    }
+
+    #[inline]
+    fn set_suffix_version(&mut self, value: u64) {
+        debug_assert!(value <= 0x001F_FFFF);
+        self.repr &= !0x001F_FFFF;
+        self.repr |= value;
     }
 }
 
@@ -996,11 +1213,7 @@ impl VersionSmall {
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)
 )]
-#[cfg_attr(feature = "rkyv", archive(check_bytes))]
-#[cfg_attr(
-    feature = "rkyv",
-    archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))
-)]
+#[cfg_attr(feature = "rkyv", rkyv(derive(Debug, Eq, PartialEq, PartialOrd, Ord)))]
 struct VersionFull {
     /// The [versioning
     /// epoch](https://peps.python.org/pep-0440/#version-epochs). Normally
@@ -1017,8 +1230,8 @@ struct VersionFull {
     /// i.e. alpha, beta or rc plus a number
     ///
     /// Note that whether this is Some influences the version range
-    /// matching since normally we exclude all prerelease versions
-    pre: Option<PreRelease>,
+    /// matching since normally we exclude all pre-release versions
+    pre: Option<Prerelease>,
     /// The [Post release
     /// version](https://peps.python.org/pep-0440/#post-releases), higher
     /// post version are preferred over lower post or none-post versions
@@ -1028,15 +1241,26 @@ struct VersionFull {
     /// if any
     dev: Option<u64>,
     /// A [local version
-    /// identifier](https://peps.python.org/pep-0440/#local-version-identif
-    /// iers) such as `+deadbeef` in `1.2.3+deadbeef`
+    /// identifier](https://peps.python.org/pep-0440/#local-version-identifiers)
+    /// such as `+deadbeef` in `1.2.3+deadbeef`
     ///
     /// > They consist of a normal public version identifier (as defined
     /// > in the previous section), along with an arbitrary “local version
     /// > label”, separated from the public version identifier by a plus.
     /// > Local version labels have no specific semantics assigned, but
     /// > some syntactic restrictions are imposed.
+    ///
+    /// Local versions allow multiple segments separated by periods, such as `deadbeef.1.2.3`, see
+    /// [`LocalSegment`] for details on the semantics.
     local: Vec<LocalSegment>,
+    /// An internal-only segment that does not exist in PEP 440, used to
+    /// represent the smallest possible version of a release, preceding any
+    /// `dev`, `pre`, `post` or releases.
+    min: Option<u64>,
+    /// An internal-only segment that does not exist in PEP 440, used to
+    /// represent the largest possible version of a release, following any
+    /// `post` or local releases.
+    max: Option<u64>,
 }
 
 /// A version number pattern.
@@ -1067,8 +1291,8 @@ impl VersionPattern {
     /// Creates a new verbatim version pattern that matches the given
     /// version exactly.
     #[inline]
-    pub fn verbatim(version: Version) -> VersionPattern {
-        VersionPattern {
+    pub fn verbatim(version: Version) -> Self {
+        Self {
             version,
             wildcard: false,
         }
@@ -1077,8 +1301,8 @@ impl VersionPattern {
     /// Creates a new wildcard version pattern that matches any version with
     /// the given version as a prefix.
     #[inline]
-    pub fn wildcard(version: Version) -> VersionPattern {
-        VersionPattern {
+    pub fn wildcard(version: Version) -> Self {
+        Self {
             version,
             wildcard: true,
         }
@@ -1106,60 +1330,56 @@ impl VersionPattern {
 impl FromStr for VersionPattern {
     type Err = VersionPatternParseError;
 
-    fn from_str(version: &str) -> Result<VersionPattern, VersionPatternParseError> {
+    fn from_str(version: &str) -> Result<Self, VersionPatternParseError> {
         Parser::new(version.as_bytes()).parse_pattern()
     }
 }
 
 /// An optional pre-release modifier and number applied to a version.
 #[derive(PartialEq, Eq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
-#[cfg_attr(feature = "pyo3", pyclass)]
 #[cfg_attr(
     feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)
+    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize,)
 )]
-#[cfg_attr(feature = "rkyv", archive(check_bytes))]
-#[cfg_attr(
-    feature = "rkyv",
-    archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))
-)]
-pub struct PreRelease {
+#[cfg_attr(feature = "rkyv", rkyv(derive(Debug, Eq, PartialEq, PartialOrd, Ord)))]
+pub struct Prerelease {
     /// The kind of pre-release.
-    pub kind: PreReleaseKind,
+    pub kind: PrereleaseKind,
     /// The number associated with the pre-release.
     pub number: u64,
 }
 
-/// Optional prerelease modifier (alpha, beta or release candidate) appended to version
+/// Optional pre-release modifier (alpha, beta or release candidate) appended to version
 ///
 /// <https://peps.python.org/pep-0440/#pre-releases>
 #[derive(PartialEq, Eq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
-#[cfg_attr(feature = "pyo3", pyclass(eq, eq_int))]
 #[cfg_attr(
     feature = "rkyv",
-    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)
+    derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize,)
 )]
-#[cfg_attr(feature = "rkyv", archive(check_bytes))]
-#[cfg_attr(
-    feature = "rkyv",
-    archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))
-)]
-pub enum PreReleaseKind {
-    /// alpha prerelease
+#[cfg_attr(feature = "rkyv", rkyv(derive(Debug, Eq, PartialEq, PartialOrd, Ord)))]
+pub enum PrereleaseKind {
+    /// alpha pre-release
     Alpha,
-    /// beta prerelease
+    /// beta pre-release
     Beta,
-    /// release candidate prerelease
+    /// release candidate pre-release
     Rc,
 }
 
-impl std::fmt::Display for PreReleaseKind {
+impl std::fmt::Display for PrereleaseKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Alpha => write!(f, "a"),
             Self::Beta => write!(f, "b"),
             Self::Rc => write!(f, "rc"),
         }
+    }
+}
+
+impl std::fmt::Display for Prerelease {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.kind, self.number)
     }
 }
 
@@ -1183,11 +1403,7 @@ impl std::fmt::Display for PreReleaseKind {
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)
 )]
-#[cfg_attr(feature = "rkyv", archive(check_bytes))]
-#[cfg_attr(
-    feature = "rkyv",
-    archive_attr(derive(Debug, Eq, PartialEq, PartialOrd, Ord))
-)]
+#[cfg_attr(feature = "rkyv", rkyv(derive(Debug, Eq, PartialEq, PartialOrd, Ord)))]
 pub enum LocalSegment {
     /// Not-parseable as integer segment of local version
     String(String),
@@ -1242,7 +1458,7 @@ struct Parser<'a> {
     /// The release numbers extracted from the version.
     release: ReleaseNumbers,
     /// The pre-release version, if any.
-    pre: Option<PreRelease>,
+    pre: Option<Prerelease>,
     /// The post-release version, if any.
     post: Option<u64>,
     /// The dev release, if any.
@@ -1258,6 +1474,7 @@ struct Parser<'a> {
 impl<'a> Parser<'a> {
     /// The "separators" that are allowed in several different parts of a
     /// version.
+    #[allow(clippy::byte_char_slices)]
     const SEPARATOR: ByteSet = ByteSet::new(&[b'.', b'_', b'-']);
 
     /// Create a new `Parser` for parsing the version in the given byte string.
@@ -1281,10 +1498,10 @@ impl<'a> Parser<'a> {
     fn parse(self) -> Result<Version, VersionParseError> {
         match self.parse_pattern() {
             Ok(vpat) => {
-                if !vpat.is_wildcard() {
-                    Ok(vpat.into_version())
-                } else {
+                if vpat.is_wildcard() {
                     Err(ErrorKind::Wildcard.into())
+                } else {
+                    Ok(vpat.into_version())
                 }
             }
             // If we get an error when parsing a version pattern, then
@@ -1318,8 +1535,8 @@ impl<'a> Parser<'a> {
         self.parse_local()?;
         self.bump_while(|byte| byte.is_ascii_whitespace());
         if !self.is_done() {
+            let version = String::from_utf8_lossy(&self.v[..self.i]).into_owned();
             let remaining = String::from_utf8_lossy(&self.v[self.i..]).into_owned();
-            let version = self.into_pattern().version;
             return Err(ErrorKind::UnexpectedEnd { version, remaining }.into());
         }
         Ok(self.into_pattern())
@@ -1368,9 +1585,9 @@ impl<'a> Parser<'a> {
                 | (u64::from(release[1]) << 40)
                 | (u64::from(release[2]) << 32)
                 | (u64::from(release[3]) << 24)
-                | (0x00 << 16)
-                | (0xFF << 8)
-                | (0xFF << 0),
+                | (0xA0 << 16)
+                | (0x00 << 8)
+                | (0x00 << 0),
             release: [
                 u64::from(release[0]),
                 u64::from(release[1]),
@@ -1459,22 +1676,22 @@ impl<'a> Parser<'a> {
         // SPELLINGS and MAP are in correspondence. SPELLINGS is used to look
         // for what spelling is used in the version string (if any), and
         // the index of the element found is used to lookup which type of
-        // PreRelease it is.
+        // pre-release it is.
         //
         // Note also that the order of the strings themselves matters. If 'pre'
         // were before 'preview' for example, then 'preview' would never match
         // since the strings are matched in order.
         const SPELLINGS: StringSet =
             StringSet::new(&["alpha", "beta", "preview", "pre", "rc", "a", "b", "c"]);
-        const MAP: &[PreReleaseKind] = &[
-            PreReleaseKind::Alpha,
-            PreReleaseKind::Beta,
-            PreReleaseKind::Rc,
-            PreReleaseKind::Rc,
-            PreReleaseKind::Rc,
-            PreReleaseKind::Alpha,
-            PreReleaseKind::Beta,
-            PreReleaseKind::Rc,
+        const MAP: &[PrereleaseKind] = &[
+            PrereleaseKind::Alpha,
+            PrereleaseKind::Beta,
+            PrereleaseKind::Rc,
+            PrereleaseKind::Rc,
+            PrereleaseKind::Rc,
+            PrereleaseKind::Alpha,
+            PrereleaseKind::Beta,
+            PrereleaseKind::Rc,
         ];
 
         let oldpos = self.i;
@@ -1492,7 +1709,7 @@ impl<'a> Parser<'a> {
         // Under the normalization rules, a pre-release without an
         // explicit number defaults to `0`.
         let number = self.parse_number()?.unwrap_or(0);
-        self.pre = Some(PreRelease { kind, number });
+        self.pre = Some(Prerelease { kind, number });
         Ok(())
     }
 
@@ -1726,8 +1943,8 @@ enum ReleaseNumbers {
 
 impl ReleaseNumbers {
     /// Create a new empty set of release numbers.
-    fn new() -> ReleaseNumbers {
-        ReleaseNumbers::Inline {
+    fn new() -> Self {
+        Self::Inline {
             numbers: [0; 4],
             len: 0,
         }
@@ -1737,7 +1954,7 @@ impl ReleaseNumbers {
     /// when the lengths grow too big.
     fn push(&mut self, n: u64) {
         match *self {
-            ReleaseNumbers::Inline {
+            Self::Inline {
                 ref mut numbers,
                 ref mut len,
             } => {
@@ -1745,13 +1962,13 @@ impl ReleaseNumbers {
                 if *len == 4 {
                     let mut numbers = numbers.to_vec();
                     numbers.push(n);
-                    *self = ReleaseNumbers::Vec(numbers.to_vec());
+                    *self = Self::Vec(numbers.clone());
                 } else {
                     numbers[*len] = n;
                     *len += 1;
                 }
             }
-            ReleaseNumbers::Vec(ref mut numbers) => {
+            Self::Vec(ref mut numbers) => {
                 numbers.push(n);
             }
         }
@@ -1765,8 +1982,8 @@ impl ReleaseNumbers {
     /// Returns the release components as a slice.
     fn as_slice(&self) -> &[u64] {
         match *self {
-            ReleaseNumbers::Inline { ref numbers, len } => &numbers[..len],
-            ReleaseNumbers::Vec(ref vec) => vec,
+            Self::Inline { ref numbers, len } => &numbers[..len],
+            Self::Vec(ref vec) => vec,
         }
     }
 }
@@ -1790,7 +2007,7 @@ impl StringSet {
     /// # Panics
     ///
     /// When the number of strings is too big.
-    const fn new(strings: &'static [&'static str]) -> StringSet {
+    const fn new(strings: &'static [&'static str]) -> Self {
         assert!(
             strings.len() <= 20,
             "only a small number of strings are supported"
@@ -1807,7 +2024,7 @@ impl StringSet {
             i += 1;
         }
         let first_byte = ByteSet::new(&firsts);
-        StringSet {
+        Self {
             first_byte,
             strings,
         }
@@ -1836,7 +2053,7 @@ struct ByteSet {
 
 impl ByteSet {
     /// Create a new byte set for searching from the given bytes.
-    const fn new(bytes: &[u8]) -> ByteSet {
+    const fn new(bytes: &[u8]) -> Self {
         let mut set = [false; 256];
         let mut i = 0;
         while i < bytes.len() {
@@ -1844,7 +2061,7 @@ impl ByteSet {
             set[bytes[i].to_ascii_lowercase() as usize] = true;
             i += 1;
         }
-        ByteSet { set }
+        Self { set }
     }
 
     /// Returns the first byte in the haystack if and only if that byte is in
@@ -1894,8 +2111,7 @@ impl std::fmt::Display for VersionParseError {
             ErrorKind::InvalidDigit { got } => {
                 write!(
                     f,
-                    "expected ASCII digit, but found non-ASCII byte \\x{:02X}",
-                    got
+                    "expected ASCII digit, but found non-ASCII byte \\x{got:02X}"
                 )
             }
             ErrorKind::NumberTooBig { ref bytes } => {
@@ -1930,7 +2146,7 @@ impl std::fmt::Display for VersionParseError {
                 write!(
                     f,
                     "found a `{precursor}` indicating the start of a local \
-                     component in a version, but did not find any alpha-numeric \
+                     component in a version, but did not find any alphanumeric \
                      ASCII segment following the `{precursor}`",
                 )
             }
@@ -1940,7 +2156,7 @@ impl std::fmt::Display for VersionParseError {
             } => {
                 write!(
                     f,
-                    "after parsing {version}, found {remaining:?} after it, \
+                    "after parsing `{version}`, found `{remaining}`, \
                      which is not part of a valid version",
                 )
             }
@@ -1970,7 +2186,7 @@ pub(crate) enum ErrorKind {
     /// Occurs when an epoch version does not have a number after the `!`.
     NoLeadingReleaseNumber,
     /// Occurs when a `+` (or a `.` after the first local segment) is seen
-    /// (indicating a local component of a version), but no alpha-numeric ASCII
+    /// (indicating a local component of a version), but no alphanumeric ASCII
     /// string is found following it.
     LocalEmpty {
         /// Either a `+` or a `[-_.]` indicating what was found that demands a
@@ -1981,15 +2197,15 @@ pub(crate) enum ErrorKind {
     /// trailing data in the string.
     UnexpectedEnd {
         /// The version that has been parsed so far.
-        version: Version,
+        version: String,
         /// The bytes that were remaining and not parsed.
         remaining: String,
     },
 }
 
 impl From<ErrorKind> for VersionParseError {
-    fn from(kind: ErrorKind) -> VersionParseError {
-        VersionParseError {
+    fn from(kind: ErrorKind) -> Self {
+        Self {
             kind: Box::new(kind),
         }
     }
@@ -2022,151 +2238,24 @@ pub(crate) enum PatternErrorKind {
 }
 
 impl From<PatternErrorKind> for VersionPatternParseError {
-    fn from(kind: PatternErrorKind) -> VersionPatternParseError {
-        VersionPatternParseError {
+    fn from(kind: PatternErrorKind) -> Self {
+        Self {
             kind: Box::new(kind),
         }
     }
 }
 
 impl From<ErrorKind> for VersionPatternParseError {
-    fn from(kind: ErrorKind) -> VersionPatternParseError {
-        VersionPatternParseError::from(VersionParseError::from(kind))
+    fn from(kind: ErrorKind) -> Self {
+        Self::from(VersionParseError::from(kind))
     }
 }
 
 impl From<VersionParseError> for VersionPatternParseError {
-    fn from(err: VersionParseError) -> VersionPatternParseError {
-        VersionPatternParseError {
+    fn from(err: VersionParseError) -> Self {
+        Self {
             kind: Box::new(PatternErrorKind::Version(err)),
         }
-    }
-}
-
-/// Workaround for <https://github.com/PyO3/pyo3/pull/2786>
-#[cfg(feature = "pyo3")]
-#[derive(Clone, Debug)]
-#[pyclass(name = "Version")]
-pub struct PyVersion(pub Version);
-
-#[cfg(feature = "pyo3")]
-#[pymethods]
-impl PyVersion {
-    /// The [versioning epoch](https://peps.python.org/pep-0440/#version-epochs). Normally just 0,
-    /// but you can increment it if you switched the versioning scheme.
-    #[getter]
-    pub fn epoch(&self) -> u64 {
-        self.0.epoch()
-    }
-    /// The normal number part of the version
-    /// (["final release"](https://peps.python.org/pep-0440/#final-releases)),
-    /// such a `1.2.3` in `4!1.2.3-a8.post9.dev1`
-    ///
-    /// Note that we drop the * placeholder by moving it to `Operator`
-    #[getter]
-    pub fn release(&self) -> Vec<u64> {
-        self.0.release().to_vec()
-    }
-    /// The [prerelease](https://peps.python.org/pep-0440/#pre-releases), i.e. alpha, beta or rc
-    /// plus a number
-    ///
-    /// Note that whether this is Some influences the version
-    /// range matching since normally we exclude all prerelease versions
-    #[getter]
-    pub fn pre(&self) -> Option<PreRelease> {
-        self.0.pre()
-    }
-    /// The [Post release version](https://peps.python.org/pep-0440/#post-releases),
-    /// higher post version are preferred over lower post or none-post versions
-    #[getter]
-    pub fn post(&self) -> Option<u64> {
-        self.0.post()
-    }
-    /// The [developmental release](https://peps.python.org/pep-0440/#developmental-releases),
-    /// if any
-    #[getter]
-    pub fn dev(&self) -> Option<u64> {
-        self.0.dev()
-    }
-    /// The first item of release or 0 if unavailable.
-    #[getter]
-    #[allow(clippy::get_first)]
-    pub fn major(&self) -> u64 {
-        self.0.release().get(0).copied().unwrap_or_default()
-    }
-    /// The second item of release or 0 if unavailable.
-    #[getter]
-    pub fn minor(&self) -> u64 {
-        self.0.release().get(1).copied().unwrap_or_default()
-    }
-    /// The third item of release or 0 if unavailable.
-    #[getter]
-    pub fn micro(&self) -> u64 {
-        self.0.release().get(2).copied().unwrap_or_default()
-    }
-
-    /// Parses a PEP 440 version string
-    #[cfg(feature = "pyo3")]
-    #[new]
-    pub fn parse(version: &str) -> PyResult<Self> {
-        Ok(Self(
-            Version::from_str(version).map_err(|e| PyValueError::new_err(e.to_string()))?,
-        ))
-    }
-
-    // Maps the error type
-    /// Parse a PEP 440 version optionally ending with `.*`
-    #[cfg(feature = "pyo3")]
-    #[staticmethod]
-    pub fn parse_star(version_specifier: &str) -> PyResult<(Self, bool)> {
-        version_specifier
-            .parse::<VersionPattern>()
-            .map_err(|e| PyValueError::new_err(e.to_string()))
-            .map(|VersionPattern { version, wildcard }| (Self(version), wildcard))
-    }
-
-    /// Returns the normalized representation
-    #[cfg(feature = "pyo3")]
-    pub fn __str__(&self) -> String {
-        self.0.to_string()
-    }
-
-    /// Returns the normalized representation
-    #[cfg(feature = "pyo3")]
-    pub fn __repr__(&self) -> String {
-        format!(r#"<Version("{}")>"#, self.0)
-    }
-
-    /// Returns the normalized representation
-    #[cfg(feature = "pyo3")]
-    pub fn __hash__(&self) -> u64 {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        self.0.hash(&mut hasher);
-        hasher.finish()
-    }
-
-    #[cfg(feature = "pyo3")]
-    fn __richcmp__(&self, other: &Self, op: CompareOp) -> bool {
-        op.matches(self.0.cmp(&other.0))
-    }
-
-    fn any_prerelease(&self) -> bool {
-        self.0.any_prerelease()
-    }
-}
-
-#[cfg(feature = "pyo3")]
-impl IntoPy<PyObject> for Version {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        PyVersion(self).into_py(py)
-    }
-}
-
-#[cfg(feature = "pyo3")]
-impl<'source> FromPyObject<'source> for Version {
-    fn extract_bound(ob: &Bound<'source, PyAny>) -> PyResult<Self> {
-        use pyo3::prelude::*;
-        Ok(ob.extract::<PyVersion>()?.0)
     }
 }
 
@@ -2202,9 +2291,9 @@ pub(crate) fn compare_release(this: &[u64], other: &[u64]) -> Ordering {
 /// According to [a summary of permitted suffixes and relative
 /// ordering][pep440-suffix-ordering] the order of pre/post-releases is: .devN,
 /// aN, bN, rcN, <no suffix (final)>, .postN but also, you can have dev/post
-/// releases on beta releases, so we make a three stage ordering: ({dev: 0, a:
-/// 1, b: 2, rc: 3, (): 4, post: 5}, <preN>, <postN or None as smallest>, <devN
-/// or Max as largest>, <local>)
+/// releases on beta releases, so we make a three stage ordering: ({min: 0,
+/// dev: 1, a: 2, b: 3, rc: 4, (): 5, post: 6}, <preN>, <postN or None as
+/// smallest>, <devN or Max as largest>, <local>)
 ///
 /// For post, any number is better than none (so None defaults to None<0),
 /// but for dev, no number is better (so None default to the maximum). For
@@ -2213,40 +2302,53 @@ pub(crate) fn compare_release(this: &[u64], other: &[u64]) -> Ordering {
 ///
 /// [pep440-suffix-ordering]: https://peps.python.org/pep-0440/#summary-of-permitted-suffixes-and-relative-ordering
 fn sortable_tuple(version: &Version) -> (u64, u64, Option<u64>, u64, &[LocalSegment]) {
-    match (version.pre(), version.post(), version.dev()) {
+    // If the version is a "max" version, use a post version larger than any possible post version.
+    let post = if version.max().is_some() {
+        Some(u64::MAX)
+    } else {
+        version.post()
+    };
+    match (version.pre(), post, version.dev(), version.min()) {
+        // min release
+        (_pre, post, _dev, Some(n)) => (0, 0, post, n, version.local()),
         // dev release
-        (None, None, Some(n)) => (0, 0, None, n, version.local()),
+        (None, None, Some(n), None) => (1, 0, None, n, version.local()),
         // alpha release
         (
-            Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
+            Some(Prerelease {
+                kind: PrereleaseKind::Alpha,
                 number: n,
             }),
             post,
             dev,
-        ) => (1, n, post, dev.unwrap_or(u64::MAX), version.local()),
+            None,
+        ) => (2, n, post, dev.unwrap_or(u64::MAX), version.local()),
         // beta release
         (
-            Some(PreRelease {
-                kind: PreReleaseKind::Beta,
+            Some(Prerelease {
+                kind: PrereleaseKind::Beta,
                 number: n,
             }),
             post,
             dev,
-        ) => (2, n, post, dev.unwrap_or(u64::MAX), version.local()),
+            None,
+        ) => (3, n, post, dev.unwrap_or(u64::MAX), version.local()),
         // alpha release
         (
-            Some(PreRelease {
-                kind: PreReleaseKind::Rc,
+            Some(Prerelease {
+                kind: PrereleaseKind::Rc,
                 number: n,
             }),
             post,
             dev,
-        ) => (3, n, post, dev.unwrap_or(u64::MAX), version.local()),
+            None,
+        ) => (4, n, post, dev.unwrap_or(u64::MAX), version.local()),
         // final release
-        (None, None, None) => (4, 0, None, 0, version.local()),
+        (None, None, None, None) => (5, 0, None, 0, version.local()),
         // post release
-        (None, Some(post), dev) => (5, 0, Some(post), dev.unwrap_or(u64::MAX), version.local()),
+        (None, Some(post), dev, None) => {
+            (6, 0, Some(post), dev.unwrap_or(u64::MAX), version.local())
+        }
     }
 }
 
@@ -2266,7 +2368,7 @@ fn starts_with_ignore_ascii_case(needle: &[u8], haystack: &[u8]) -> bool {
 /// # Motivation
 ///
 /// We hand-write this for a couple reasons. Firstly, the standard library's
-/// FromStr impl for parsing integers requires UTF-8 validation first. We
+/// `FromStr` impl for parsing integers requires UTF-8 validation first. We
 /// don't need that for version parsing since we stay in the realm of ASCII.
 /// Secondly, std's version is a little more flexible because it supports
 /// signed integers. So for example, it permits a leading `+` before the actual
@@ -2293,1235 +2395,7 @@ fn parse_u64(bytes: &[u8]) -> Result<u64, VersionParseError> {
 }
 
 /// The minimum version that can be represented by a [`Version`]: `0a0.dev0`.
-pub static MIN_VERSION: once_cell::sync::Lazy<Version> =
-    once_cell::sync::Lazy::new(|| Version::from_str("0a0.dev0").unwrap());
+pub static MIN_VERSION: Lazy<Version> = Lazy::new(|| Version::from_str("0a0.dev0").unwrap());
 
 #[cfg(test)]
-mod tests {
-    use std::str::FromStr;
-
-    #[cfg(feature = "pyo3")]
-    use pyo3::pyfunction;
-
-    use crate::VersionSpecifier;
-
-    use super::*;
-
-    /// <https://github.com/pypa/packaging/blob/237ff3aa348486cf835a980592af3a59fccd6101/tests/test_version.py#L24-L81>
-    #[test]
-    fn test_packaging_versions() {
-        let versions = [
-            // Implicit epoch of 0
-            ("1.0.dev456", Version::new([1, 0]).with_dev(Some(456))),
-            (
-                "1.0a1",
-                Version::new([1, 0]).with_pre(Some(PreRelease {
-                    kind: PreReleaseKind::Alpha,
-                    number: 1,
-                })),
-            ),
-            (
-                "1.0a2.dev456",
-                Version::new([1, 0])
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Alpha,
-                        number: 2,
-                    }))
-                    .with_dev(Some(456)),
-            ),
-            (
-                "1.0a12.dev456",
-                Version::new([1, 0])
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Alpha,
-                        number: 12,
-                    }))
-                    .with_dev(Some(456)),
-            ),
-            (
-                "1.0a12",
-                Version::new([1, 0]).with_pre(Some(PreRelease {
-                    kind: PreReleaseKind::Alpha,
-                    number: 12,
-                })),
-            ),
-            (
-                "1.0b1.dev456",
-                Version::new([1, 0])
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Beta,
-                        number: 1,
-                    }))
-                    .with_dev(Some(456)),
-            ),
-            (
-                "1.0b2",
-                Version::new([1, 0]).with_pre(Some(PreRelease {
-                    kind: PreReleaseKind::Beta,
-                    number: 2,
-                })),
-            ),
-            (
-                "1.0b2.post345.dev456",
-                Version::new([1, 0])
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Beta,
-                        number: 2,
-                    }))
-                    .with_dev(Some(456))
-                    .with_post(Some(345)),
-            ),
-            (
-                "1.0b2.post345",
-                Version::new([1, 0])
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Beta,
-                        number: 2,
-                    }))
-                    .with_post(Some(345)),
-            ),
-            (
-                "1.0b2-346",
-                Version::new([1, 0])
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Beta,
-                        number: 2,
-                    }))
-                    .with_post(Some(346)),
-            ),
-            (
-                "1.0c1.dev456",
-                Version::new([1, 0])
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Rc,
-                        number: 1,
-                    }))
-                    .with_dev(Some(456)),
-            ),
-            (
-                "1.0c1",
-                Version::new([1, 0]).with_pre(Some(PreRelease {
-                    kind: PreReleaseKind::Rc,
-                    number: 1,
-                })),
-            ),
-            (
-                "1.0rc2",
-                Version::new([1, 0]).with_pre(Some(PreRelease {
-                    kind: PreReleaseKind::Rc,
-                    number: 2,
-                })),
-            ),
-            (
-                "1.0c3",
-                Version::new([1, 0]).with_pre(Some(PreRelease {
-                    kind: PreReleaseKind::Rc,
-                    number: 3,
-                })),
-            ),
-            ("1.0", Version::new([1, 0])),
-            (
-                "1.0.post456.dev34",
-                Version::new([1, 0]).with_post(Some(456)).with_dev(Some(34)),
-            ),
-            ("1.0.post456", Version::new([1, 0]).with_post(Some(456))),
-            ("1.1.dev1", Version::new([1, 1]).with_dev(Some(1))),
-            (
-                "1.2+123abc",
-                Version::new([1, 2]).with_local(vec![LocalSegment::String("123abc".to_string())]),
-            ),
-            (
-                "1.2+123abc456",
-                Version::new([1, 2])
-                    .with_local(vec![LocalSegment::String("123abc456".to_string())]),
-            ),
-            (
-                "1.2+abc",
-                Version::new([1, 2]).with_local(vec![LocalSegment::String("abc".to_string())]),
-            ),
-            (
-                "1.2+abc123",
-                Version::new([1, 2]).with_local(vec![LocalSegment::String("abc123".to_string())]),
-            ),
-            (
-                "1.2+abc123def",
-                Version::new([1, 2])
-                    .with_local(vec![LocalSegment::String("abc123def".to_string())]),
-            ),
-            (
-                "1.2+1234.abc",
-                Version::new([1, 2]).with_local(vec![
-                    LocalSegment::Number(1234),
-                    LocalSegment::String("abc".to_string()),
-                ]),
-            ),
-            (
-                "1.2+123456",
-                Version::new([1, 2]).with_local(vec![LocalSegment::Number(123456)]),
-            ),
-            (
-                "1.2.r32+123456",
-                Version::new([1, 2])
-                    .with_post(Some(32))
-                    .with_local(vec![LocalSegment::Number(123456)]),
-            ),
-            (
-                "1.2.rev33+123456",
-                Version::new([1, 2])
-                    .with_post(Some(33))
-                    .with_local(vec![LocalSegment::Number(123456)]),
-            ),
-            // Explicit epoch of 1
-            (
-                "1!1.0.dev456",
-                Version::new([1, 0]).with_epoch(1).with_dev(Some(456)),
-            ),
-            (
-                "1!1.0a1",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Alpha,
-                        number: 1,
-                    })),
-            ),
-            (
-                "1!1.0a2.dev456",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Alpha,
-                        number: 2,
-                    }))
-                    .with_dev(Some(456)),
-            ),
-            (
-                "1!1.0a12.dev456",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Alpha,
-                        number: 12,
-                    }))
-                    .with_dev(Some(456)),
-            ),
-            (
-                "1!1.0a12",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Alpha,
-                        number: 12,
-                    })),
-            ),
-            (
-                "1!1.0b1.dev456",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Beta,
-                        number: 1,
-                    }))
-                    .with_dev(Some(456)),
-            ),
-            (
-                "1!1.0b2",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Beta,
-                        number: 2,
-                    })),
-            ),
-            (
-                "1!1.0b2.post345.dev456",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Beta,
-                        number: 2,
-                    }))
-                    .with_post(Some(345))
-                    .with_dev(Some(456)),
-            ),
-            (
-                "1!1.0b2.post345",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Beta,
-                        number: 2,
-                    }))
-                    .with_post(Some(345)),
-            ),
-            (
-                "1!1.0b2-346",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Beta,
-                        number: 2,
-                    }))
-                    .with_post(Some(346)),
-            ),
-            (
-                "1!1.0c1.dev456",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Rc,
-                        number: 1,
-                    }))
-                    .with_dev(Some(456)),
-            ),
-            (
-                "1!1.0c1",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Rc,
-                        number: 1,
-                    })),
-            ),
-            (
-                "1!1.0rc2",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Rc,
-                        number: 2,
-                    })),
-            ),
-            (
-                "1!1.0c3",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_pre(Some(PreRelease {
-                        kind: PreReleaseKind::Rc,
-                        number: 3,
-                    })),
-            ),
-            ("1!1.0", Version::new([1, 0]).with_epoch(1)),
-            (
-                "1!1.0.post456.dev34",
-                Version::new([1, 0])
-                    .with_epoch(1)
-                    .with_post(Some(456))
-                    .with_dev(Some(34)),
-            ),
-            (
-                "1!1.0.post456",
-                Version::new([1, 0]).with_epoch(1).with_post(Some(456)),
-            ),
-            (
-                "1!1.1.dev1",
-                Version::new([1, 1]).with_epoch(1).with_dev(Some(1)),
-            ),
-            (
-                "1!1.2+123abc",
-                Version::new([1, 2])
-                    .with_epoch(1)
-                    .with_local(vec![LocalSegment::String("123abc".to_string())]),
-            ),
-            (
-                "1!1.2+123abc456",
-                Version::new([1, 2])
-                    .with_epoch(1)
-                    .with_local(vec![LocalSegment::String("123abc456".to_string())]),
-            ),
-            (
-                "1!1.2+abc",
-                Version::new([1, 2])
-                    .with_epoch(1)
-                    .with_local(vec![LocalSegment::String("abc".to_string())]),
-            ),
-            (
-                "1!1.2+abc123",
-                Version::new([1, 2])
-                    .with_epoch(1)
-                    .with_local(vec![LocalSegment::String("abc123".to_string())]),
-            ),
-            (
-                "1!1.2+abc123def",
-                Version::new([1, 2])
-                    .with_epoch(1)
-                    .with_local(vec![LocalSegment::String("abc123def".to_string())]),
-            ),
-            (
-                "1!1.2+1234.abc",
-                Version::new([1, 2]).with_epoch(1).with_local(vec![
-                    LocalSegment::Number(1234),
-                    LocalSegment::String("abc".to_string()),
-                ]),
-            ),
-            (
-                "1!1.2+123456",
-                Version::new([1, 2])
-                    .with_epoch(1)
-                    .with_local(vec![LocalSegment::Number(123456)]),
-            ),
-            (
-                "1!1.2.r32+123456",
-                Version::new([1, 2])
-                    .with_epoch(1)
-                    .with_post(Some(32))
-                    .with_local(vec![LocalSegment::Number(123456)]),
-            ),
-            (
-                "1!1.2.rev33+123456",
-                Version::new([1, 2])
-                    .with_epoch(1)
-                    .with_post(Some(33))
-                    .with_local(vec![LocalSegment::Number(123456)]),
-            ),
-            (
-                "98765!1.2.rev33+123456",
-                Version::new([1, 2])
-                    .with_epoch(98765)
-                    .with_post(Some(33))
-                    .with_local(vec![LocalSegment::Number(123456)]),
-            ),
-        ];
-        for (string, structured) in versions {
-            match Version::from_str(string) {
-                Err(err) => {
-                    unreachable!(
-                        "expected {string:?} to parse as {structured:?}, but got {err:?}",
-                        structured = structured.as_bloated_debug(),
-                    )
-                }
-                Ok(v) => assert!(
-                    v == structured,
-                    "for {string:?}, expected {structured:?} but got {v:?}",
-                    structured = structured.as_bloated_debug(),
-                    v = v.as_bloated_debug(),
-                ),
-            }
-            let spec = format!("=={string}");
-            match VersionSpecifier::from_str(&spec) {
-                Err(err) => {
-                    unreachable!(
-                        "expected version in {spec:?} to parse as {structured:?}, but got {err:?}",
-                        structured = structured.as_bloated_debug(),
-                    )
-                }
-                Ok(v) => assert!(
-                    v.version() == &structured,
-                    "for {string:?}, expected {structured:?} but got {v:?}",
-                    structured = structured.as_bloated_debug(),
-                    v = v.version.as_bloated_debug(),
-                ),
-            }
-        }
-    }
-
-    /// <https://github.com/pypa/packaging/blob/237ff3aa348486cf835a980592af3a59fccd6101/tests/test_version.py#L91-L100>
-    #[test]
-    fn test_packaging_failures() {
-        let versions = [
-            // Versions with invalid local versions
-            "1.0+a+",
-            "1.0++",
-            "1.0+_foobar",
-            "1.0+foo&asd",
-            "1.0+1+1",
-            // Nonsensical versions should also be invalid
-            "french toast",
-            "==french toast",
-        ];
-        for version in versions {
-            assert!(Version::from_str(version).is_err());
-            assert!(VersionSpecifier::from_str(&format!("=={version}")).is_err());
-        }
-    }
-
-    #[test]
-    fn test_equality_and_normalization() {
-        let versions = [
-            // Various development release incarnations
-            ("1.0dev", "1.0.dev0"),
-            ("1.0.dev", "1.0.dev0"),
-            ("1.0dev1", "1.0.dev1"),
-            ("1.0dev", "1.0.dev0"),
-            ("1.0-dev", "1.0.dev0"),
-            ("1.0-dev1", "1.0.dev1"),
-            ("1.0DEV", "1.0.dev0"),
-            ("1.0.DEV", "1.0.dev0"),
-            ("1.0DEV1", "1.0.dev1"),
-            ("1.0DEV", "1.0.dev0"),
-            ("1.0.DEV1", "1.0.dev1"),
-            ("1.0-DEV", "1.0.dev0"),
-            ("1.0-DEV1", "1.0.dev1"),
-            // Various alpha incarnations
-            ("1.0a", "1.0a0"),
-            ("1.0.a", "1.0a0"),
-            ("1.0.a1", "1.0a1"),
-            ("1.0-a", "1.0a0"),
-            ("1.0-a1", "1.0a1"),
-            ("1.0alpha", "1.0a0"),
-            ("1.0.alpha", "1.0a0"),
-            ("1.0.alpha1", "1.0a1"),
-            ("1.0-alpha", "1.0a0"),
-            ("1.0-alpha1", "1.0a1"),
-            ("1.0A", "1.0a0"),
-            ("1.0.A", "1.0a0"),
-            ("1.0.A1", "1.0a1"),
-            ("1.0-A", "1.0a0"),
-            ("1.0-A1", "1.0a1"),
-            ("1.0ALPHA", "1.0a0"),
-            ("1.0.ALPHA", "1.0a0"),
-            ("1.0.ALPHA1", "1.0a1"),
-            ("1.0-ALPHA", "1.0a0"),
-            ("1.0-ALPHA1", "1.0a1"),
-            // Various beta incarnations
-            ("1.0b", "1.0b0"),
-            ("1.0.b", "1.0b0"),
-            ("1.0.b1", "1.0b1"),
-            ("1.0-b", "1.0b0"),
-            ("1.0-b1", "1.0b1"),
-            ("1.0beta", "1.0b0"),
-            ("1.0.beta", "1.0b0"),
-            ("1.0.beta1", "1.0b1"),
-            ("1.0-beta", "1.0b0"),
-            ("1.0-beta1", "1.0b1"),
-            ("1.0B", "1.0b0"),
-            ("1.0.B", "1.0b0"),
-            ("1.0.B1", "1.0b1"),
-            ("1.0-B", "1.0b0"),
-            ("1.0-B1", "1.0b1"),
-            ("1.0BETA", "1.0b0"),
-            ("1.0.BETA", "1.0b0"),
-            ("1.0.BETA1", "1.0b1"),
-            ("1.0-BETA", "1.0b0"),
-            ("1.0-BETA1", "1.0b1"),
-            // Various release candidate incarnations
-            ("1.0c", "1.0rc0"),
-            ("1.0.c", "1.0rc0"),
-            ("1.0.c1", "1.0rc1"),
-            ("1.0-c", "1.0rc0"),
-            ("1.0-c1", "1.0rc1"),
-            ("1.0rc", "1.0rc0"),
-            ("1.0.rc", "1.0rc0"),
-            ("1.0.rc1", "1.0rc1"),
-            ("1.0-rc", "1.0rc0"),
-            ("1.0-rc1", "1.0rc1"),
-            ("1.0C", "1.0rc0"),
-            ("1.0.C", "1.0rc0"),
-            ("1.0.C1", "1.0rc1"),
-            ("1.0-C", "1.0rc0"),
-            ("1.0-C1", "1.0rc1"),
-            ("1.0RC", "1.0rc0"),
-            ("1.0.RC", "1.0rc0"),
-            ("1.0.RC1", "1.0rc1"),
-            ("1.0-RC", "1.0rc0"),
-            ("1.0-RC1", "1.0rc1"),
-            // Various post release incarnations
-            ("1.0post", "1.0.post0"),
-            ("1.0.post", "1.0.post0"),
-            ("1.0post1", "1.0.post1"),
-            ("1.0post", "1.0.post0"),
-            ("1.0-post", "1.0.post0"),
-            ("1.0-post1", "1.0.post1"),
-            ("1.0POST", "1.0.post0"),
-            ("1.0.POST", "1.0.post0"),
-            ("1.0POST1", "1.0.post1"),
-            ("1.0POST", "1.0.post0"),
-            ("1.0r", "1.0.post0"),
-            ("1.0rev", "1.0.post0"),
-            ("1.0.POST1", "1.0.post1"),
-            ("1.0.r1", "1.0.post1"),
-            ("1.0.rev1", "1.0.post1"),
-            ("1.0-POST", "1.0.post0"),
-            ("1.0-POST1", "1.0.post1"),
-            ("1.0-5", "1.0.post5"),
-            ("1.0-r5", "1.0.post5"),
-            ("1.0-rev5", "1.0.post5"),
-            // Local version case insensitivity
-            ("1.0+AbC", "1.0+abc"),
-            // Integer Normalization
-            ("1.01", "1.1"),
-            ("1.0a05", "1.0a5"),
-            ("1.0b07", "1.0b7"),
-            ("1.0c056", "1.0rc56"),
-            ("1.0rc09", "1.0rc9"),
-            ("1.0.post000", "1.0.post0"),
-            ("1.1.dev09000", "1.1.dev9000"),
-            ("00!1.2", "1.2"),
-            ("0100!0.0", "100!0.0"),
-            // Various other normalizations
-            ("v1.0", "1.0"),
-            ("   v1.0\t\n", "1.0"),
-        ];
-        for (version_str, normalized_str) in versions {
-            let version = Version::from_str(version_str).unwrap();
-            let normalized = Version::from_str(normalized_str).unwrap();
-            // Just test version parsing again
-            assert_eq!(version, normalized, "{version_str} {normalized_str}");
-            // Test version normalization
-            assert_eq!(
-                version.to_string(),
-                normalized.to_string(),
-                "{version_str} {normalized_str}"
-            );
-        }
-    }
-
-    /// <https://github.com/pypa/packaging/blob/237ff3aa348486cf835a980592af3a59fccd6101/tests/test_version.py#L229-L277>
-    #[test]
-    fn test_equality_and_normalization2() {
-        let versions = [
-            ("1.0.dev456", "1.0.dev456"),
-            ("1.0a1", "1.0a1"),
-            ("1.0a2.dev456", "1.0a2.dev456"),
-            ("1.0a12.dev456", "1.0a12.dev456"),
-            ("1.0a12", "1.0a12"),
-            ("1.0b1.dev456", "1.0b1.dev456"),
-            ("1.0b2", "1.0b2"),
-            ("1.0b2.post345.dev456", "1.0b2.post345.dev456"),
-            ("1.0b2.post345", "1.0b2.post345"),
-            ("1.0rc1.dev456", "1.0rc1.dev456"),
-            ("1.0rc1", "1.0rc1"),
-            ("1.0", "1.0"),
-            ("1.0.post456.dev34", "1.0.post456.dev34"),
-            ("1.0.post456", "1.0.post456"),
-            ("1.0.1", "1.0.1"),
-            ("0!1.0.2", "1.0.2"),
-            ("1.0.3+7", "1.0.3+7"),
-            ("0!1.0.4+8.0", "1.0.4+8.0"),
-            ("1.0.5+9.5", "1.0.5+9.5"),
-            ("1.2+1234.abc", "1.2+1234.abc"),
-            ("1.2+123456", "1.2+123456"),
-            ("1.2+123abc", "1.2+123abc"),
-            ("1.2+123abc456", "1.2+123abc456"),
-            ("1.2+abc", "1.2+abc"),
-            ("1.2+abc123", "1.2+abc123"),
-            ("1.2+abc123def", "1.2+abc123def"),
-            ("1.1.dev1", "1.1.dev1"),
-            ("7!1.0.dev456", "7!1.0.dev456"),
-            ("7!1.0a1", "7!1.0a1"),
-            ("7!1.0a2.dev456", "7!1.0a2.dev456"),
-            ("7!1.0a12.dev456", "7!1.0a12.dev456"),
-            ("7!1.0a12", "7!1.0a12"),
-            ("7!1.0b1.dev456", "7!1.0b1.dev456"),
-            ("7!1.0b2", "7!1.0b2"),
-            ("7!1.0b2.post345.dev456", "7!1.0b2.post345.dev456"),
-            ("7!1.0b2.post345", "7!1.0b2.post345"),
-            ("7!1.0rc1.dev456", "7!1.0rc1.dev456"),
-            ("7!1.0rc1", "7!1.0rc1"),
-            ("7!1.0", "7!1.0"),
-            ("7!1.0.post456.dev34", "7!1.0.post456.dev34"),
-            ("7!1.0.post456", "7!1.0.post456"),
-            ("7!1.0.1", "7!1.0.1"),
-            ("7!1.0.2", "7!1.0.2"),
-            ("7!1.0.3+7", "7!1.0.3+7"),
-            ("7!1.0.4+8.0", "7!1.0.4+8.0"),
-            ("7!1.0.5+9.5", "7!1.0.5+9.5"),
-            ("7!1.1.dev1", "7!1.1.dev1"),
-        ];
-        for (version_str, normalized_str) in versions {
-            let version = Version::from_str(version_str).unwrap();
-            let normalized = Version::from_str(normalized_str).unwrap();
-            assert_eq!(version, normalized, "{version_str} {normalized_str}");
-            // Test version normalization
-            assert_eq!(
-                version.to_string(),
-                normalized_str,
-                "{version_str} {normalized_str}"
-            );
-            // Since we're already at it
-            assert_eq!(
-                version.to_string(),
-                normalized.to_string(),
-                "{version_str} {normalized_str}"
-            );
-        }
-    }
-
-    #[test]
-    fn test_star_fixed_version() {
-        let result = Version::from_str("0.9.1.*");
-        assert_eq!(result.unwrap_err(), ErrorKind::Wildcard.into());
-    }
-
-    #[test]
-    fn test_invalid_word() {
-        let result = Version::from_str("blergh");
-        assert_eq!(result.unwrap_err(), ErrorKind::NoLeadingNumber.into());
-    }
-
-    #[test]
-    fn test_from_version_star() {
-        let p = |s: &str| -> Result<VersionPattern, _> { s.parse() };
-        assert!(!p("1.2.3").unwrap().is_wildcard());
-        assert!(p("1.2.3.*").unwrap().is_wildcard());
-        assert_eq!(
-            p("1.2.*.4.*").unwrap_err(),
-            PatternErrorKind::WildcardNotTrailing.into(),
-        );
-        assert_eq!(
-            p("1.0-dev1.*").unwrap_err(),
-            ErrorKind::UnexpectedEnd {
-                version: Version::new([1, 0]).with_dev(Some(1)),
-                remaining: ".*".to_string()
-            }
-            .into(),
-        );
-        assert_eq!(
-            p("1.0a1.*").unwrap_err(),
-            ErrorKind::UnexpectedEnd {
-                version: Version::new([1, 0]).with_pre(Some(PreRelease {
-                    kind: PreReleaseKind::Alpha,
-                    number: 1
-                })),
-                remaining: ".*".to_string()
-            }
-            .into(),
-        );
-        assert_eq!(
-            p("1.0.post1.*").unwrap_err(),
-            ErrorKind::UnexpectedEnd {
-                version: Version::new([1, 0]).with_post(Some(1)),
-                remaining: ".*".to_string()
-            }
-            .into(),
-        );
-        assert_eq!(
-            p("1.0+lolwat.*").unwrap_err(),
-            ErrorKind::LocalEmpty { precursor: '.' }.into(),
-        );
-    }
-
-    // Tests the valid cases of our version parser. These were written
-    // in tandem with the parser.
-    //
-    // They are meant to be additional (but in some cases likely redundant)
-    // with some of the above tests.
-    #[test]
-    fn parse_version_valid() {
-        let p = |s: &str| match Parser::new(s.as_bytes()).parse() {
-            Ok(v) => v,
-            Err(err) => unreachable!("expected valid version, but got error: {err:?}"),
-        };
-
-        // release-only tests
-        assert_eq!(p("5"), Version::new([5]));
-        assert_eq!(p("5.6"), Version::new([5, 6]));
-        assert_eq!(p("5.6.7"), Version::new([5, 6, 7]));
-        assert_eq!(p("512.623.734"), Version::new([512, 623, 734]));
-        assert_eq!(p("1.2.3.4"), Version::new([1, 2, 3, 4]));
-        assert_eq!(p("1.2.3.4.5"), Version::new([1, 2, 3, 4, 5]));
-
-        // epoch tests
-        assert_eq!(p("4!5"), Version::new([5]).with_epoch(4));
-        assert_eq!(p("4!5.6"), Version::new([5, 6]).with_epoch(4));
-
-        // pre-release tests
-        assert_eq!(
-            p("5a1"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 1
-            }))
-        );
-        assert_eq!(
-            p("5alpha1"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 1
-            }))
-        );
-        assert_eq!(
-            p("5b1"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Beta,
-                number: 1
-            }))
-        );
-        assert_eq!(
-            p("5beta1"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Beta,
-                number: 1
-            }))
-        );
-        assert_eq!(
-            p("5rc1"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Rc,
-                number: 1
-            }))
-        );
-        assert_eq!(
-            p("5c1"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Rc,
-                number: 1
-            }))
-        );
-        assert_eq!(
-            p("5preview1"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Rc,
-                number: 1
-            }))
-        );
-        assert_eq!(
-            p("5pre1"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Rc,
-                number: 1
-            }))
-        );
-        assert_eq!(
-            p("5.6.7pre1"),
-            Version::new([5, 6, 7]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Rc,
-                number: 1
-            }))
-        );
-        assert_eq!(
-            p("5alpha789"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 789
-            }))
-        );
-        assert_eq!(
-            p("5.alpha789"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 789
-            }))
-        );
-        assert_eq!(
-            p("5-alpha789"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 789
-            }))
-        );
-        assert_eq!(
-            p("5_alpha789"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 789
-            }))
-        );
-        assert_eq!(
-            p("5alpha.789"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 789
-            }))
-        );
-        assert_eq!(
-            p("5alpha-789"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 789
-            }))
-        );
-        assert_eq!(
-            p("5alpha_789"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 789
-            }))
-        );
-        assert_eq!(
-            p("5ALPHA789"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 789
-            }))
-        );
-        assert_eq!(
-            p("5aLpHa789"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 789
-            }))
-        );
-        assert_eq!(
-            p("5alpha"),
-            Version::new([5]).with_pre(Some(PreRelease {
-                kind: PreReleaseKind::Alpha,
-                number: 0
-            }))
-        );
-
-        // post-release tests
-        assert_eq!(p("5post2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(p("5rev2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(p("5r2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(p("5.post2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(p("5-post2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(p("5_post2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(p("5.post.2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(p("5.post-2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(p("5.post_2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(
-            p("5.6.7.post_2"),
-            Version::new([5, 6, 7]).with_post(Some(2))
-        );
-        assert_eq!(p("5-2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(p("5.6.7-2"), Version::new([5, 6, 7]).with_post(Some(2)));
-        assert_eq!(p("5POST2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(p("5PoSt2"), Version::new([5]).with_post(Some(2)));
-        assert_eq!(p("5post"), Version::new([5]).with_post(Some(0)));
-
-        // dev-release tests
-        assert_eq!(p("5dev2"), Version::new([5]).with_dev(Some(2)));
-        assert_eq!(p("5.dev2"), Version::new([5]).with_dev(Some(2)));
-        assert_eq!(p("5-dev2"), Version::new([5]).with_dev(Some(2)));
-        assert_eq!(p("5_dev2"), Version::new([5]).with_dev(Some(2)));
-        assert_eq!(p("5.dev.2"), Version::new([5]).with_dev(Some(2)));
-        assert_eq!(p("5.dev-2"), Version::new([5]).with_dev(Some(2)));
-        assert_eq!(p("5.dev_2"), Version::new([5]).with_dev(Some(2)));
-        assert_eq!(p("5.6.7.dev_2"), Version::new([5, 6, 7]).with_dev(Some(2)));
-        assert_eq!(p("5DEV2"), Version::new([5]).with_dev(Some(2)));
-        assert_eq!(p("5dEv2"), Version::new([5]).with_dev(Some(2)));
-        assert_eq!(p("5DeV2"), Version::new([5]).with_dev(Some(2)));
-        assert_eq!(p("5dev"), Version::new([5]).with_dev(Some(0)));
-
-        // local tests
-        assert_eq!(
-            p("5+2"),
-            Version::new([5]).with_local(vec![LocalSegment::Number(2)])
-        );
-        assert_eq!(
-            p("5+a"),
-            Version::new([5]).with_local(vec![LocalSegment::String("a".to_string())])
-        );
-        assert_eq!(
-            p("5+abc.123"),
-            Version::new([5]).with_local(vec![
-                LocalSegment::String("abc".to_string()),
-                LocalSegment::Number(123),
-            ])
-        );
-        assert_eq!(
-            p("5+123.abc"),
-            Version::new([5]).with_local(vec![
-                LocalSegment::Number(123),
-                LocalSegment::String("abc".to_string()),
-            ])
-        );
-        assert_eq!(
-            p("5+18446744073709551615.abc"),
-            Version::new([5]).with_local(vec![
-                LocalSegment::Number(18446744073709551615),
-                LocalSegment::String("abc".to_string()),
-            ])
-        );
-        assert_eq!(
-            p("5+18446744073709551616.abc"),
-            Version::new([5]).with_local(vec![
-                LocalSegment::String("18446744073709551616".to_string()),
-                LocalSegment::String("abc".to_string()),
-            ])
-        );
-        assert_eq!(
-            p("5+ABC.123"),
-            Version::new([5]).with_local(vec![
-                LocalSegment::String("abc".to_string()),
-                LocalSegment::Number(123),
-            ])
-        );
-        assert_eq!(
-            p("5+ABC-123.4_5_xyz-MNO"),
-            Version::new([5]).with_local(vec![
-                LocalSegment::String("abc".to_string()),
-                LocalSegment::Number(123),
-                LocalSegment::Number(4),
-                LocalSegment::Number(5),
-                LocalSegment::String("xyz".to_string()),
-                LocalSegment::String("mno".to_string()),
-            ])
-        );
-        assert_eq!(
-            p("5.6.7+abc-00123"),
-            Version::new([5, 6, 7]).with_local(vec![
-                LocalSegment::String("abc".to_string()),
-                LocalSegment::Number(123),
-            ])
-        );
-        assert_eq!(
-            p("5.6.7+abc-foo00123"),
-            Version::new([5, 6, 7]).with_local(vec![
-                LocalSegment::String("abc".to_string()),
-                LocalSegment::String("foo00123".to_string()),
-            ])
-        );
-        assert_eq!(
-            p("5.6.7+abc-00123a"),
-            Version::new([5, 6, 7]).with_local(vec![
-                LocalSegment::String("abc".to_string()),
-                LocalSegment::String("00123a".to_string()),
-            ])
-        );
-
-        // {pre-release, post-release} tests
-        assert_eq!(
-            p("5a2post3"),
-            Version::new([5])
-                .with_pre(Some(PreRelease {
-                    kind: PreReleaseKind::Alpha,
-                    number: 2
-                }))
-                .with_post(Some(3))
-        );
-        assert_eq!(
-            p("5.a-2_post-3"),
-            Version::new([5])
-                .with_pre(Some(PreRelease {
-                    kind: PreReleaseKind::Alpha,
-                    number: 2
-                }))
-                .with_post(Some(3))
-        );
-        assert_eq!(
-            p("5a2-3"),
-            Version::new([5])
-                .with_pre(Some(PreRelease {
-                    kind: PreReleaseKind::Alpha,
-                    number: 2
-                }))
-                .with_post(Some(3))
-        );
-
-        // Ignoring a no-op 'v' prefix.
-        assert_eq!(p("v5"), Version::new([5]));
-        assert_eq!(p("V5"), Version::new([5]));
-        assert_eq!(p("v5.6.7"), Version::new([5, 6, 7]));
-
-        // Ignoring leading and trailing whitespace.
-        assert_eq!(p("  v5  "), Version::new([5]));
-        assert_eq!(p("  5  "), Version::new([5]));
-        assert_eq!(
-            p("  5.6.7+abc.123.xyz  "),
-            Version::new([5, 6, 7]).with_local(vec![
-                LocalSegment::String("abc".to_string()),
-                LocalSegment::Number(123),
-                LocalSegment::String("xyz".to_string())
-            ])
-        );
-        assert_eq!(p("  \n5\n \t"), Version::new([5]));
-    }
-
-    // Tests the error cases of our version parser.
-    //
-    // I wrote these with the intent to cover every possible error
-    // case.
-    //
-    // They are meant to be additional (but in some cases likely redundant)
-    // with some of the above tests.
-    #[test]
-    fn parse_version_invalid() {
-        let p = |s: &str| match Parser::new(s.as_bytes()).parse() {
-            Err(err) => err,
-            Ok(v) => unreachable!(
-                "expected version parser error, but got: {v:?}",
-                v = v.as_bloated_debug()
-            ),
-        };
-
-        assert_eq!(p(""), ErrorKind::NoLeadingNumber.into());
-        assert_eq!(p("a"), ErrorKind::NoLeadingNumber.into());
-        assert_eq!(p("v 5"), ErrorKind::NoLeadingNumber.into());
-        assert_eq!(p("V 5"), ErrorKind::NoLeadingNumber.into());
-        assert_eq!(p("x 5"), ErrorKind::NoLeadingNumber.into());
-        assert_eq!(
-            p("18446744073709551616"),
-            ErrorKind::NumberTooBig {
-                bytes: b"18446744073709551616".to_vec()
-            }
-            .into()
-        );
-        assert_eq!(p("5!"), ErrorKind::NoLeadingReleaseNumber.into());
-        assert_eq!(
-            p("5.6./"),
-            ErrorKind::UnexpectedEnd {
-                version: Version::new([5, 6]),
-                remaining: "./".to_string()
-            }
-            .into()
-        );
-        assert_eq!(
-            p("5.6.-alpha2"),
-            ErrorKind::UnexpectedEnd {
-                version: Version::new([5, 6]),
-                remaining: ".-alpha2".to_string()
-            }
-            .into()
-        );
-        assert_eq!(
-            p("1.2.3a18446744073709551616"),
-            ErrorKind::NumberTooBig {
-                bytes: b"18446744073709551616".to_vec()
-            }
-            .into()
-        );
-        assert_eq!(p("5+"), ErrorKind::LocalEmpty { precursor: '+' }.into());
-        assert_eq!(p("5+ "), ErrorKind::LocalEmpty { precursor: '+' }.into());
-        assert_eq!(p("5+abc."), ErrorKind::LocalEmpty { precursor: '.' }.into());
-        assert_eq!(p("5+abc-"), ErrorKind::LocalEmpty { precursor: '-' }.into());
-        assert_eq!(p("5+abc_"), ErrorKind::LocalEmpty { precursor: '_' }.into());
-        assert_eq!(
-            p("5+abc. "),
-            ErrorKind::LocalEmpty { precursor: '.' }.into()
-        );
-        assert_eq!(
-            p("5.6-"),
-            ErrorKind::UnexpectedEnd {
-                version: Version::new([5, 6]),
-                remaining: "-".to_string()
-            }
-            .into()
-        );
-    }
-
-    #[test]
-    fn parse_version_pattern_valid() {
-        let p = |s: &str| match Parser::new(s.as_bytes()).parse_pattern() {
-            Ok(v) => v,
-            Err(err) => unreachable!("expected valid version, but got error: {err:?}"),
-        };
-
-        assert_eq!(p("5.*"), VersionPattern::wildcard(Version::new([5])));
-        assert_eq!(p("5.6.*"), VersionPattern::wildcard(Version::new([5, 6])));
-        assert_eq!(
-            p("2!5.6.*"),
-            VersionPattern::wildcard(Version::new([5, 6]).with_epoch(2))
-        );
-    }
-
-    #[test]
-    fn parse_version_pattern_invalid() {
-        let p = |s: &str| match Parser::new(s.as_bytes()).parse_pattern() {
-            Err(err) => err,
-            Ok(vpat) => unreachable!("expected version pattern parser error, but got: {vpat:?}"),
-        };
-
-        assert_eq!(p("*"), ErrorKind::NoLeadingNumber.into());
-        assert_eq!(p("2!*"), ErrorKind::NoLeadingReleaseNumber.into());
-    }
-
-    // Tests that the ordering between versions is correct.
-    //
-    // The ordering example used here was taken from PEP 440:
-    // https://packaging.python.org/en/latest/specifications/version-specifiers/#summary-of-permitted-suffixes-and-relative-ordering
-    #[test]
-    fn ordering() {
-        let versions = &[
-            "1.dev0",
-            "1.0.dev456",
-            "1.0a1",
-            "1.0a2.dev456",
-            "1.0a12.dev456",
-            "1.0a12",
-            "1.0b1.dev456",
-            "1.0b2",
-            "1.0b2.post345.dev456",
-            "1.0b2.post345",
-            "1.0rc1.dev456",
-            "1.0rc1",
-            "1.0",
-            "1.0+abc.5",
-            "1.0+abc.7",
-            "1.0+5",
-            "1.0.post456.dev34",
-            "1.0.post456",
-            "1.0.15",
-            "1.1.dev1",
-        ];
-        for pair in versions.windows(2) {
-            let less = pair[0].parse::<Version>().unwrap();
-            let greater = pair[1].parse::<Version>().unwrap();
-            assert_eq!(
-                less.cmp(&greater),
-                Ordering::Less,
-                "less: {:?}\ngreater: {:?}",
-                less.as_bloated_debug(),
-                greater.as_bloated_debug()
-            );
-        }
-    }
-
-    // Tests our bespoke u64 decimal integer parser.
-    #[test]
-    fn parse_number_u64() {
-        let p = |s: &str| parse_u64(s.as_bytes());
-        assert_eq!(p("0"), Ok(0));
-        assert_eq!(p("00"), Ok(0));
-        assert_eq!(p("1"), Ok(1));
-        assert_eq!(p("01"), Ok(1));
-        assert_eq!(p("9"), Ok(9));
-        assert_eq!(p("10"), Ok(10));
-        assert_eq!(p("18446744073709551615"), Ok(18446744073709551615));
-        assert_eq!(p("018446744073709551615"), Ok(18446744073709551615));
-        assert_eq!(p("000000018446744073709551615"), Ok(18446744073709551615));
-
-        assert_eq!(p("10a"), Err(ErrorKind::InvalidDigit { got: b'a' }.into()));
-        assert_eq!(p("10["), Err(ErrorKind::InvalidDigit { got: b'[' }.into()));
-        assert_eq!(p("10/"), Err(ErrorKind::InvalidDigit { got: b'/' }.into()));
-        assert_eq!(
-            p("18446744073709551616"),
-            Err(ErrorKind::NumberTooBig {
-                bytes: b"18446744073709551616".to_vec()
-            }
-            .into())
-        );
-        assert_eq!(
-            p("18446744073799551615abc"),
-            Err(ErrorKind::NumberTooBig {
-                bytes: b"18446744073799551615abc".to_vec()
-            }
-            .into())
-        );
-        assert_eq!(
-            parse_u64(b"18446744073799551615\xFF"),
-            Err(ErrorKind::NumberTooBig {
-                bytes: b"18446744073799551615\xFF".to_vec()
-            }
-            .into())
-        );
-    }
-
-    #[cfg(feature = "pyo3")]
-    #[pyfunction]
-    fn _convert_in_and_out(version: Version) -> Version {
-        version
-    }
-
-    /// Wraps a `Version` and provides a more "bloated" debug but standard
-    /// representation.
-    ///
-    /// We don't do this by default because it takes up a ton of space, and
-    /// just printing out the display version of the version is quite a bit
-    /// simpler.
-    ///
-    /// Nevertheless, when *testing* version parsing, you really want to
-    /// be able to peek at all of its constituent parts. So we use this in
-    /// assertion failure messages.
-    struct VersionBloatedDebug<'a>(&'a Version);
-
-    impl<'a> std::fmt::Debug for VersionBloatedDebug<'a> {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_struct("Version")
-                .field("epoch", &self.0.epoch())
-                .field("release", &self.0.release())
-                .field("pre", &self.0.pre())
-                .field("post", &self.0.post())
-                .field("dev", &self.0.dev())
-                .field("local", &self.0.local())
-                .finish()
-        }
-    }
-
-    impl Version {
-        pub(crate) fn as_bloated_debug(&self) -> impl std::fmt::Debug + '_ {
-            VersionBloatedDebug(self)
-        }
-    }
-}
+mod tests;

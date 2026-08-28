@@ -2,25 +2,22 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::ffi::OsStr;
 use std::fs::{self, File};
-use std::io::Read;
 use std::path::Path;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::error::{Error, Result};
 use crate::report::BenchmarkId;
 
-pub fn load<A, P: ?Sized>(path: &P) -> Result<A>
+pub fn load<A, P>(path: &P) -> Result<A>
 where
     A: DeserializeOwned,
-    P: AsRef<Path>,
+    P: AsRef<Path> + ?Sized,
 {
     let path = path.as_ref();
-    let mut f = File::open(path).map_err(|inner| Error::AccessError {
+    let string = std::fs::read_to_string(path).map_err(|inner| Error::AccessError {
         inner,
         path: path.to_owned(),
     })?;
-    let mut string = String::new();
-    let _ = f.read_to_string(&mut string);
     let result: A = serde_json::from_str(string.as_str()).map_err(|inner| Error::SerdeError {
         inner,
         path: path.to_owned(),
@@ -44,8 +41,7 @@ where
     fs::create_dir_all(path.as_ref()).map_err(|inner| Error::AccessError {
         inner,
         path: path.as_ref().to_owned(),
-    })?;
-    Ok(())
+    })
 }
 
 pub fn cp(from: &Path, to: &Path) -> Result<()> {

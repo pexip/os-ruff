@@ -1,22 +1,21 @@
-use std::sync::Arc;
-use std::thread::ThreadId;
+use std::pin::Pin;
 
-use crate::active_query::ActiveQuery;
-use crate::key::DatabaseKeyIndex;
-use crate::runtime::WaitResult;
-use parking_lot::{Condvar, MutexGuard};
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 
-type QueryStack = Vec<ActiveQuery>;
+use crate::key::DatabaseKeyIndex;
+use crate::runtime::dependency_graph::edge::EdgeCondvar;
+use crate::runtime::WaitResult;
+use crate::sync::thread::ThreadId;
+use crate::sync::MutexGuard;
 
 #[derive(Debug, Default)]
 pub(super) struct DependencyGraph {
-    /// A `(K -> V)` pair in this map indicates that the the runtime
+    /// A `(K -> V)` pair in this map indicates that the runtime
     /// `K` is blocked on some query executing in the runtime `V`.
     /// This encodes a graph that must be acyclic (or else deadlock
     /// will result).
-    edges: FxHashMap<ThreadId, Edge>,
+    edges: FxHashMap<ThreadId, edge::Edge>,
 
     /// Encodes the `ThreadId` that are blocked waiting for the result
     /// of a given query.
@@ -25,25 +24,14 @@ pub(super) struct DependencyGraph {
     /// When a key K completes which had dependent queries Qs blocked on it,
     /// it stores its `WaitResult` here. As they wake up, each query Q in Qs will
     /// come here to fetch their results.
-    wait_results: FxHashMap<ThreadId, (QueryStack, WaitResult)>,
-}
-
-#[derive(Debug)]
-struct Edge {
-    blocked_on_id: ThreadId,
-    blocked_on_key: DatabaseKeyIndex,
-    stack: QueryStack,
-
-    /// Signalled whenever a query with dependents completes.
-    /// Allows those dependents to check if they are ready to unblock.
-    condvar: Arc<parking_lot::Condvar>,
+    wait_results: FxHashMap<ThreadId, WaitResult>,
 }
 
 impl DependencyGraph {
     /// True if `from_id` depends on `to_id`.
     ///
     /// (i.e., there is a path from `from_id` to `to_id` in the graph.)
-    pub(super) fn depends_on(&mut self, from_id: ThreadId, to_id: ThreadId) -> bool {
+    pub(super) fn depends_on(&self, from_id: ThreadId, to_id: ThreadId) -> bool {
         let mut p = from_id;
         while let Some(q) = self.edges.get(&p).map(|edge| edge.blocked_on_id) {
             if q == to_id {
@@ -53,131 +41,6 @@ impl DependencyGraph {
             p = q;
         }
         p == to_id
-    }
-
-    /// Invokes `closure` with a `&mut ActiveQuery` for each query that participates in the cycle.
-    /// The cycle runs as follows:
-    ///
-    /// 1. The runtime `from_id`, which has the stack `from_stack`, would like to invoke `database_key`...
-    /// 2. ...but `database_key` is already being executed by `to_id`...
-    /// 3. ...and `to_id` is transitively dependent on something which is present on `from_stack`.
-    pub(super) fn for_each_cycle_participant(
-        &mut self,
-        from_id: ThreadId,
-        from_stack: &mut QueryStack,
-        database_key: DatabaseKeyIndex,
-        to_id: ThreadId,
-        mut closure: impl FnMut(&mut [ActiveQuery]),
-    ) {
-        debug_assert!(self.depends_on(to_id, from_id));
-
-        // To understand this algorithm, consider this [drawing](https://is.gd/TGLI9v):
-        //
-        //    database_key = QB2
-        //    from_id = A
-        //    to_id = B
-        //    from_stack = [QA1, QA2, QA3]
-        //
-        //    self.edges[B] = { C, QC2, [QB1..QB3] }
-        //    self.edges[C] = { A, QA2, [QC1..QC3] }
-        //
-        //         The cyclic
-        //         edge we have
-        //         failed to add.
-        //           :
-        //    A      :    B         C
-        //           :
-        //    QA1    v    QB1       QC1
-        // ┌► QA2    ┌──► QB2   ┌─► QC2
-        // │  QA3 ───┘    QB3 ──┘   QC3 ───┐
-        // │                               │
-        // └───────────────────────────────┘
-        //
-        // Final output: [QB2, QB3, QC2, QC3, QA2, QA3]
-
-        let mut id = to_id;
-        let mut key = database_key;
-        while id != from_id {
-            // Looking at the diagram above, the idea is to
-            // take the edge from `to_id` starting at `key`
-            // (inclusive) and down to the end. We can then
-            // load up the next thread (i.e., we start at B/QB2,
-            // and then load up the dependency on C/QC2).
-            let edge = self.edges.get_mut(&id).unwrap();
-            let prefix = edge
-                .stack
-                .iter_mut()
-                .take_while(|p| p.database_key_index != key)
-                .count();
-            closure(&mut edge.stack[prefix..]);
-            id = edge.blocked_on_id;
-            key = edge.blocked_on_key;
-        }
-
-        // Finally, we copy in the results from `from_stack`.
-        let prefix = from_stack
-            .iter_mut()
-            .take_while(|p| p.database_key_index != key)
-            .count();
-        closure(&mut from_stack[prefix..]);
-    }
-
-    /// Unblock each blocked runtime (excluding the current one) if some
-    /// query executing in that runtime is participating in cycle fallback.
-    ///
-    /// Returns a boolean (Current, Others) where:
-    /// * Current is true if the current runtime has cycle participants
-    ///   with fallback;
-    /// * Others is true if other runtimes were unblocked.
-    pub(super) fn maybe_unblock_runtimes_in_cycle(
-        &mut self,
-        from_id: ThreadId,
-        from_stack: &QueryStack,
-        database_key: DatabaseKeyIndex,
-        to_id: ThreadId,
-    ) -> (bool, bool) {
-        // See diagram in `for_each_cycle_participant`.
-        let mut id = to_id;
-        let mut key = database_key;
-        let mut others_unblocked = false;
-        while id != from_id {
-            let edge = self.edges.get(&id).unwrap();
-            let prefix = edge
-                .stack
-                .iter()
-                .take_while(|p| p.database_key_index != key)
-                .count();
-            let next_id = edge.blocked_on_id;
-            let next_key = edge.blocked_on_key;
-
-            if let Some(cycle) = edge.stack[prefix..]
-                .iter()
-                .rev()
-                .find_map(|aq| aq.cycle.clone())
-            {
-                // Remove `id` from the list of runtimes blocked on `next_key`:
-                self.query_dependents
-                    .get_mut(&next_key)
-                    .unwrap()
-                    .retain(|r| *r != id);
-
-                // Unblock runtime so that it can resume execution once lock is released:
-                self.unblock_runtime(id, WaitResult::Cycle(cycle));
-
-                others_unblocked = true;
-            }
-
-            id = next_id;
-            key = next_key;
-        }
-
-        let prefix = from_stack
-            .iter()
-            .take_while(|p| p.database_key_index != key)
-            .count();
-        let this_unblocked = from_stack[prefix..].iter().any(|aq| aq.cycle.is_some());
-
-        (this_unblocked, others_unblocked)
     }
 
     /// Modifies the graph so that `from_id` is blocked
@@ -198,53 +61,53 @@ impl DependencyGraph {
         from_id: ThreadId,
         database_key: DatabaseKeyIndex,
         to_id: ThreadId,
-        from_stack: QueryStack,
         query_mutex_guard: QueryMutexGuard,
-    ) -> (QueryStack, WaitResult) {
-        let condvar = me.add_edge(from_id, database_key, to_id, from_stack);
+    ) -> WaitResult {
+        let cvar = std::pin::pin!(EdgeCondvar::default());
+        let cvar = cvar.as_ref();
+        // SAFETY: We are blocking until the result is removed from `DependencyGraph::wait_results`
+        // at which point the `edge` won't signal the condvar anymore.
+        // As such we are keeping the cond var alive until the reference in the edge drops.
+        unsafe { me.add_edge(from_id, database_key, to_id, cvar) };
 
         // Release the mutex that prevents `database_key`
         // from completing, now that the edge has been added.
         drop(query_mutex_guard);
 
         loop {
-            if let Some(stack_and_result) = me.wait_results.remove(&from_id) {
+            if let Some(result) = me.wait_results.remove(&from_id) {
                 debug_assert!(!me.edges.contains_key(&from_id));
-                return stack_and_result;
+                return result;
             }
-            condvar.wait(&mut me);
+            me = cvar.wait(me);
         }
     }
 
     /// Helper for `block_on`: performs actual graph modification
     /// to add a dependency edge from `from_id` to `to_id`, which is
     /// computing `database_key`.
-    fn add_edge(
+    ///
+    /// # Safety
+    ///
+    /// The caller needs to keep the referent of `cvar` alive until the corresponding
+    /// [`Self::wait_results`] entry has been inserted.
+    unsafe fn add_edge(
         &mut self,
         from_id: ThreadId,
         database_key: DatabaseKeyIndex,
         to_id: ThreadId,
-        from_stack: QueryStack,
-    ) -> Arc<parking_lot::Condvar> {
+        cvar: Pin<&EdgeCondvar>,
+    ) {
         assert_ne!(from_id, to_id);
         debug_assert!(!self.edges.contains_key(&from_id));
         debug_assert!(!self.depends_on(to_id, from_id));
-
-        let condvar = Arc::new(Condvar::new());
-        self.edges.insert(
-            from_id,
-            Edge {
-                blocked_on_id: to_id,
-                blocked_on_key: database_key,
-                stack: from_stack,
-                condvar: condvar.clone(),
-            },
-        );
+        // SAFETY: The caller is responsible for ensuring that the `EdgeGuard` outlives the `Edge`.
+        let edge = unsafe { edge::Edge::new(to_id, cvar) };
+        self.edges.insert(from_id, edge);
         self.query_dependents
             .entry(database_key)
             .or_default()
             .push(from_id);
-        condvar
     }
 
     /// Invoked when runtime `to_id` completes executing
@@ -260,7 +123,7 @@ impl DependencyGraph {
             .unwrap_or_default();
 
         for from_id in dependents {
-            self.unblock_runtime(from_id, wait_result.clone());
+            self.unblock_runtime(from_id, wait_result);
         }
     }
 
@@ -269,10 +132,60 @@ impl DependencyGraph {
     /// the lock on this data structure first, to recover the wait result).
     fn unblock_runtime(&mut self, id: ThreadId, wait_result: WaitResult) {
         let edge = self.edges.remove(&id).expect("not blocked");
-        self.wait_results.insert(id, (edge.stack, wait_result));
+        self.wait_results.insert(id, wait_result);
 
         // Now that we have inserted the `wait_results`,
         // notify the thread.
-        edge.condvar.notify_one();
+        edge.notify();
+    }
+}
+
+mod edge {
+    use crate::sync::thread::ThreadId;
+    use crate::sync::{Condvar, MutexGuard};
+
+    use std::pin::Pin;
+
+    #[derive(Default, Debug)]
+    pub(super) struct EdgeCondvar {
+        condvar: Condvar,
+        _phantom_pin: std::marker::PhantomPinned,
+    }
+
+    impl EdgeCondvar {
+        #[inline]
+        pub(super) fn wait<'a, T>(&self, mutex_guard: MutexGuard<'a, T>) -> MutexGuard<'a, T> {
+            self.condvar.wait(mutex_guard)
+        }
+    }
+
+    #[derive(Debug)]
+    pub(super) struct Edge {
+        pub(super) blocked_on_id: ThreadId,
+
+        /// Signalled whenever a query with dependents completes.
+        /// Allows those dependents to check if they are ready to unblock.
+        // condvar: unsafe<'stack_frame> Pin<&'stack_frame Condvar>,
+        condvar: Pin<&'static EdgeCondvar>,
+    }
+
+    impl Edge {
+        /// # SAFETY
+        ///
+        /// The caller must ensure that the [`EdgeCondvar`] is kept alive until the [`Edge`] is dropped.
+        pub(super) unsafe fn new(blocked_on_id: ThreadId, condvar: Pin<&EdgeCondvar>) -> Self {
+            Self {
+                blocked_on_id,
+                // SAFETY: The caller is responsible for ensuring that the `EdgeCondvar` outlives the `Edge`.
+                condvar: unsafe {
+                    std::mem::transmute::<Pin<&EdgeCondvar>, Pin<&'static EdgeCondvar>>(condvar)
+                },
+            }
+        }
+
+        #[inline]
+        pub(super) fn notify(self) {
+            self.condvar.condvar.notify_one();
+        }
     }
 }

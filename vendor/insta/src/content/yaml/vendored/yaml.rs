@@ -1,11 +1,8 @@
 use crate::content::yaml::vendored::parser::*;
 use crate::content::yaml::vendored::scanner::{Marker, ScanError, TScalarStyle, TokenType};
 
-use linked_hash_map::LinkedHashMap;
-
 use std::collections::BTreeMap;
 use std::f64;
-use std::i64;
 use std::mem;
 use std::ops::Index;
 use std::string;
@@ -15,8 +12,8 @@ use std::vec;
 /// access your YAML document.
 #[derive(Clone, PartialEq, PartialOrd, Debug, Eq, Ord, Hash)]
 pub enum Yaml {
-    /// Float types are stored as String and parsed on demand.
-    /// Note that f64 does NOT implement Eq trait and can NOT be stored in BTreeMap.
+    /// Float types are stored as [`String`] and parsed on demand.
+    /// Note that [`f64'] does NOT implement [`Eq'] trait and can NOT be stored in [`BTreeMap`].
     Real(string::String),
     /// YAML int is stored as i64.
     Integer(i64),
@@ -26,7 +23,7 @@ pub enum Yaml {
     Boolean(bool),
     /// YAML array, can be accessed as a `Vec`.
     Array(self::Array),
-    /// YAML hash, can be accessed as a `LinkedHashMap`.
+    /// YAML hash, can be accessed as a sorted vector of key/value pairs.
     ///
     /// Insertion order will match the order of insertion into the map.
     Hash(self::Hash),
@@ -39,7 +36,7 @@ pub enum Yaml {
 }
 
 pub type Array = Vec<Yaml>;
-pub type Hash = LinkedHashMap<Yaml, Yaml>;
+pub type Hash = Vec<(Yaml, Yaml)>;
 
 // parse f64 as Core schema
 // See: https://github.com/chyh1990/yaml-rust/issues/51
@@ -157,7 +154,7 @@ impl YamlLoader {
                     } else {
                         let mut newkey = Yaml::BadValue;
                         mem::swap(&mut newkey, cur_key);
-                        h.insert(newkey, node.0);
+                        h.push((newkey, node.0));
                     }
                 }
                 _ => unreachable!(),
@@ -290,7 +287,7 @@ impl<'a> Index<&'a str> for Yaml {
     fn index(&self, idx: &'a str) -> &Yaml {
         let key = Yaml::String(idx.to_owned());
         match self.as_hash() {
-            Some(h) => h.get(&key).unwrap_or(&BAD_VALUE),
+            Some(h) => h.iter().find(|x| x.0 == key).map_or(&BAD_VALUE, |x| &x.1),
             None => &BAD_VALUE,
         }
     }
@@ -304,7 +301,7 @@ impl Index<usize> for Yaml {
             v.get(idx).unwrap_or(&BAD_VALUE)
         } else if let Some(v) = self.as_hash() {
             let key = Yaml::Integer(idx as i64);
-            v.get(&key).unwrap_or(&BAD_VALUE)
+            v.iter().find(|x| x.0 == key).map_or(&BAD_VALUE, |x| &x.1)
         } else {
             &BAD_VALUE
         }

@@ -1,17 +1,21 @@
 use std::marker::PhantomData;
 
-use syn::{ext::IdentExt, spanned::Spanned};
+use syn::ext::IdentExt;
+use syn::parenthesized;
+use syn::spanned::Spanned;
 
 /// "Options" are flags that can be supplied to the various salsa related
 /// macros. They are listed like `(ref, no_eq, foo=bar)` etc. The commas
 /// are required and trailing commas are permitted. The options accepted
 /// for any particular location are configured via the `AllowedOptions`
 /// trait.
+#[derive(Debug)]
 pub(crate) struct Options<A: AllowedOptions> {
-    /// The `return_ref` option is used to signal that field/return type is "by ref"
+    /// The `returns` option is used to configure the "return mode" for the field/function.
+    /// This may be one of `copy`, `clone`, `ref`, `as_ref`, `as_deref`.
     ///
-    /// If this is `Some`, the value is the `ref` identifier.
-    pub return_ref: Option<syn::Ident>,
+    /// If this is `Some`, the value is the ident representing the selected mode.
+    pub returns: Option<syn::Ident>,
 
     /// The `no_eq` option is used to signal that a given field does not implement
     /// the `Eq` trait and cannot be compared for equality.
@@ -19,15 +23,15 @@ pub(crate) struct Options<A: AllowedOptions> {
     /// If this is `Some`, the value is the `no_eq` identifier.
     pub no_eq: Option<syn::Ident>,
 
-    /// Signal we should not generate a `Debug` impl.
+    /// Signal we should generate a `Debug` impl.
     ///
-    /// If this is `Some`, the value is the `no_debug` identifier.
-    pub no_debug: Option<syn::Ident>,
+    /// If this is `Some`, the value is the `debug` identifier.
+    pub debug: Option<syn::Ident>,
 
-    /// Signal we should not generate a `Clone` impl.
+    /// Signal we should not include the `'db` lifetime.
     ///
-    /// If this is `Some`, the value is the `no_clone` identifier.
-    pub no_clone: Option<syn::Ident>,
+    /// If this is `Some`, the value is the `no_lifetime` identifier.
+    pub no_lifetime: Option<syn::Ident>,
 
     /// The `singleton` option is used on input with only one field
     /// It allows the creation of convenient methods
@@ -39,15 +43,32 @@ pub(crate) struct Options<A: AllowedOptions> {
     /// If this is `Some`, the value is the `specify` identifier.
     pub specify: Option<syn::Ident>,
 
+    /// The `non_update_return_type` option is used to signal that a tracked function's
+    /// return type does not require `Update` to be implemented. This is unsafe and
+    /// generally discouraged as it allows for dangling references.
+    ///
+    /// If this is `Some`, the value is the `non_update_return_type` identifier.
+    pub non_update_return_type: Option<syn::Ident>,
+
     /// The `db = <path>` option is used to indicate the db.
     ///
     /// If this is `Some`, the value is the `<path>`.
     pub db_path: Option<syn::Path>,
 
-    /// The `recovery_fn = <path>` option is used to indicate the recovery function.
+    /// The `cycle_fn = <path>` option is used to indicate the cycle recovery function.
     ///
     /// If this is `Some`, the value is the `<path>`.
-    pub recovery_fn: Option<syn::Path>,
+    pub cycle_fn: Option<syn::Path>,
+
+    /// The `cycle_initial = <path>` option is the initial value for cycle iteration.
+    ///
+    /// If this is `Some`, the value is the `<path>`.
+    pub cycle_initial: Option<syn::Path>,
+
+    /// The `cycle_result = <path>` option is the result for non-fixpoint cycle.
+    ///
+    /// If this is `Some`, the value is the `<path>`.
+    pub cycle_result: Option<syn::Expr>,
 
     /// The `data = <ident>` option is used to define the name of the data type for an interned
     /// struct.
@@ -66,6 +87,12 @@ pub(crate) struct Options<A: AllowedOptions> {
     /// If this is `Some`, the value is the `<ident>`.
     pub constructor_name: Option<syn::Ident>,
 
+    /// The `id = <path>` option is used to set a custom ID for interrned structs.
+    ///
+    /// The ID must implement `salsa::plumbing::AsId` and `salsa::plumbing::FromId`.
+    /// If this is `Some`, the value is the `<ident>`.
+    pub id: Option<syn::Path>,
+
     /// Remember the `A` parameter, which plays no role after parsing.
     phantom: PhantomData<A>,
 }
@@ -73,35 +100,43 @@ pub(crate) struct Options<A: AllowedOptions> {
 impl<A: AllowedOptions> Default for Options<A> {
     fn default() -> Self {
         Self {
-            return_ref: Default::default(),
+            returns: Default::default(),
             specify: Default::default(),
+            non_update_return_type: Default::default(),
             no_eq: Default::default(),
-            no_debug: Default::default(),
-            no_clone: Default::default(),
+            debug: Default::default(),
+            no_lifetime: Default::default(),
             db_path: Default::default(),
-            recovery_fn: Default::default(),
+            cycle_fn: Default::default(),
+            cycle_initial: Default::default(),
+            cycle_result: Default::default(),
             data: Default::default(),
             constructor_name: Default::default(),
             phantom: Default::default(),
             lru: Default::default(),
             singleton: Default::default(),
+            id: Default::default(),
         }
     }
 }
 
 /// These flags determine which options are allowed in a given context
 pub(crate) trait AllowedOptions {
-    const RETURN_REF: bool;
+    const RETURNS: bool;
     const SPECIFY: bool;
     const NO_EQ: bool;
-    const NO_DEBUG: bool;
-    const NO_CLONE: bool;
+    const DEBUG: bool;
+    const NO_LIFETIME: bool;
+    const NON_UPDATE_RETURN_TYPE: bool;
     const SINGLETON: bool;
     const DATA: bool;
     const DB: bool;
-    const RECOVERY_FN: bool;
+    const CYCLE_FN: bool;
+    const CYCLE_INITIAL: bool;
+    const CYCLE_RESULT: bool;
     const LRU: bool;
     const CONSTRUCTOR_NAME: bool;
+    const ID: bool;
 }
 
 type Equals = syn::Token![=];
@@ -113,23 +148,26 @@ impl<A: AllowedOptions> syn::parse::Parse for Options<A> {
 
         while !input.is_empty() {
             let ident: syn::Ident = syn::Ident::parse_any(input)?;
-            if ident == "return_ref" {
-                if A::RETURN_REF {
-                    if let Some(old) = std::mem::replace(&mut options.return_ref, Some(ident)) {
+            if ident == "returns" {
+                let content;
+                parenthesized!(content in input);
+                let mode = syn::Ident::parse_any(&content)?;
+                if A::RETURNS {
+                    if let Some(old) = options.returns.replace(mode) {
                         return Err(syn::Error::new(
                             old.span(),
-                            "option `return_ref` provided twice",
+                            "option `returns` provided twice",
                         ));
                     }
                 } else {
                     return Err(syn::Error::new(
                         ident.span(),
-                        "`return_ref` option not allowed here",
+                        "`returns` option not allowed here",
                     ));
                 }
             } else if ident == "no_eq" {
                 if A::NO_EQ {
-                    if let Some(old) = std::mem::replace(&mut options.no_eq, Some(ident)) {
+                    if let Some(old) = options.no_eq.replace(ident) {
                         return Err(syn::Error::new(old.span(), "option `no_eq` provided twice"));
                     }
                 } else {
@@ -138,37 +176,58 @@ impl<A: AllowedOptions> syn::parse::Parse for Options<A> {
                         "`no_eq` option not allowed here",
                     ));
                 }
-            } else if ident == "no_debug" {
-                if A::NO_DEBUG {
-                    if let Some(old) = std::mem::replace(&mut options.no_debug, Some(ident)) {
-                        return Err(syn::Error::new(
-                            old.span(),
-                            "option `no_debug` provided twice",
-                        ));
+            } else if ident == "debug" {
+                if A::DEBUG {
+                    if let Some(old) = options.debug.replace(ident) {
+                        return Err(syn::Error::new(old.span(), "option `debug` provided twice"));
                     }
                 } else {
                     return Err(syn::Error::new(
                         ident.span(),
-                        "`no_debug` option not allowed here",
+                        "`debug` option not allowed here",
                     ));
                 }
-            } else if ident == "no_clone" {
-                if A::NO_CLONE {
-                    if let Some(old) = std::mem::replace(&mut options.no_clone, Some(ident)) {
+            } else if ident == "no_lifetime" {
+                if A::NO_LIFETIME {
+                    if let Some(old) = options.no_lifetime.replace(ident) {
                         return Err(syn::Error::new(
                             old.span(),
-                            "option `no_clone` provided twice",
+                            "option `no_lifetime` provided twice",
                         ));
                     }
                 } else {
                     return Err(syn::Error::new(
                         ident.span(),
-                        "`no_clone` option not allowed here",
+                        "`no_lifetime` option not allowed here",
+                    ));
+                }
+            } else if ident == "unsafe" {
+                if A::NON_UPDATE_RETURN_TYPE {
+                    let content;
+                    parenthesized!(content in input);
+                    let ident = syn::Ident::parse_any(&content)?;
+                    if ident == "non_update_return_type" {
+                        if let Some(old) = options.non_update_return_type.replace(ident) {
+                            return Err(syn::Error::new(
+                                old.span(),
+                                "option `non_update_return_type` provided twice",
+                            ));
+                        }
+                    } else {
+                        return Err(syn::Error::new(
+                            ident.span(),
+                            "expected `non_update_return_type`",
+                        ));
+                    }
+                } else {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        "`unsafe` options not allowed here",
                     ));
                 }
             } else if ident == "singleton" {
                 if A::SINGLETON {
-                    if let Some(old) = std::mem::replace(&mut options.singleton, Some(ident)) {
+                    if let Some(old) = options.singleton.replace(ident) {
                         return Err(syn::Error::new(
                             old.span(),
                             "option `singleton` provided twice",
@@ -182,7 +241,7 @@ impl<A: AllowedOptions> syn::parse::Parse for Options<A> {
                 }
             } else if ident == "specify" {
                 if A::SPECIFY {
-                    if let Some(old) = std::mem::replace(&mut options.specify, Some(ident)) {
+                    if let Some(old) = options.specify.replace(ident) {
                         return Err(syn::Error::new(
                             old.span(),
                             "option `specify` provided twice",
@@ -198,7 +257,7 @@ impl<A: AllowedOptions> syn::parse::Parse for Options<A> {
                 if A::DB {
                     let _eq = Equals::parse(input)?;
                     let path = syn::Path::parse(input)?;
-                    if let Some(old) = std::mem::replace(&mut options.db_path, Some(path)) {
+                    if let Some(old) = options.db_path.replace(path) {
                         return Err(syn::Error::new(old.span(), "option `db` provided twice"));
                     }
                 } else {
@@ -207,27 +266,59 @@ impl<A: AllowedOptions> syn::parse::Parse for Options<A> {
                         "`db` option not allowed here",
                     ));
                 }
-            } else if ident == "recovery_fn" {
-                if A::RECOVERY_FN {
+            } else if ident == "cycle_fn" {
+                if A::CYCLE_FN {
                     let _eq = Equals::parse(input)?;
                     let path = syn::Path::parse(input)?;
-                    if let Some(old) = std::mem::replace(&mut options.recovery_fn, Some(path)) {
+                    if let Some(old) = options.cycle_fn.replace(path) {
                         return Err(syn::Error::new(
                             old.span(),
-                            "option `recovery_fn` provided twice",
+                            "option `cycle_fn` provided twice",
                         ));
                     }
                 } else {
                     return Err(syn::Error::new(
                         ident.span(),
-                        "`recovery_fn` option not allowed here",
+                        "`cycle_fn` option not allowed here",
+                    ));
+                }
+            } else if ident == "cycle_initial" {
+                if A::CYCLE_INITIAL {
+                    let _eq = Equals::parse(input)?;
+                    let path = syn::Path::parse(input)?;
+                    if let Some(old) = options.cycle_initial.replace(path) {
+                        return Err(syn::Error::new(
+                            old.span(),
+                            "option `cycle_initial` provided twice",
+                        ));
+                    }
+                } else {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        "`cycle_initial` option not allowed here",
+                    ));
+                }
+            } else if ident == "cycle_result" {
+                if A::CYCLE_RESULT {
+                    let _eq = Equals::parse(input)?;
+                    let expr = syn::Expr::parse(input)?;
+                    if let Some(old) = options.cycle_result.replace(expr) {
+                        return Err(syn::Error::new(
+                            old.span(),
+                            "option `cycle_result` provided twice",
+                        ));
+                    }
+                } else {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        "`cycle_result` option not allowed here",
                     ));
                 }
             } else if ident == "data" {
                 if A::DATA {
                     let _eq = Equals::parse(input)?;
                     let ident = syn::Ident::parse(input)?;
-                    if let Some(old) = std::mem::replace(&mut options.data, Some(ident)) {
+                    if let Some(old) = options.data.replace(ident) {
                         return Err(syn::Error::new(old.span(), "option `data` provided twice"));
                     }
                 } else {
@@ -241,7 +332,7 @@ impl<A: AllowedOptions> syn::parse::Parse for Options<A> {
                     let _eq = Equals::parse(input)?;
                     let lit = syn::LitInt::parse(input)?;
                     let value = lit.base10_parse::<usize>()?;
-                    if let Some(old) = std::mem::replace(&mut options.lru, Some(value)) {
+                    if let Some(old) = options.lru.replace(value) {
                         return Err(syn::Error::new(old.span(), "option `lru` provided twice"));
                     }
                 } else {
@@ -254,8 +345,7 @@ impl<A: AllowedOptions> syn::parse::Parse for Options<A> {
                 if A::CONSTRUCTOR_NAME {
                     let _eq = Equals::parse(input)?;
                     let ident = syn::Ident::parse(input)?;
-                    if let Some(old) = std::mem::replace(&mut options.constructor_name, Some(ident))
-                    {
+                    if let Some(old) = options.constructor_name.replace(ident) {
                         return Err(syn::Error::new(
                             old.span(),
                             "option `constructor` provided twice",
@@ -267,10 +357,21 @@ impl<A: AllowedOptions> syn::parse::Parse for Options<A> {
                         "`constructor` option not allowed here",
                     ));
                 }
+            } else if ident == "id" {
+                if A::ID {
+                    let _eq = Equals::parse(input)?;
+                    let path = syn::Path::parse(input)?;
+                    options.id = Some(path);
+                } else {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        "`id` option not allowed here",
+                    ));
+                }
             } else {
                 return Err(syn::Error::new(
                     ident.span(),
-                    format!("unrecognized option `{}`", ident),
+                    format!("unrecognized option `{ident}`"),
                 ));
             }
 

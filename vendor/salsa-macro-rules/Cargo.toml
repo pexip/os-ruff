@@ -11,7 +11,23 @@
 
 [package]
 edition = "2021"
+rust-version = "1.85"
 name = "salsa-macro-rules"
-version = "0.1.0"
+version = "0.22.0"
+authors = ["Salsa developers"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+description = "Declarative macros for the salsa crate"
+readme = false
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/salsa-rs/salsa"
+
+[lib]
+name = "salsa_macro_rules"
+path = "src/lib.rs"
 
 [dependencies]

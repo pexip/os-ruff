@@ -1,3 +1,6 @@
+use once_cell::sync::Lazy;
+#[cfg(feature = "serde")]
+use serde::{de::value::Error as ValueError, Serialize};
 use std::cell::RefCell;
 use std::future::Future;
 use std::mem;
@@ -5,9 +8,6 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-
-#[cfg(feature = "serde")]
-use serde::{de::value::Error as ValueError, Serialize};
 
 use crate::content::Content;
 #[cfg(feature = "serde")]
@@ -17,26 +17,25 @@ use crate::filters::Filters;
 #[cfg(feature = "redactions")]
 use crate::redaction::{dynamic_redaction, sorted_redaction, ContentPath, Redaction, Selector};
 
-lazy_static::lazy_static! {
-    static ref DEFAULT_SETTINGS: Arc<ActualSettings> = {
-        Arc::new(ActualSettings {
-            sort_maps: false,
-            snapshot_path: "snapshots".into(),
-            snapshot_suffix: "".into(),
-            input_file: None,
-            description: None,
-            info: None,
-            omit_expression: false,
-            prepend_module_to_snapshot: true,
-            #[cfg(feature = "redactions")]
-            redactions: Redactions::default(),
-            #[cfg(feature = "filters")]
-            filters: Filters::default(),
-            #[cfg(feature = "glob")]
-            allow_empty_glob: false,
-        })
-    };
-}
+static DEFAULT_SETTINGS: Lazy<Arc<ActualSettings>> = Lazy::new(|| {
+    Arc::new(ActualSettings {
+        sort_maps: false,
+        snapshot_path: "snapshots".into(),
+        snapshot_suffix: "".into(),
+        input_file: None,
+        description: None,
+        info: None,
+        omit_expression: false,
+        prepend_module_to_snapshot: true,
+        #[cfg(feature = "redactions")]
+        redactions: Redactions::default(),
+        #[cfg(feature = "filters")]
+        filters: Filters::default(),
+        #[cfg(feature = "glob")]
+        allow_empty_glob: false,
+    })
+});
+
 thread_local!(static CURRENT_SETTINGS: RefCell<Settings> = RefCell::new(Settings::new()));
 
 /// Represents stored redactions.
@@ -176,7 +175,7 @@ impl Default for Settings {
 impl Settings {
     /// Returns the default settings.
     ///
-    /// It's recommended to use `clone_current` instead so that
+    /// It's recommended to use [`Self::clone_current`] instead so that
     /// already applied modifications are not discarded.
     pub fn new() -> Settings {
         Settings::default()
@@ -196,7 +195,7 @@ impl Settings {
     /// Enables forceful sorting of maps before serialization.
     ///
     /// Note that this only applies to snapshots that undergo serialization
-    /// (eg: does not work for `assert_debug_snapshot!`.)
+    /// (eg: does not work for [`assert_debug_snapshot!`](crate::assert_debug_snapshot!).)
     ///
     /// The default value is `false`.
     pub fn set_sort_maps(&mut self, value: bool) {
@@ -210,7 +209,7 @@ impl Settings {
 
     /// Disables prepending of modules to the snapshot filename.
     ///
-    /// By default the filename of a snapshot is `<module>__<name>.snap`.
+    /// By default, the filename of a snapshot is `<module>__<name>.snap`.
     /// Setting this flag to `false` changes the snapshot filename to just
     /// `<name>.snap`.
     ///
@@ -226,7 +225,7 @@ impl Settings {
 
     /// Allows the [`glob!`] macro to succeed if it matches no files.
     ///
-    /// By default the glob macro will fail the test if it does not find
+    /// By default, the glob macro will fail the test if it does not find
     /// any files to prevent accidental typos.  This can be disabled when
     /// fixtures should be conditional.
     ///
@@ -269,10 +268,10 @@ impl Settings {
 
     /// Sets the input file reference.
     ///
-    /// This value is completely unused by the snapshot testing system but
-    /// it lets you store some meta data with a snapshot that refers you back
-    /// to the input file.  The path stored here is made relative to the
-    /// workspace root before storing with the snapshot.
+    /// This value is completely unused by the snapshot testing system but it
+    /// allows storing some metadata with a snapshot that refers back to the
+    /// input file.  The path stored here is made relative to the workspace root
+    /// before storing with the snapshot.
     pub fn set_input_file<P: AsRef<Path>>(&mut self, p: P) {
         self._private_inner_mut().input_file(p);
     }
@@ -295,7 +294,7 @@ impl Settings {
     /// super useful by itself, particularly when working with loops and generated
     /// tests.  In that case the `description` can be set as extra information.
     ///
-    /// See also [`set_info`](Self::set_info).
+    /// See also [`Self::set_info`].
     pub fn set_description<S: Into<String>>(&mut self, value: S) {
         self._private_inner_mut().description(value);
     }
@@ -320,7 +319,7 @@ impl Settings {
     /// As an example the input parameters to the function that creates the snapshot
     /// can be persisted here.
     ///
-    /// Alternatively you can use [`set_raw_info`](Self::set_raw_info) instead.
+    /// Alternatively you can use [`Self::set_raw_info`] instead.
     #[cfg(feature = "serde")]
     #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
     pub fn set_info<S: Serialize>(&mut self, s: &S) {
@@ -329,7 +328,7 @@ impl Settings {
 
     /// Sets the info from a content object.
     ///
-    /// This works like [`set_info`](Self::set_info) but does not require `serde`.
+    /// This works like [`Self::set_info`] but does not require [`serde`].
     pub fn set_raw_info(&mut self, content: &Content) {
         self._private_inner_mut().raw_info(content);
     }
@@ -365,7 +364,7 @@ impl Settings {
     /// snapshots.
     ///
     /// Note that this only applies to snapshots that undergo serialization
-    /// (eg: does not work for `assert_debug_snapshot!`.)
+    /// (eg: does not work for [`assert_debug_snapshot!`](crate::assert_debug_snapshot!).)
     #[cfg(feature = "redactions")]
     #[cfg_attr(docsrs, doc(cfg(feature = "redactions")))]
     pub fn add_redaction<R: Into<Redaction>>(&mut self, selector: &str, replacement: R) {
@@ -384,7 +383,7 @@ impl Settings {
     ///
     /// This works similar to a redaction but instead of changing the value it
     /// asserts the value at a certain place.  This function is internally
-    /// supposed to call things like `assert_eq!`.
+    /// supposed to call things like [`assert_eq!`].
     ///
     /// This is a shortcut to `add_redaction(selector, dynamic_redaction(...))`;
     #[cfg(feature = "redactions")]
@@ -437,7 +436,7 @@ impl Settings {
     ///
     /// The first argument is the [`regex`] pattern to apply, the second is a replacement
     /// string.  The replacement string has the same functionality as the second argument
-    /// to [`Regex::replace`](regex::Regex::replace).
+    /// to [`regex::Regex::replace`].
     ///
     /// This is useful to perform some cleanup procedures on the snapshot for unstable values.
     ///
@@ -493,7 +492,7 @@ impl Settings {
 
     /// Runs a function with the current settings bound to the thread.
     ///
-    /// This is an alternative to [`bind_to_scope`](Settings::bind_to_scope)
+    /// This is an alternative to [`Self::bind_to_scope`]()
     /// which does not require holding on to a drop guard.  The return value
     /// of the closure is passed through.
     ///
@@ -510,7 +509,7 @@ impl Settings {
         f()
     }
 
-    /// Like `bind` but for futures.
+    /// Like [`Self::bind`] but for futures.
     ///
     /// This lets you bind settings for the duration of a future like this:
     ///
@@ -524,14 +523,18 @@ impl Settings {
     /// # }
     /// ```
     pub fn bind_async<F: Future<Output = T>, T>(&self, future: F) -> impl Future<Output = T> {
-        struct BindingFuture<F>(Arc<ActualSettings>, F);
+        struct BindingFuture<F> {
+            settings: Arc<ActualSettings>,
+            future: F,
+        }
 
         impl<F: Future> Future for BindingFuture<F> {
             type Output = F::Output;
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-                let inner = self.0.clone();
-                let future = unsafe { self.map_unchecked_mut(|s| &mut s.1) };
+                let inner = self.settings.clone();
+                // SAFETY: This is okay because `future` is pinned when `self` is.
+                let future = unsafe { self.map_unchecked_mut(|s| &mut s.future) };
                 CURRENT_SETTINGS.with(|x| {
                     let old = {
                         let mut current = x.borrow_mut();
@@ -547,7 +550,10 @@ impl Settings {
             }
         }
 
-        BindingFuture(self.inner.clone(), future)
+        BindingFuture {
+            settings: self.inner.clone(),
+            future,
+        }
     }
 
     /// Binds the settings to the current thread and resets when the drop
@@ -569,7 +575,7 @@ impl Settings {
         CURRENT_SETTINGS.with(|x| {
             let mut x = x.borrow_mut();
             let old = mem::replace(&mut x.inner, self.inner.clone());
-            SettingsBindDropGuard(Some(old))
+            SettingsBindDropGuard(Some(old), std::marker::PhantomData)
         })
     }
 
@@ -579,9 +585,30 @@ impl Settings {
     }
 }
 
-/// Returned from [`bind_to_scope`](Settings::bind_to_scope)
+/// Returned from [`Settings::bind_to_scope`]
+///
+/// This type is not shareable between threads:
+///
+/// ```compile_fail E0277
+/// let mut settings = insta::Settings::clone_current();
+/// settings.set_snapshot_suffix("test drop guard");
+/// let guard = settings.bind_to_scope();
+///
+/// std::thread::spawn(move || { let guard = guard; }); // doesn't compile
+/// ```
+///
+/// This is to ensure tests under async runtimes like `tokio` don't show unexpected results
 #[must_use = "The guard is immediately dropped so binding has no effect. Use `let _guard = ...` to bind it."]
-pub struct SettingsBindDropGuard(Option<Arc<ActualSettings>>);
+pub struct SettingsBindDropGuard(
+    Option<Arc<ActualSettings>>,
+    /// A ZST that is not [`Send`] but is [`Sync`]
+    ///
+    /// This is necessary due to the lack of stable [negative impls](https://github.com/rust-lang/rust/issues/68318).
+    ///
+    /// Required as [`SettingsBindDropGuard`] modifies a thread local variable which would end up
+    /// with unexpected results if sent to a different thread.
+    std::marker::PhantomData<std::sync::MutexGuard<'static, ()>>,
+);
 
 impl Drop for SettingsBindDropGuard {
     fn drop(&mut self) {

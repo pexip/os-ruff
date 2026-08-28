@@ -41,7 +41,7 @@ pub fn line_comparison(
 
     match axis_scale {
         AxisScale::Linear => {
-            draw_line_comarision_figure(root_area, unit, x_range, y_range, value_type, series_data)
+            draw_line_comarision_figure(root_area, unit, x_range, y_range, value_type, series_data);
         }
         AxisScale::Logarithmic => draw_line_comarision_figure(
             root_area,
@@ -86,11 +86,11 @@ fn draw_line_comarision_figure<XR: AsRangedCoord<Value = f64>, YR: AsRangedCoord
         .draw()
         .unwrap();
 
-    for (id, (name, xs, ys)) in (0..).zip(data.into_iter()) {
+    for (id, (name, xs, ys)) in (0..).zip(data) {
         let series = chart
             .draw_series(
                 LineSeries::new(
-                    xs.into_iter().zip(ys.into_iter()),
+                    xs.into_iter().zip(ys),
                     COMPARISON_COLORS[id % NUM_COLORS].filled(),
                 )
                 .point_size(POINT_SIZE),
@@ -121,7 +121,7 @@ fn line_comparison_series_data<'a>(
     let max = all_curves
         .iter()
         .map(|&(_, data)| Sample::new(data).mean())
-        .fold(::std::f64::NAN, f64::max);
+        .fold(f64::NAN, f64::max);
 
     let mut dummy = [1.0];
     let unit = formatter.scale_values(max, &mut dummy);
@@ -131,7 +131,7 @@ fn line_comparison_series_data<'a>(
     // This assumes the curves are sorted. It also assumes that the benchmark IDs all have numeric
     // values or throughputs and that value is sensible (ie. not a mix of bytes and elements
     // or whatnot)
-    for (key, group) in &all_curves.iter().group_by(|&&&(id, _)| &id.function_id) {
+    for (key, group) in &all_curves.iter().chunk_by(|&&&(id, _)| &id.function_id) {
         let mut tuples: Vec<_> = group
             .map(|&&(id, ref sample)| {
                 // Unwrap is fine here because it will only fail if the assumptions above are not true
@@ -209,7 +209,7 @@ pub fn violin(
     match axis_scale {
         AxisScale::Linear => draw_violin_figure(root_area, unit, x_range, y_range, kdes),
         AxisScale::Logarithmic => {
-            draw_violin_figure(root_area, unit, x_range.log_scale(), y_range, kdes)
+            draw_violin_figure(root_area, unit, x_range.log_scale(), y_range, kdes);
         }
     }
 }

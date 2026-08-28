@@ -1,38 +1,19 @@
-use annotate_snippets::{
-    display_list::{DisplayList, FormatOptions},
-    snippet::{Annotation, AnnotationType, Slice, Snippet},
-};
+use annotate_snippets::{Level, Renderer, Snippet};
 
 fn main() {
-    let snippet = Snippet {
-        title: Some(Annotation {
-            label: Some("mismatched types"),
-            id: None,
-            annotation_type: AnnotationType::Error,
-        }),
-        footer: vec![],
-        slices: vec![
-            Slice {
-                source: "Foo",
-                line_start: 51,
-                origin: Some("src/format.rs"),
-                fold: false,
-                annotations: vec![],
-            },
-            Slice {
-                source: "Faa",
-                line_start: 129,
-                origin: Some("src/display.rs"),
-                fold: false,
-                annotations: vec![],
-            },
-        ],
-        opt: FormatOptions {
-            color: true,
-            ..Default::default()
-        },
-    };
+    let message = Level::Error
+        .title("mismatched types")
+        .snippet(
+            Snippet::source("Foo")
+                .line_start(51)
+                .origin("src/format.rs"),
+        )
+        .snippet(
+            Snippet::source("Faa")
+                .line_start(129)
+                .origin("src/display.rs"),
+        );
 
-    let dl = DisplayList::from(snippet);
-    println!("{}", dl);
+    let renderer = Renderer::styled();
+    anstream::println!("{}", renderer.render(message));
 }

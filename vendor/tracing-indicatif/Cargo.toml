@@ -12,8 +12,13 @@
 [package]
 edition = "2021"
 name = "tracing-indicatif"
-version = "0.3.6"
+version = "0.3.9"
+build = false
 exclude = ["*.gif"]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Tracing layer that automatically creates and manages progress bars for active spans."
 documentation = "https://docs.rs/tracing-indicatif"
 readme = "README.md"
@@ -30,60 +35,70 @@ repository = "https://github.com/emersonford/tracing-indicatif"
 
 [lib]
 name = "tracing_indicatif"
+path = "src/lib.rs"
 
 [[example]]
 name = "basic"
-
-[[example]]
-name = "child_spans"
+path = "examples/basic.rs"
 
 [[example]]
 name = "build_console"
+path = "examples/build_console.rs"
 
 [[example]]
-name = "per_span_style"
-
-[[example]]
-name = "progress_bar"
-
-[[example]]
-name = "filter"
-
-[[example]]
-name = "multithread"
-
-[[example]]
-name = "stdout_stderr_printing"
+name = "child_spans"
+path = "examples/child_spans.rs"
 
 [[example]]
 name = "dialoguer_suspend"
+path = "examples/dialoguer_suspend.rs"
+
+[[example]]
+name = "filter"
+path = "examples/filter.rs"
+
+[[example]]
+name = "multithread"
+path = "examples/multithread.rs"
+
+[[example]]
+name = "per_span_style"
+path = "examples/per_span_style.rs"
+
+[[example]]
+name = "progress_bar"
+path = "examples/progress_bar.rs"
+
+[[example]]
+name = "stdout_stderr_printing"
+path = "examples/stdout_stderr_printing.rs"
 
 [dependencies.indicatif]
-version = "0.17.6"
+version = "0.17.9"
 features = ["in_memory"]
 
 [dependencies.tracing]
-version = "0.1.37"
+version = "0.1.40"
 
 [dependencies.tracing-core]
-version = "0.1.30"
+version = "0.1.32"
 
 [dependencies.tracing-subscriber]
-version = "0.3.17"
+version = "0.3.18"
 
 [dev-dependencies.console]
-version = "0.15.5"
+version = "0.15.8"
 
 [dev-dependencies.dialoguer]
 version = "0.11.0"
 
 [dev-dependencies.futures]
-version = "0.3.26"
+version = "0.3.31"
 
 [dev-dependencies.rand]
 version = "0.8.5"
 features = ["std_rng"]
 
 [dev-dependencies.tokio]
-version = "1.25.0"
+version = "1.41.1"
 features = ["full"]

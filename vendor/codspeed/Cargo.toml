@@ -11,9 +11,16 @@
 
 [package]
 edition = "2021"
+rust-version = "1.74"
 name = "codspeed"
-version = "2.6.0"
+version = "2.10.1"
 authors = ["Arthur Pastel <arthur@codspeed.io>"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Core instrumentation library for CodSpeed"
 homepage = "https://codspeed.io"
 documentation = "https://docs.codspeed.io"
@@ -30,8 +37,13 @@ categories = [
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/CodSpeedHQ/codspeed-rust"
 
+[lib]
+name = "codspeed"
+path = "src/lib.rs"
+
 [[bench]]
 name = "native"
+path = "benches/native.rs"
 harness = false
 
 [dependencies.colored]
@@ -40,8 +52,16 @@ version = "2.0.0"
 [dependencies.libc]
 version = "^0.2"
 
+[dependencies.serde]
+version = "1.0.217"
+features = ["derive"]
+
 [dependencies.serde_json]
-version = "1.0.104"
+version = "1.0.138"
+
+[dependencies.uuid]
+version = "1.12.1"
+features = ["v4"]
 
 [dev-dependencies.tempfile]
 version = "3.7.0"

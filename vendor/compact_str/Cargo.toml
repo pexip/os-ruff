@@ -12,8 +12,14 @@
 [package]
 edition = "2021"
 name = "compact_str"
-version = "0.8.0"
+version = "0.9.0"
 authors = ["Parker Timmerman <parker@parkertimmerman.com>"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A memory efficient string type that transparently stores strings on the stack, when possible"
 homepage = "https://github.com/ParkMyCar/compact_str"
 readme = "README.md"
@@ -39,6 +45,10 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
+
+[lib]
+name = "compact_str"
+path = "src/lib.rs"
 
 [dependencies.arbitrary]
 version = "1"
@@ -70,7 +80,7 @@ default-features = false
 version = "1"
 
 [dependencies.markup]
-version = "0.13"
+version = "0.15"
 optional = true
 default-features = false
 
@@ -86,8 +96,7 @@ optional = true
 default-features = false
 
 [dependencies.rkyv]
-version = "0.7"
-features = ["size_32"]
+version = "0.8"
 optional = true
 default-features = false
 
@@ -112,12 +121,17 @@ features = ["union"]
 optional = true
 
 [dependencies.sqlx]
-version = "0.7"
+version = "0.8"
 optional = true
 default-features = false
 
 [dependencies.static_assertions]
 version = "1"
+
+[dependencies.zeroize]
+version = "1"
+optional = true
+default-features = false
 
 [dev-dependencies.cfg-if]
 version = "1"
@@ -138,12 +152,7 @@ version = "1"
 version = "1"
 
 [dev-dependencies.rkyv]
-version = "0.7"
-features = [
-    "alloc",
-    "size_32",
-]
-default-features = false
+version = "0.8.8"
 
 [dev-dependencies.serde]
 version = "1"
@@ -187,3 +196,4 @@ sqlx-sqlite = [
     "sqlx/sqlite",
 ]
 std = []
+zeroize = ["dep:zeroize"]

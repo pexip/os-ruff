@@ -83,8 +83,12 @@ impl ArgMatches {
     ///
     /// Returns `None` if the option wasn't present.
     ///
+    /// <div class="warning">
+    ///
     /// *NOTE:* This will always return `Some(value)` if [`default_value`] has been set.
     /// [`ArgMatches::value_source`] can be used to check if a value is present at runtime.
+    ///
+    /// </div>
     ///
     /// # Panic
     ///
@@ -304,7 +308,6 @@ impl ArgMatches {
     /// ```
     /// [`Iterator`]: std::iter::Iterator
     /// [`OsSt`]: std::ffi::OsStr
-    /// [values]: OsValues
     /// [`String`]: std::string::String
     #[cfg_attr(debug_assertions, track_caller)]
     pub fn get_raw(&self, id: &str) -> Option<RawValues<'_>> {
@@ -359,7 +362,6 @@ impl ArgMatches {
     /// ```
     /// [`Iterator`]: std::iter::Iterator
     /// [`OsStr`]: std::ffi::OsStr
-    /// [values]: OsValues
     /// [`String`]: std::string::String
     #[cfg_attr(debug_assertions, track_caller)]
     pub fn get_raw_occurrences(&self, id: &str) -> Option<RawOccurrences<'_>> {
@@ -374,8 +376,12 @@ impl ArgMatches {
     ///
     /// Returns `None` if the option wasn't present.
     ///
+    /// <div class="warning">
+    ///
     /// *NOTE:* This will always return `Some(value)` if [`default_value`] has been set.
     /// [`ArgMatches::value_source`] can be used to check if a value is present at runtime.
+    ///
+    /// </div>
     ///
     /// # Panic
     ///
@@ -485,8 +491,12 @@ impl ArgMatches {
 
     /// Check if values are present for the argument or group id
     ///
+    /// <div class="warning">
+    ///
     /// *NOTE:* This will always return `true` if [`default_value`] has been set.
     /// [`ArgMatches::value_source`] can be used to check if a value is present at runtime.
+    ///
+    /// </div>
     ///
     /// # Panics
     ///
@@ -542,7 +552,10 @@ impl ArgMatches {
         }
     }
 
-    /// Check if any args were present on the command line
+    /// Check if any [`Arg`][crate::Arg]s were present on the command line
+    ///
+    /// See [`ArgMatches::subcommand_name()`] or [`ArgMatches::subcommand()`] to check if a
+    /// subcommand was present on the command line.
     ///
     /// # Examples
     ///
@@ -563,7 +576,9 @@ impl ArgMatches {
     ///     .unwrap();
     /// assert!(! m.args_present());
     pub fn args_present(&self) -> bool {
-        !self.args.is_empty()
+        self.args
+            .values()
+            .any(|v| v.source().map(|s| s.is_explicit()).unwrap_or(false))
     }
 
     /// Report where argument value came from
@@ -612,8 +627,12 @@ impl ArgMatches {
     ///
     /// The examples should clear this up.
     ///
+    /// <div class="warning">
+    ///
     /// *NOTE:* If an argument is allowed multiple times, this method will only give the *first*
     /// index.  See [`ArgMatches::indices_of`].
+    ///
+    /// </div>
     ///
     /// # Panics
     ///
@@ -760,8 +779,12 @@ impl ArgMatches {
     /// refer to the *values* `-o val` would therefore not represent two distinct indices, only the
     /// index for `val` would be recorded. This is by design.
     ///
+    /// <div class="warning">
+    ///
     /// *NOTE:* For more information about how clap indices compared to argv indices, see
     /// [`ArgMatches::index_of`]
+    ///
+    /// </div>
     ///
     /// # Panics
     ///
@@ -828,7 +851,6 @@ impl ArgMatches {
     /// assert_eq!(m.indices_of("option").unwrap().collect::<Vec<_>>(), &[2]);
     /// ```
     /// [`ArgMatches::index_of`]: ArgMatches::index_of()
-    /// [delimiter]: Arg::value_delimiter()
     #[cfg_attr(debug_assertions, track_caller)]
     pub fn indices_of(&self, id: &str) -> Option<Indices<'_>> {
         let arg = some!(self.get_arg(id));
@@ -1201,6 +1223,18 @@ impl ArgMatches {
         let presence = self.args.contains_key(id);
         Ok(presence)
     }
+
+    /// Clears the values for the given `id`
+    ///
+    /// Alternative to [`try_remove_*`][ArgMatches::try_remove_one] when the type is not known.
+    ///
+    /// Returns `Err([``MatchesError``])` if the given `id` isn't valid for current `ArgMatches` instance.
+    ///
+    /// Returns `Ok(true)` if there were any matches with the given `id`, `Ok(false)` otherwise.
+    pub fn try_clear_id(&mut self, id: &str) -> Result<bool, MatchesError> {
+        ok!(self.verify_arg(id));
+        Ok(self.args.remove_entry(id).is_some())
+    }
 }
 
 // Private methods
@@ -1368,7 +1402,7 @@ impl<'a> DoubleEndedIterator for IdsRef<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for IdsRef<'a> {}
+impl ExactSizeIterator for IdsRef<'_> {}
 
 /// Iterate over multiple values for an argument via [`ArgMatches::remove_many`].
 ///
@@ -1565,7 +1599,7 @@ impl<'a> DoubleEndedIterator for RawValues<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for RawValues<'a> {}
+impl ExactSizeIterator for RawValues<'_> {}
 
 /// Creates an empty iterator.
 impl Default for RawValues<'_> {
@@ -1609,7 +1643,7 @@ impl<'a> Iterator for GroupedValues<'a> {
 }
 
 #[allow(deprecated)]
-impl<'a> DoubleEndedIterator for GroupedValues<'a> {
+impl DoubleEndedIterator for GroupedValues<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if let Some(next) = self.iter.next_back() {
             self.len -= 1;
@@ -1621,11 +1655,11 @@ impl<'a> DoubleEndedIterator for GroupedValues<'a> {
 }
 
 #[allow(deprecated)]
-impl<'a> ExactSizeIterator for GroupedValues<'a> {}
+impl ExactSizeIterator for GroupedValues<'_> {}
 
 /// Creates an empty iterator. Used for `unwrap_or_default()`.
 #[allow(deprecated)]
-impl<'a> Default for GroupedValues<'a> {
+impl Default for GroupedValues<'_> {
     fn default() -> Self {
         static EMPTY: [Vec<AnyValue>; 0] = [];
         GroupedValues {
@@ -1727,7 +1761,7 @@ where
 }
 
 impl<'a, T> ExactSizeIterator for OccurrencesRef<'a, T> where Self: 'a {}
-impl<'a, T> Default for OccurrencesRef<'a, T> {
+impl<T> Default for OccurrencesRef<'_, T> {
     fn default() -> Self {
         static EMPTY: [Vec<AnyValue>; 0] = [];
         OccurrencesRef {
@@ -1786,15 +1820,15 @@ impl<'a> Iterator for RawOccurrences<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for RawOccurrences<'a> {
+impl DoubleEndedIterator for RawOccurrences<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.iter.next_back()
     }
 }
 
-impl<'a> ExactSizeIterator for RawOccurrences<'a> {}
+impl ExactSizeIterator for RawOccurrences<'_> {}
 
-impl<'a> Default for RawOccurrences<'a> {
+impl Default for RawOccurrences<'_> {
     fn default() -> Self {
         static EMPTY: [Vec<OsString>; 0] = [];
         RawOccurrences {
@@ -1833,7 +1867,7 @@ where
     }
 }
 
-impl<'a> ExactSizeIterator for RawOccurrenceValues<'a> {}
+impl ExactSizeIterator for RawOccurrenceValues<'_> {}
 
 /// Iterate over indices for where an argument appeared when parsing, via [`ArgMatches::indices_of`]
 ///
@@ -1862,7 +1896,7 @@ pub struct Indices<'a> {
     len: usize,
 }
 
-impl<'a> Iterator for Indices<'a> {
+impl Iterator for Indices<'_> {
     type Item = usize;
 
     fn next(&mut self) -> Option<usize> {
@@ -1878,7 +1912,7 @@ impl<'a> Iterator for Indices<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for Indices<'a> {
+impl DoubleEndedIterator for Indices<'_> {
     fn next_back(&mut self) -> Option<usize> {
         if let Some(next) = self.iter.next_back() {
             self.len -= 1;
@@ -1889,10 +1923,10 @@ impl<'a> DoubleEndedIterator for Indices<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for Indices<'a> {}
+impl ExactSizeIterator for Indices<'_> {}
 
 /// Creates an empty iterator.
-impl<'a> Default for Indices<'a> {
+impl Default for Indices<'_> {
     fn default() -> Self {
         static EMPTY: [usize; 0] = [];
         // This is never called because the iterator is empty:
@@ -2026,5 +2060,38 @@ mod tests {
         dbg!(&b_value);
         let b = b_index.into_iter().zip(b_value).rev().collect::<Vec<_>>();
         dbg!(b);
+    }
+
+    #[test]
+    fn delete_id_without_returning() {
+        let mut matches = crate::Command::new("myprog")
+            .arg(crate::Arg::new("a").short('a').action(ArgAction::Append))
+            .arg(crate::Arg::new("b").short('b').action(ArgAction::Append))
+            .arg(crate::Arg::new("c").short('c').action(ArgAction::Append))
+            .try_get_matches_from(vec!["myprog", "-b1", "-a1", "-b2"])
+            .unwrap();
+        let matches_ids_count = matches.ids().count();
+        assert_eq!(matches_ids_count, 2);
+
+        let _ = matches
+            .try_clear_id("d")
+            .expect_err("should fail due to there is no arg 'd'");
+
+        let c_was_presented = matches
+            .try_clear_id("c")
+            .expect("doesn't fail because there is no matches for 'c' argument");
+        assert!(!c_was_presented);
+        let matches_ids_count = matches.ids().count();
+        assert_eq!(matches_ids_count, 2);
+
+        let b_was_presented = matches.try_clear_id("b").unwrap();
+        assert!(b_was_presented);
+        let matches_ids_count = matches.ids().count();
+        assert_eq!(matches_ids_count, 1);
+
+        let a_was_presented = matches.try_clear_id("a").unwrap();
+        assert!(a_was_presented);
+        let matches_ids_count = matches.ids().count();
+        assert_eq!(matches_ids_count, 0);
     }
 }

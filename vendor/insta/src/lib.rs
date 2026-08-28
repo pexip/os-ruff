@@ -1,3 +1,6 @@
+#![warn(clippy::doc_markdown)]
+#![warn(rustdoc::all)]
+
 //! <div align="center">
 //!  <img src="https://github.com/mitsuhiko/insta/blob/master/assets/logo.png?raw=true" width="250" height="250">
 //!  <p><strong>insta: a snapshot testing library for Rust</strong></p>
@@ -7,7 +10,7 @@
 //!
 //! Snapshots tests (also sometimes called approval tests) are tests that
 //! assert values against a reference value (the snapshot).  This is similar
-//! to how `assert_eq!` lets you compare a value against a reference value but
+//! to how [`assert_eq!`] lets you compare a value against a reference value but
 //! unlike simple string assertions, snapshot tests let you test against complex
 //! values and come with comprehensive tools to review changes.
 //!
@@ -46,7 +49,8 @@
 //! ```
 //!
 //! The recommended flow is to run the tests once, have them fail and check
-//! if the result is okay.  By default the new snapshots are stored next
+//! if the result is okay.
+//! By default, the new snapshots are stored next
 //! to the old ones with the extra `.new` extension.  Once you are satisfied
 //! move the new files over.  To simplify this workflow you can use
 //! `cargo insta review` (requires
@@ -62,17 +66,9 @@
 //!
 //! Note that `cargo-insta` is entirely optional.  You can also just use insta
 //! directly from `cargo test` and control it via the `INSTA_UPDATE` environment
-//! variable.  The default is `auto` which will write all new snapshots into
-//! `.snap.new` files if no CI is detected so that `cargo-insta` can pick them
-//! up.  The following other modes are possible:
+//! variable — see [Updating snapshots](#updating-snapshots) for details.
 //!
-//! - `auto`: the default. `no` for CI environments or `new` otherwise
-//! - `always`: overwrites old snapshot files with new ones unasked
-//! - `unseen`: behaves like `always` for new snapshots and `new` for others
-//! - `new`: write new snapshots into `.snap.new` files
-//! - `no`: does not update snapshot files at all (just runs tests)
-//!
-//! You can for instance first run the tests and not write and new snapshots, and
+//! You can for instance first run the tests and not write any new snapshots, and
 //! if you like them run the tests again and update them:
 //!
 //! ```text
@@ -84,11 +80,11 @@
 //!
 //! This crate exports multiple macros for snapshot testing:
 //!
-//! - [`assert_snapshot!`] for comparing basic string snapshots.
+//! - [`assert_snapshot!`] for comparing basic snapshots of
+//!   [`Display`](std::fmt::Display) outputs, often strings.
 //! - [`assert_debug_snapshot!`] for comparing [`Debug`] outputs of values.
-//! - [`assert_display_snapshot!`] for comparing [`Display`](std::fmt::Display) outputs of values.
 //!
-//! The following macros require the use of serde's [`Serialize`](serde::Serialize):
+//! The following macros require the use of [`serde::Serialize`]:
 //!
 #![cfg_attr(
     feature = "csv",
@@ -119,7 +115,7 @@
 //! partial values.  See [redactions in the
 //! documentation](https://insta.rs/docs/redactions/) for more information.
 //!
-//! # Snapshot updating
+//! # Updating snapshots
 //!
 //! During test runs snapshots will be updated according to the `INSTA_UPDATE`
 //! environment variable.  The default is `auto` which will write snapshots for
@@ -137,6 +133,7 @@
 //! - `unseen`: `always` for previously unseen snapshots or `new` for existing
 //!   snapshots
 //! - `no`: does not write to snapshot files at all; just runs tests
+//! - `force`: forcibly updates snapshot files, even if assertions pass
 //!
 //! When `new`, `auto` or `unseen` is used, the
 //! [`cargo-insta`](https://crates.io/crates/cargo-insta) command can be used to
@@ -177,11 +174,11 @@
 //!
 //! The following features exist:
 //!
-//! * `csv`: enables CSV support (via serde)
-//! * `json`: enables JSON support (via serde)
-//! * `ron`: enables RON support (via serde)
-//! * `toml`: enables TOML support (via serde)
-//! * `yaml`: enables YAML support (via serde)
+//! * `csv`: enables CSV support (via [`serde`])
+//! * `json`: enables JSON support (via [`serde`])
+//! * `ron`: enables RON support (via [`serde`])
+//! * `toml`: enables TOML support (via [`serde`])
+//! * `yaml`: enables YAML support (via [`serde`])
 //! * `redactions`: enables support for redactions
 //! * `filters`: enables support for filters
 //! * `glob`: enables support for globbing ([`glob!`])
@@ -191,13 +188,14 @@
 //! limited capacity.  You will receive a deprecation warning if you are not
 //! opting into them but for now the macros will continue to function.
 //!
-//! Enabling any of the serde based formats enables the hidden `serde` feature
-//! which gates some serde specific APIs such as [`Settings::set_info`].
+//! Enabling any of the [`serde`] based formats enables the hidden `serde` feature
+//! which gates some [`serde`] specific APIs such as [`Settings::set_info`].
 //!
 //! # Dependencies
 //!
-//! `insta` tries to be light in dependencies but this is tricky to accomplish
-//! given what it tries to do.  By default it currently depends on `serde` for
+//! [`insta`] tries to be light in dependencies but this is tricky to accomplish
+//! given what it tries to do.
+//! By default, it currently depends on [`serde`] for
 //! the [`assert_toml_snapshot!`] and [`assert_yaml_snapshot!`] macros.  In the
 //! future this default dependencies will be removed.  To already benefit from
 //! this optimization you can disable the default features and manually opt into
@@ -208,15 +206,13 @@
 //! There are some settings that can be changed on a per-thread (and thus
 //! per-test) basis.  For more information see [Settings].
 //!
-//! Additionally Insta will load a YAML config file with settings that change
+//! Additionally, Insta will load a YAML config file with settings that change
 //! the behavior of insta between runs.  It's loaded from any of the following
 //! locations: `.config/insta.yaml`, `insta.yaml` and `.insta.yaml` from the
 //! workspace root.  The following config options exist:
 //!
 //! ```yaml
 //! behavior:
-//!   # also set by INSTA_FORCE_UPDATE
-//!   force_update: true/false
 //!   # also set by INSTA_REQUIRE_FULL_MATCH
 //!   require_full_match: true/false
 //!   # also set by INSTA_FORCE_PASS
@@ -224,14 +220,18 @@
 //!   # also set by INSTA_OUTPUT
 //!   output: "diff" | "summary" | "minimal" | "none"
 //!   # also set by INSTA_UPDATE
-//!   update: "auto" | "always" | "new" | "unseen" | "no"
+//!   update: "auto" | "new" | "always" | "no" | "unseen" | "force"
 //!   # also set by INSTA_GLOB_FAIL_FAST
 //!   glob_fail_fast: true/false
 //!
 //! # these are used by cargo insta test
 //! test:
 //!   # also set by INSTA_TEST_RUNNER
+//!   # cargo-nextest binary path can be explicitly set by INSTA_CARGO_NEXTEST_BIN
 //!   runner: "auto" | "cargo-test" | "nextest"
+//!   # whether to fallback to `cargo-test` if `nextest` is not available,
+//!   # also set by INSTA_TEST_RUNNER_FALLBACK, default false
+//!   test_runner_fallback: true/false
 //!   # automatically assume --review was passed to cargo insta test
 //!   auto_review: true/false
 //!   # automatically assume --accept-unseen was passed to cargo insta test
@@ -252,8 +252,8 @@
 //!
 //! Insta benefits from being compiled in release mode, even as dev dependency.
 //! It will compile slightly slower once, but use less memory, have faster diffs
-//! and just generally be more fun to use.  To achieve that, opt `insta` and
-//! `similar` (the diffing library) into higher optimization in your
+//! and just generally be more fun to use.  To achieve that, opt [`insta`] and
+//! [`similar`] (the diffing library) into higher optimization in your
 //! `Cargo.toml`:
 //!
 //! ```yaml
@@ -264,8 +264,10 @@
 //! opt-level = 3
 //! ```
 //!
-//! You can also disable the default features of `insta` which will cut down on
+//! You can also disable the default features of [`insta`] which will cut down on
 //! the compile time a bit by removing some quality of life features.
+//!
+//!  [`insta`]: https://docs.rs/insta
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[macro_use]
@@ -293,12 +295,15 @@ mod glob;
 mod test;
 
 pub use crate::settings::Settings;
-pub use crate::snapshot::{MetaData, Snapshot};
+pub use crate::snapshot::{MetaData, Snapshot, TextSnapshotKind};
 
 /// Exposes some library internals.
 ///
 /// You're unlikely to want to work with these objects but they
 /// are exposed for documentation primarily.
+///
+/// This module does not follow the same stability guarantees as the rest of the crate and is not
+/// guaranteed to be compatible between minor versions.
 pub mod internals {
     pub use crate::content::Content;
     #[cfg(feature = "filters")]
@@ -326,6 +331,8 @@ pub mod _cargo_insta_support {
         output::SnapshotPrinter,
         snapshot::PendingInlineSnapshot,
         snapshot::SnapshotContents,
+        snapshot::TextSnapshotContents,
+        utils::get_cargo,
         utils::is_ci,
     };
 }
@@ -338,8 +345,13 @@ pub use crate::redaction::{dynamic_redaction, rounded_redaction, sorted_redactio
 #[doc(hidden)]
 pub mod _macro_support {
     pub use crate::content::Content;
-    pub use crate::env::get_cargo_workspace;
-    pub use crate::runtime::{assert_snapshot, with_allow_duplicates, AutoName, ReferenceValue};
+    pub use crate::env::{get_cargo_workspace, Workspace};
+    pub use crate::runtime::{
+        assert_snapshot, with_allow_duplicates, AutoName, BinarySnapshotValue, InlineValue,
+        SnapshotValue,
+    };
+    pub use core::{file, line, module_path};
+    pub use std::{any, env, format, option_env, path, vec};
 
     #[cfg(feature = "serde")]
     pub use crate::serialization::{serialize_value, SerializationFormat, SnapshotLocation};

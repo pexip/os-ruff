@@ -1,8 +1,7 @@
 use super::*;
 use crate::estimate::Estimate;
 use crate::estimate::Statistic;
-use crate::measurement::ValueFormatter;
-use crate::report::{BenchmarkId, MeasurementData, ReportContext};
+use crate::report::ReportContext;
 use crate::stats::Distribution;
 
 fn abs_distribution(
@@ -150,8 +149,8 @@ pub(crate) fn abs_distributions(
                 distribution,
                 estimate,
                 size,
-            )
-        })
+            );
+        });
 }
 
 fn rel_distribution(
@@ -304,6 +303,6 @@ pub(crate) fn rel_distributions(
             comparison.relative_estimates.get(statistic),
             comparison.noise_threshold,
             size,
-        )
+        );
     });
 }

@@ -10,14 +10,21 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
+edition = "2021"
+rust-version = "1.80"
 name = "criterion"
-version = "0.5.1"
+version = "0.6.0"
 authors = [
     "Jorge Aparicio <japaricious@gmail.com>",
     "Brook Heisler <brookheisler@gmail.com>",
 ]
+build = false
 exclude = ["book/*"]
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Statistics-driven micro-benchmarking library"
 homepage = "https://bheisler.github.io/criterion.rs/book/index.html"
 readme = "README.md"
@@ -37,18 +44,66 @@ features = [
     "async_tokio",
 ]
 
+[badges.maintenance]
+status = "passively-maintained"
+
+[features]
+async = []
+async_futures = [
+    "dep:futures",
+    "async",
+]
+async_smol = [
+    "dep:smol",
+    "async",
+]
+async_std = [
+    "dep:async-std",
+    "async",
+]
+async_tokio = [
+    "dep:tokio",
+    "async",
+]
+cargo_bench_support = []
+csv_output = ["dep:csv"]
+default = [
+    "rayon",
+    "plotters",
+    "cargo_bench_support",
+]
+html_reports = []
+plotters = ["dep:plotters"]
+rayon = ["dep:rayon"]
+real_blackbox = []
+stable = [
+    "csv_output",
+    "html_reports",
+    "async_futures",
+    "async_smol",
+    "async_tokio",
+    "async_std",
+]
+
 [lib]
+name = "criterion"
+path = "src/lib.rs"
 bench = false
+
+[[test]]
+name = "criterion_tests"
+path = "tests/criterion_tests.rs"
 
 [[bench]]
 name = "bench_main"
+path = "benches/bench_main.rs"
 harness = false
 
 [dependencies.anes]
 version = "0.1.4"
 
 [dependencies.async-std]
-version = "1.9"
+version = "1.13"
 optional = true
 
 [dependencies.cast]
@@ -58,8 +113,11 @@ version = "0.3"
 version = "0.2.0"
 
 [dependencies.clap]
-version = "4"
-features = ["std"]
+version = "4.5"
+features = [
+    "std",
+    "help",
+]
 default-features = false
 
 [dependencies.criterion-plot]
@@ -71,28 +129,23 @@ optional = true
 
 [dependencies.futures]
 version = "0.3"
+features = ["executor"]
 optional = true
-default_features = false
-
-[dependencies.is-terminal]
-version = "0.4.6"
+default-features = false
 
 [dependencies.itertools]
-version = "0.10"
+version = "0.13"
 
 [dependencies.num-traits]
 version = "0.2"
 features = ["std"]
 default-features = false
 
-[dependencies.once_cell]
-version = "1.14"
-
 [dependencies.oorandom]
 version = "11.1"
 
 [dependencies.plotters]
-version = "^0.3.1"
+version = "^0.3.2"
 features = [
     "svg_backend",
     "area_series",
@@ -106,21 +159,19 @@ version = "1.3"
 optional = true
 
 [dependencies.regex]
-version = "1.5"
+version = "1.5.1"
 features = ["std"]
 default-features = false
 
 [dependencies.serde]
-version = "1.0"
-
-[dependencies.serde_derive]
-version = "1.0"
+version = "1.0.100"
+features = ["derive"]
 
 [dependencies.serde_json]
-version = "1.0"
+version = "1.0.100"
 
 [dependencies.smol]
-version = "1.2"
+version = "2.0"
 optional = true
 default-features = false
 
@@ -141,8 +192,6 @@ version = "0.5.0"
 
 [dev-dependencies.futures]
 version = "0.3"
-features = ["executor"]
-default_features = false
 
 [dev-dependencies.quickcheck]
 version = "1.0"
@@ -152,43 +201,4 @@ default-features = false
 version = "0.8"
 
 [dev-dependencies.tempfile]
-version = "~3.5.0"
-
-[features]
-async = ["futures"]
-async_futures = [
-    "futures/executor",
-    "async",
-]
-async_smol = [
-    "smol",
-    "async",
-]
-async_std = [
-    "async-std",
-    "async",
-]
-async_tokio = [
-    "tokio",
-    "async",
-]
-cargo_bench_support = []
-csv_output = ["csv"]
-default = [
-    "rayon",
-    "plotters",
-    "cargo_bench_support",
-]
-html_reports = []
-real_blackbox = []
-stable = [
-    "csv_output",
-    "html_reports",
-    "async_futures",
-    "async_smol",
-    "async_tokio",
-    "async_std",
-]
-
-[badges.maintenance]
-status = "passively-maintained"
+version = "3.5.0"

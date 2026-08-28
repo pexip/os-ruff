@@ -202,7 +202,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 pub use crate::error::{Error, Result};
-pub use crate::lookahead::{Lookahead1, Peek};
+pub use crate::lookahead::{End, Lookahead1, Peek};
 
 /// Parsing interface implemented by all types that can be parsed in a default
 /// way from a token stream.
@@ -502,7 +502,7 @@ impl<'a> ParseBuffer<'a> {
     ///     }
     /// }
     /// ```
-    pub fn call<T>(&self, function: fn(ParseStream) -> Result<T>) -> Result<T> {
+    pub fn call<T>(&'a self, function: fn(ParseStream<'a>) -> Result<T>) -> Result<T> {
         function(self)
     }
 
@@ -732,8 +732,8 @@ impl<'a> ParseBuffer<'a> {
     /// }
     /// ```
     pub fn parse_terminated<T, P>(
-        &self,
-        parser: fn(ParseStream) -> Result<T>,
+        &'a self,
+        parser: fn(ParseStream<'a>) -> Result<T>,
         separator: P,
     ) -> Result<Punctuated<T, P::Token>>
     where
@@ -750,6 +750,11 @@ impl<'a> ParseBuffer<'a> {
     /// This method returns true upon reaching the end of the content within a
     /// set of delimiters, as well as at the end of the tokens provided to the
     /// outermost parsing entry point.
+    ///
+    /// This is equivalent to
+    /// <code>.<a href="#method.peek">peek</a>(<a href="struct.End.html">syn::parse::End</a>)</code>.
+    /// Use `.peek2(End)` or `.peek3(End)` to look for the end of a parse stream
+    /// further ahead than the current position.
     ///
     /// # Example
     ///
@@ -1236,14 +1241,14 @@ pub trait Parser: Sized {
 
     /// Parse a proc-macro2 token stream into the chosen syntax tree node.
     ///
-    /// This function will check that the input is fully parsed. If there are
-    /// any unparsed tokens at the end of the stream, an error is returned.
+    /// This function enforces that the input is fully parsed. If there are any
+    /// unparsed tokens at the end of the stream, an error is returned.
     fn parse2(self, tokens: TokenStream) -> Result<Self::Output>;
 
     /// Parse tokens of source code into the chosen syntax tree node.
     ///
-    /// This function will check that the input is fully parsed. If there are
-    /// any unparsed tokens at the end of the stream, an error is returned.
+    /// This function enforces that the input is fully parsed. If there are any
+    /// unparsed tokens at the end of the stream, an error is returned.
     #[cfg(feature = "proc-macro")]
     #[cfg_attr(docsrs, doc(cfg(feature = "proc-macro")))]
     fn parse(self, tokens: proc_macro::TokenStream) -> Result<Self::Output> {
@@ -1252,8 +1257,8 @@ pub trait Parser: Sized {
 
     /// Parse a string of Rust code into the chosen syntax tree node.
     ///
-    /// This function will check that the input is fully parsed. If there are
-    /// any unparsed tokens at the end of the string, an error is returned.
+    /// This function enforces that the input is fully parsed. If there are any
+    /// unparsed tokens at the end of the string, an error is returned.
     ///
     /// # Hygiene
     ///

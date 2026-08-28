@@ -1,26 +1,16 @@
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
-use alloc::string::{
-    String,
-    ToString,
-};
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::str::FromStr;
-use core::{
-    num,
-    slice,
-};
+use core::{num, slice};
 
 use proptest::collection::SizeRange;
 use proptest::prelude::*;
 use test_case::test_case;
 use test_strategy::proptest;
 
-use crate::{
-    format_compact,
-    CompactString,
-    ToCompactString,
-};
+use crate::{format_compact, CompactString, ToCompactString};
 
 #[cfg(target_pointer_width = "64")]
 const MAX_SIZE: usize = 24;
@@ -30,22 +20,24 @@ const MAX_SIZE: usize = 12;
 const SIXTEEN_MB: usize = 16 * 1024 * 1024;
 
 /// generates random unicode strings, upto 80 chars long
-pub fn rand_unicode() -> impl Strategy<Value = String> {
+pub(crate) fn rand_unicode() -> impl Strategy<Value = String> {
     proptest::collection::vec(proptest::char::any(), 0..80).prop_map(|v| v.into_iter().collect())
 }
 
 /// generates a random collection of bytes, upto 80 bytes long
-pub fn rand_bytes() -> impl Strategy<Value = Vec<u8>> {
+pub(crate) fn rand_bytes() -> impl Strategy<Value = Vec<u8>> {
     proptest::collection::vec(any::<u8>(), 0..80)
 }
 
 /// generates a random collection of `u16`s, upto 80 elements long
-pub fn rand_u16s() -> impl Strategy<Value = Vec<u16>> {
+pub(crate) fn rand_u16s() -> impl Strategy<Value = Vec<u16>> {
     proptest::collection::vec(any::<u16>(), 0..80)
 }
 
 /// [`proptest::strategy::Strategy`] that generates [`String`]s with up to `len` bytes
-pub fn rand_unicode_with_range(range: impl Into<SizeRange>) -> impl Strategy<Value = String> {
+pub(crate) fn rand_unicode_with_range(
+    range: impl Into<SizeRange>,
+) -> impl Strategy<Value = String> {
     proptest::collection::vec(proptest::char::any(), range).prop_map(|v| v.into_iter().collect())
 }
 
@@ -301,11 +293,11 @@ fn proptest_remove(#[strategy(rand_unicode_with_range(1..80))] mut control: Stri
 
 #[proptest]
 #[cfg_attr(miri, ignore)]
-fn proptest_from_utf8_unchecked(#[strategy(rand_bytes())] bytes: Vec<u8>) {
-    let compact = unsafe { CompactString::from_utf8_unchecked(&bytes) };
-    let std_str = unsafe { String::from_utf8_unchecked(bytes.clone()) };
+fn proptest_from_utf8_unchecked(#[strategy(rand_unicode())] std_str: String) {
+    let bytes = std_str.as_bytes();
+    let compact = unsafe { CompactString::from_utf8_unchecked(bytes) };
 
-    // we might not make valid strings, but we should be able to read the underlying bytes
+    // we should be able to read the underlying bytes
     assert_eq!(compact.as_bytes(), std_str.as_bytes());
     assert_eq!(compact.as_bytes(), bytes);
 
@@ -314,7 +306,7 @@ fn proptest_from_utf8_unchecked(#[strategy(rand_bytes())] bytes: Vec<u8>) {
 
     // check if we were valid UTF-8, if so, assert the data written into the CompactString is
     // correct
-    let data_is_valid = core::str::from_utf8(&bytes);
+    let data_is_valid = core::str::from_utf8(bytes);
     let compact_is_valid = core::str::from_utf8(compact.as_bytes());
     let std_str_is_valid = core::str::from_utf8(std_str.as_bytes());
 
@@ -1229,7 +1221,9 @@ fn test_into_string_empty_str() {
     let new_str_len = new_string.len();
     let new_str_cap = new_string.capacity();
 
-    assert_eq!(String::new().as_ptr(), new_str_addr);
+    let empty_string = String::new();
+
+    assert_eq!(empty_string.as_ptr(), new_str_addr);
     assert_eq!(str_len, new_str_len);
     assert_eq!(str_len, new_str_cap);
 }
@@ -1245,7 +1239,9 @@ fn test_into_string_empty_static_str() {
     let new_str_len = new_string.len();
     let new_str_cap = new_string.capacity();
 
-    assert_eq!(String::new().as_ptr(), new_str_addr);
+    let empty_string = String::new();
+
+    assert_eq!(empty_string.as_ptr(), new_str_addr);
     assert_eq!(str_len, new_str_len);
     assert_eq!(str_len, new_str_cap);
 }
@@ -1369,6 +1365,41 @@ fn test_insert(to_compact: fn(&'static str) -> CompactString) {
         s,
         "\u{ffff}\u{ffff}\u{ffff}\u{ffff}\u{ffff}\u{ffff}\u{ffff}\u{ffff}",
     );
+}
+
+#[test]
+#[cfg_attr(not(panic = "unwind"), ignore = "test requires unwinding support")]
+fn test_retain() {
+    let mut s = CompactString::from("α_β_γ");
+
+    s.retain(|_| true);
+    assert_eq!(s, "α_β_γ");
+
+    s.retain(|c| c != '_');
+    assert_eq!(s, "αβγ");
+
+    s.retain(|c| c != 'β');
+    assert_eq!(s, "αγ");
+
+    s.retain(|c| c == 'α');
+    assert_eq!(s, "α");
+
+    s.retain(|_| false);
+    assert_eq!(s, "");
+
+    let mut s = CompactString::from("0è0");
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut count = 0;
+        s.retain(|_| {
+            count += 1;
+            match count {
+                1 => false,
+                2 => true,
+                _ => panic!(),
+            }
+        });
+    }));
+    assert!(std::str::from_utf8(s.as_bytes()).is_ok());
 }
 
 #[test]
@@ -1941,7 +1972,7 @@ fn test_from_string_buffer_inlines_on_clone() {
 #[should_panic = "Cannot allocate memory to hold CompactString"]
 fn test_alloc_excessively_long_string() {
     // 2**56 - 2 bytes, the maximum number `Capacity` can hold
-    CompactString::with_capacity((1 << 56) - 2);
+    std::hint::black_box(CompactString::with_capacity((1 << 56) - 2));
 }
 
 // This feature was enabled by <https://github.com/rust-lang/rust/pull/94075> which was first

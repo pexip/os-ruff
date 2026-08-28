@@ -1,9 +1,9 @@
-use crate::{
-    hygiene::Hygiene,
-    options::Options,
-    salsa_struct::{SalsaStruct, SalsaStructAllowedOptions},
-};
 use proc_macro2::TokenStream;
+
+use crate::hygiene::Hygiene;
+use crate::options::Options;
+use crate::salsa_struct::{SalsaStruct, SalsaStructAllowedOptions};
+use crate::token_stream_with_error;
 
 /// For an entity struct `Foo` with fields `f1: T1, ..., fN: TN`, we generate...
 ///
@@ -16,7 +16,7 @@ pub(crate) fn input(
 ) -> proc_macro::TokenStream {
     let args = syn::parse_macro_input!(args as InputArgs);
     let hygiene = Hygiene::from1(&input);
-    let struct_item = syn::parse_macro_input!(input as syn::ItemStruct);
+    let struct_item = parse_macro_input!(input as syn::ItemStruct);
     let m = Macro {
         hygiene,
         args,
@@ -24,7 +24,7 @@ pub(crate) fn input(
     };
     match m.try_macro() {
         Ok(v) => v.into(),
-        Err(e) => e.to_compile_error().into(),
+        Err(e) => token_stream_with_error(input, e),
     }
 }
 
@@ -33,15 +33,17 @@ type InputArgs = Options<InputStruct>;
 struct InputStruct;
 
 impl crate::options::AllowedOptions for InputStruct {
-    const RETURN_REF: bool = false;
+    const RETURNS: bool = false;
 
     const SPECIFY: bool = false;
 
     const NO_EQ: bool = false;
 
-    const NO_DEBUG: bool = true;
+    const DEBUG: bool = true;
 
-    const NO_CLONE: bool = false;
+    const NO_LIFETIME: bool = false;
+
+    const NON_UPDATE_RETURN_TYPE: bool = false;
 
     const SINGLETON: bool = true;
 
@@ -49,19 +51,27 @@ impl crate::options::AllowedOptions for InputStruct {
 
     const DB: bool = false;
 
-    const RECOVERY_FN: bool = false;
+    const CYCLE_FN: bool = false;
+
+    const CYCLE_INITIAL: bool = false;
+
+    const CYCLE_RESULT: bool = false;
 
     const LRU: bool = false;
 
     const CONSTRUCTOR_NAME: bool = true;
+
+    const ID: bool = false;
 }
 
 impl SalsaStructAllowedOptions for InputStruct {
     const KIND: &'static str = "input";
 
-    const ALLOW_ID: bool = false;
+    const ALLOW_TRACKED: bool = false;
 
     const HAS_LIFETIME: bool = false;
+
+    const ELIDABLE_LIFETIME: bool = false;
 
     const ALLOW_DEFAULT: bool = true;
 }
@@ -91,6 +101,7 @@ impl Macro {
         let field_options = salsa_struct.field_options();
         let field_tys = salsa_struct.field_tys();
         let field_durability_ids = salsa_struct.field_durability_ids();
+        let field_attrs = salsa_struct.field_attrs();
         let is_singleton = self.args.singleton.is_some();
         let generate_debug_impl = salsa_struct.generate_debug_impl();
 
@@ -115,6 +126,7 @@ impl Macro {
                     field_setters: [#(#field_vis #field_setter_ids),*],
                     field_tys: [#(#field_tys),*],
                     field_indices: [#(#field_indices),*],
+                    field_attrs: [#([#(#field_attrs),*]),*],
                     required_fields: [#(#required_fields),*],
                     field_durability_ids: [#(#field_durability_ids),*],
                     num_fields: #num_fields,

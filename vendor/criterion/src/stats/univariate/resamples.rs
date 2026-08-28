@@ -13,7 +13,7 @@ where
     stage: Option<Vec<A>>,
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::should_implement_trait))]
+#[allow(clippy::should_implement_trait)]
 impl<'a, A> Resamples<'a, A>
 where
     A: 'a + Float,
@@ -38,7 +38,7 @@ where
 
                 for _ in 0..n {
                     let idx = rng.rand_range(0u64..(self.sample.len() as u64));
-                    stage.push(self.sample[idx as usize])
+                    stage.push(self.sample[idx as usize]);
                 }
 
                 self.stage = Some(stage);
@@ -46,13 +46,13 @@ where
             Some(ref mut stage) => {
                 for elem in stage.iter_mut() {
                     let idx = rng.rand_range(0u64..(self.sample.len() as u64));
-                    *elem = self.sample[idx as usize]
+                    *elem = self.sample[idx as usize];
                 }
             }
         }
 
         if let Some(ref v) = self.stage {
-            unsafe { mem::transmute::<&[_], _>(v) }
+            unsafe { mem::transmute::<&[A], &Sample<A>>(v) }
         } else {
             unreachable!();
         }

@@ -21,11 +21,12 @@ struct MyInput {
 
 #[salsa::tracked]
 struct MyTracked<'db> {
+    #[tracked]
     counter: usize,
 }
 
 #[salsa::tracked]
-fn function(db: &dyn Database, input: MyInput) -> usize {
+fn function(db: &dyn Database, input: MyInput) -> (usize, usize) {
     // Read input 1
     let _field1 = input.field1(db);
 
@@ -36,9 +37,17 @@ fn function(db: &dyn Database, input: MyInput) -> usize {
     // but which actually depends on the leaked value.
     let tracked = MyTracked::new(db, counter);
 
+    // Read the tracked field
+    let result = counter_field(db, tracked);
+
     // Read input 2. This will cause us to re-execute on revision 2.
     let _field2 = input.field2(db);
 
+    (result, tracked.counter(db))
+}
+
+#[salsa::tracked]
+fn counter_field<'db>(db: &'db dyn Database, tracked: MyTracked<'db>) -> usize {
     tracked.counter(db)
 }
 
@@ -50,11 +59,13 @@ fn test_leaked_inputs_ignored() {
     let result_in_rev_1 = function(&db, input);
     db.assert_logs(expect![[r#"
         [
-            "Event { thread_id: ThreadId(2), kind: WillCheckCancellation }",
-            "Event { thread_id: ThreadId(2), kind: WillExecute { database_key: function(0) } }",
+            "WillCheckCancellation",
+            "WillExecute { database_key: function(Id(0)) }",
+            "WillCheckCancellation",
+            "WillExecute { database_key: counter_field(Id(400)) }",
         ]"#]]);
 
-    assert_eq!(result_in_rev_1, 0);
+    assert_eq!(result_in_rev_1, (0, 0));
 
     // Modify field2 so that `function` is seen to have changed --
     // but only *after* the tracked struct is created.
@@ -66,14 +77,19 @@ fn test_leaked_inputs_ignored() {
     let result_in_rev_2 = function(&db, input);
     db.assert_logs(expect![[r#"
         [
-            "Event { thread_id: ThreadId(2), kind: DidSetCancellationFlag }",
-            "Event { thread_id: ThreadId(2), kind: WillCheckCancellation }",
-            "Event { thread_id: ThreadId(2), kind: WillExecute { database_key: function(0) } }",
+            "DidSetCancellationFlag",
+            "WillCheckCancellation",
+            "WillCheckCancellation",
+            "DidValidateMemoizedValue { database_key: counter_field(Id(400)) }",
+            "WillExecute { database_key: function(Id(0)) }",
+            "WillCheckCancellation",
         ]"#]]);
 
-    // Because salsa did not see any way for the tracked
-    // struct to have changed, its field values will not have
-    // been updated, even though in theory they would have
-    // the leaked value from the counter.
-    assert_eq!(result_in_rev_2, 0);
+    // Because salsa does not see any way for the tracked
+    // struct to have changed, it will re-use the cached return value
+    // from `counter_field` (`0`). This in turn "locks" the cached
+    // struct so that the new value of 100 is ignored.
+    //
+    // Contrast with preverify-struct-with-leaked-data-2.rs.
+    assert_eq!(result_in_rev_2, (0, 0));
 }

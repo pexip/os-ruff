@@ -15,35 +15,18 @@
 //! * Produces detailed charts, providing thorough understanding of your code's
 //!   performance behavior.
 
-#![warn(missing_docs)]
+#![warn(clippy::doc_markdown, missing_docs)]
 #![warn(bare_trait_objects)]
-#![cfg_attr(feature = "real_blackbox", feature(test))]
-#![cfg_attr(
-    feature = "cargo-clippy",
-    allow(
+#![allow(
         clippy::just_underscores_and_digits, // Used in the stats code
         clippy::transmute_ptr_to_ptr, // Used in the stats code
-        clippy::manual_non_exhaustive, // Remove when MSRV bumped above 1.40
-    )
 )]
 
 #[cfg(all(feature = "rayon", target_arch = "wasm32"))]
 compile_error!("Rayon cannot be used when targeting wasi32. Try disabling default features.");
 
-#[cfg(test)]
-extern crate approx;
-
-#[cfg(test)]
-extern crate quickcheck;
-
-use is_terminal::IsTerminal;
 use regex::Regex;
-
-#[cfg(feature = "real_blackbox")]
-extern crate test;
-
-#[macro_use]
-extern crate serde_derive;
+use serde::{Deserialize, Serialize};
 
 // Needs to be declared before other modules
 // in order to be usable there.
@@ -75,9 +58,8 @@ mod stats;
 
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::default::Default;
 use std::env;
-use std::io::stdout;
+use std::io::{stdout, IsTerminal};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -85,7 +67,7 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
 use criterion_plot::{Version, VersionError};
-use once_cell::sync::Lazy;
+use std::sync::OnceLock;
 
 use crate::benchmark::BenchmarkConfig;
 use crate::connection::Connection;
@@ -103,77 +85,79 @@ pub use crate::bencher::AsyncBencher;
 pub use crate::bencher::Bencher;
 pub use crate::benchmark_group::{BenchmarkGroup, BenchmarkId};
 
-static DEBUG_ENABLED: Lazy<bool> = Lazy::new(|| std::env::var_os("CRITERION_DEBUG").is_some());
-static GNUPLOT_VERSION: Lazy<Result<Version, VersionError>> = Lazy::new(criterion_plot::version);
-static DEFAULT_PLOTTING_BACKEND: Lazy<PlottingBackend> = Lazy::new(|| match &*GNUPLOT_VERSION {
-    Ok(_) => PlottingBackend::Gnuplot,
-    #[cfg(feature = "plotters")]
-    Err(e) => {
-        match e {
-            VersionError::Exec(_) => eprintln!("Gnuplot not found, using plotters backend"),
-            e => eprintln!(
-                "Gnuplot not found or not usable, using plotters backend\n{}",
-                e
-            ),
-        };
-        PlottingBackend::Plotters
-    }
-    #[cfg(not(feature = "plotters"))]
-    Err(_) => PlottingBackend::None,
-});
-static CARGO_CRITERION_CONNECTION: Lazy<Option<Mutex<Connection>>> =
-    Lazy::new(|| match std::env::var("CARGO_CRITERION_PORT") {
+fn gnuplot_version() -> &'static Result<Version, VersionError> {
+    static GNUPLOT_VERSION: OnceLock<Result<Version, VersionError>> = OnceLock::new();
+
+    GNUPLOT_VERSION.get_or_init(criterion_plot::version)
+}
+
+fn default_plotting_backend() -> &'static PlottingBackend {
+    static DEFAULT_PLOTTING_BACKEND: OnceLock<PlottingBackend> = OnceLock::new();
+
+    DEFAULT_PLOTTING_BACKEND.get_or_init(|| match gnuplot_version() {
+        Ok(_) => PlottingBackend::Gnuplot,
+        #[cfg(feature = "plotters")]
+        Err(e) => {
+            match e {
+                VersionError::Exec(_) => eprintln!("Gnuplot not found, using plotters backend"),
+                e => eprintln!(
+                    "Gnuplot not found or not usable, using plotters backend\n{}",
+                    e
+                ),
+            };
+            PlottingBackend::Plotters
+        }
+        #[cfg(not(feature = "plotters"))]
+        Err(_) => PlottingBackend::None,
+    })
+}
+
+fn cargo_criterion_connection() -> &'static Option<Mutex<Connection>> {
+    static CARGO_CRITERION_CONNECTION: OnceLock<Option<Mutex<Connection>>> = OnceLock::new();
+
+    CARGO_CRITERION_CONNECTION.get_or_init(|| match std::env::var("CARGO_CRITERION_PORT") {
         Ok(port_str) => {
             let port: u16 = port_str.parse().ok()?;
             let stream = TcpStream::connect(("localhost", port)).ok()?;
             Some(Mutex::new(Connection::new(stream).ok()?))
         }
         Err(_) => None,
-    });
-static DEFAULT_OUTPUT_DIRECTORY: Lazy<PathBuf> = Lazy::new(|| {
-    // Set criterion home to (in descending order of preference):
-    // - $CRITERION_HOME (cargo-criterion sets this, but other users could as well)
-    // - $CARGO_TARGET_DIR/criterion
-    // - the cargo target dir from `cargo metadata`
-    // - ./target/criterion
-    if let Some(value) = env::var_os("CRITERION_HOME") {
-        PathBuf::from(value)
-    } else if let Some(path) = cargo_target_directory() {
-        path.join("criterion")
-    } else {
-        PathBuf::from("target/criterion")
-    }
-});
+    })
+}
+
+fn default_output_directory() -> &'static PathBuf {
+    static DEFAULT_OUTPUT_DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
+
+    DEFAULT_OUTPUT_DIRECTORY.get_or_init(|| {
+        // Set criterion home to (in descending order of preference):
+        // - $CRITERION_HOME (cargo-criterion sets this, but other users could as well)
+        // - $CARGO_TARGET_DIR/criterion
+        // - the cargo target dir from `cargo metadata`
+        // - ./target/criterion
+        if let Some(value) = env::var_os("CRITERION_HOME") {
+            PathBuf::from(value)
+        } else if let Some(path) = cargo_target_directory() {
+            path.join("criterion")
+        } else {
+            PathBuf::from("target/criterion")
+        }
+    })
+}
 
 fn debug_enabled() -> bool {
-    *DEBUG_ENABLED
+    static DEBUG_ENABLED: OnceLock<bool> = OnceLock::new();
+
+    *DEBUG_ENABLED.get_or_init(|| std::env::var_os("CRITERION_DEBUG").is_some())
 }
 
 /// A function that is opaque to the optimizer, used to prevent the compiler from
 /// optimizing away computations in a benchmark.
-///
-/// This variant is backed by the (unstable) test::black_box function.
-#[cfg(feature = "real_blackbox")]
+#[deprecated(note = "use `std::hint::black_box()` instead")]
 pub fn black_box<T>(dummy: T) -> T {
-    test::black_box(dummy)
+    std::hint::black_box(dummy)
 }
 
-/// A function that is opaque to the optimizer, used to prevent the compiler from
-/// optimizing away computations in a benchmark.
-///
-/// This variant is stable-compatible, but it may cause some performance overhead
-/// or fail to prevent code from being eliminated.
-#[cfg(not(feature = "real_blackbox"))]
-pub fn black_box<T>(dummy: T) -> T {
-    unsafe {
-        let ret = std::ptr::read_volatile(&dummy);
-        std::mem::forget(dummy);
-        ret
-    }
-}
-
-/// Argument to [`Bencher::iter_batched`](struct.Bencher.html#method.iter_batched) and
-/// [`Bencher::iter_batched_ref`](struct.Bencher.html#method.iter_batched_ref) which controls the
+/// Argument to [`Bencher::iter_batched`] and [`Bencher::iter_batched_ref`] which controls the
 /// batch size.
 ///
 /// Generally speaking, almost all benchmarks should use `SmallInput`. If the input or the result
@@ -193,7 +177,7 @@ pub fn black_box<T>(dummy: T) -> T {
 ///
 /// With that said, if the runtime of your function is small relative to the measurement overhead
 /// it will be difficult to take accurate measurements. In this situation, the best option is to use
-/// [`Bencher::iter`](struct.Bencher.html#method.iter) which has next-to-zero measurement overhead.
+/// [`Bencher::iter`] which has next-to-zero measurement overhead.
 #[derive(Debug, Eq, PartialEq, Copy, Hash, Clone)]
 pub enum BatchSize {
     /// `SmallInput` indicates that the input to the benchmark routine (the value returned from
@@ -258,29 +242,31 @@ impl BatchSize {
     }
 }
 
-/// Baseline describes how the baseline_directory is handled.
+/// Baseline describes how the `baseline_directory` is handled.
 #[derive(Debug, Clone, Copy)]
 pub enum Baseline {
-    /// CompareLenient compares against a previous saved version of the baseline.
+    /// `CompareLenient` compares against a previous saved version of the baseline.
     /// If a previous baseline does not exist, the benchmark is run as normal but no comparison occurs.
     CompareLenient,
-    /// CompareStrict compares against a previous saved version of the baseline.
+    /// `CompareStrict` compares against a previous saved version of the baseline.
     /// If a previous baseline does not exist, a panic occurs.
     CompareStrict,
-    /// Save writes the benchmark results to the baseline directory,
+    /// `Save` writes the benchmark results to the baseline directory,
     /// overwriting any results that were previously there.
     Save,
-    /// Discard benchmark results.
+    /// `Discard` benchmark results.
     Discard,
 }
 
 /// Enum used to select the plotting backend.
+///
+/// See [`Criterion::plotting_backend`].
 #[derive(Debug, Clone, Copy)]
 pub enum PlottingBackend {
     /// Plotting backend which uses the external `gnuplot` command to render plots. This is the
     /// default if the `gnuplot` command is installed.
     Gnuplot,
-    /// Plotting backend which uses the rust 'Plotters' library. This is the default if `gnuplot`
+    /// Plotting backend which uses the Rust 'Plotters' library. This is the default if `gnuplot`
     /// is not installed.
     Plotters,
     /// Null plotting backend which outputs nothing,
@@ -321,20 +307,15 @@ impl Mode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 /// Enum representing the list format.
 pub(crate) enum ListFormat {
     /// The regular, default format.
+    #[default]
     Pretty,
     /// The terse format, where nothing other than the name of the test and ": benchmark" at the end
     /// is printed out.
     Terse,
-}
-
-impl Default for ListFormat {
-    fn default() -> Self {
-        Self::Pretty
-    }
 }
 
 /// Benchmark filtering support.
@@ -357,13 +338,13 @@ pub enum BenchmarkFilter {
 /// Each benchmark consists of four phases:
 ///
 /// - **Warm-up**: The routine is repeatedly executed, to let the CPU/OS/JIT/interpreter adapt to
-/// the new load
+///   the new load
 /// - **Measurement**: The routine is repeatedly executed, and timing information is collected into
-/// a sample
+///   a sample
 /// - **Analysis**: The sample is analyzed and distilled into meaningful statistics that get
-/// reported to stdout, stored in files, and plotted
+///   reported to stdout, stored in files, and plotted
 /// - **Comparison**: The current sample is compared with the sample obtained in the previous
-/// benchmark.
+///   benchmark.
 pub struct Criterion<M: Measurement = WallTime> {
     config: BenchmarkConfig,
     filter: BenchmarkFilter,
@@ -418,7 +399,7 @@ impl Default for Criterion {
             cli: CliReport::new(false, false, CliVerbosity::Normal),
             bencher_enabled: false,
             bencher: BencherReport,
-            html: DEFAULT_PLOTTING_BACKEND.create_plotter().map(Html::new),
+            html: default_plotting_backend().create_plotter().map(Html::new),
             csv_enabled: cfg!(feature = "csv_output"),
         };
 
@@ -439,12 +420,12 @@ impl Default for Criterion {
             baseline_directory: "base".to_owned(),
             baseline: Baseline::Save,
             load_baseline: None,
-            output_directory: DEFAULT_OUTPUT_DIRECTORY.clone(),
+            output_directory: default_output_directory().clone(),
             all_directories: HashSet::new(),
             all_titles: HashSet::new(),
             measurement: WallTime,
             profiler: Box::new(RefCell::new(ExternalProfiler)),
-            connection: CARGO_CRITERION_CONNECTION
+            connection: cargo_criterion_connection()
                 .as_ref()
                 .map(|mtx| mtx.lock().unwrap()),
             mode: Mode::Benchmark,
@@ -463,7 +444,7 @@ impl Default for Criterion {
 
 impl<M: Measurement> Criterion<M> {
     /// Changes the measurement for the benchmarks run with this runner. See the
-    /// Measurement trait for more details
+    /// [`Measurement`] trait for more details
     pub fn with_measurement<M2: Measurement>(self, m: M2) -> Criterion<M2> {
         // Can't use struct update syntax here because they're technically different types.
         Criterion {
@@ -485,7 +466,7 @@ impl<M: Measurement> Criterion<M> {
 
     #[must_use]
     /// Changes the internal profiler for benchmarks run with this runner. See
-    /// the Profiler trait for more details.
+    /// the [`Profiler`] trait for more details.
     pub fn with_profiler<P: Profiler + 'static>(self, p: P) -> Criterion<M> {
         Criterion {
             profiler: Box::new(RefCell::new(p)),
@@ -494,14 +475,16 @@ impl<M: Measurement> Criterion<M> {
     }
 
     #[must_use]
-    /// Set the plotting backend. By default, Criterion will use gnuplot if available, or plotters
-    /// if not.
+    /// Set the [plotting backend]. By default, Criterion will use `gnuplot` if available,
+    /// or `plotters` if not.
     ///
-    /// Panics if `backend` is `PlottingBackend::Gnuplot` and gnuplot is not available.
+    /// Panics if `backend` is [`PlottingBackend::Gnuplot`] and `gnuplot` is not available.
+    ///
+    /// [plotting backend]: PlottingBackend
     pub fn plotting_backend(mut self, backend: PlottingBackend) -> Criterion<M> {
         if let PlottingBackend::Gnuplot = backend {
             assert!(
-                !GNUPLOT_VERSION.is_err(),
+                !gnuplot_version().is_err(),
                 "Gnuplot plotting backend was requested, but gnuplot is not available. \
                 To continue, either install Gnuplot or allow Criterion.rs to fall back \
                 to using plotters."
@@ -655,7 +638,7 @@ impl<M: Measurement> Criterion<M> {
     pub fn with_plots(mut self) -> Criterion<M> {
         // If running under cargo-criterion then don't re-enable the reports; let it do the reporting.
         if self.connection.is_none() && self.report.html.is_none() {
-            let default_backend = DEFAULT_PLOTTING_BACKEND.create_plotter();
+            let default_backend = default_plotting_backend().create_plotter();
             if let Some(backend) = default_backend {
                 self.report.html = Some(Html::new(backend));
             } else {
@@ -731,7 +714,7 @@ impl<M: Measurement> Criterion<M> {
     #[must_use]
     #[doc(hidden)]
     pub fn output_directory(mut self, path: &Path) -> Criterion<M> {
-        self.output_directory = path.to_owned();
+        path.clone_into(&mut self.output_directory);
 
         self
     }
@@ -766,7 +749,7 @@ impl<M: Measurement> Criterion<M> {
     /// Configure this criterion struct based on the command-line arguments to
     /// this process.
     #[must_use]
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::cognitive_complexity))]
+    #[allow(clippy::cognitive_complexity)]
     pub fn configure_from_args(mut self) -> Criterion<M> {
         use clap::{value_parser, Arg, Command};
         let matches = Command::new("Criterion Benchmark")
@@ -906,6 +889,11 @@ impl<M: Measurement> Criterion<M> {
                 .num_args(0)
                 .hide(true)
                 .help("Ignored, but added for compatibility with libtest."))
+            .arg(Arg::new("include-ignored")
+                .long("include-ignored")
+                .num_args(0)
+                .hide(true)
+                .help("Ignored, but added for compatibility with libtest."))
             .arg(Arg::new("version")
                 .hide(true)
                 .short('V')
@@ -950,7 +938,7 @@ https://bheisler.github.io/criterion.rs/book/faq.html
             if matches.contains_id("baseline")
                 || matches
                     .get_one::<String>("save-baseline")
-                    .map_or(false, |base| base != "base")
+                    .is_some_and(|base| base != "base")
                 || matches.contains_id("load-baseline")
             {
                 eprintln!("Error: baselines are not supported when running with cargo-criterion.");
@@ -1032,18 +1020,18 @@ https://bheisler.github.io/criterion.rs/book/faq.html
 
         if let Some(dir) = matches.get_one::<String>("save-baseline") {
             self.baseline = Baseline::Save;
-            self.baseline_directory = dir.to_owned()
+            dir.clone_into(&mut self.baseline_directory);
         }
         if matches.get_flag("discard-baseline") {
             self.baseline = Baseline::Discard;
         }
         if let Some(dir) = matches.get_one::<String>("baseline") {
             self.baseline = Baseline::CompareStrict;
-            self.baseline_directory = dir.to_owned();
+            dir.clone_into(&mut self.baseline_directory);
         }
         if let Some(dir) = matches.get_one::<String>("baseline-lenient") {
             self.baseline = Baseline::CompareLenient;
-            self.baseline_directory = dir.to_owned();
+            dir.clone_into(&mut self.baseline_directory);
         }
 
         if self.connection.is_some() {
@@ -1159,8 +1147,7 @@ https://bheisler.github.io/criterion.rs/book/faq.html
     /// # Examples:
     ///
     /// ```rust
-    /// #[macro_use] extern crate criterion;
-    /// use self::criterion::*;
+    /// use criterion::{criterion_group, criterion_main, Criterion};
     ///
     /// fn bench_simple(c: &mut Criterion) {
     ///     let mut group = c.benchmark_group("My Group");
@@ -1168,7 +1155,7 @@ https://bheisler.github.io/criterion.rs/book/faq.html
     ///     // Now we can perform benchmarks with this group
     ///     group.bench_function("Bench 1", |b| b.iter(|| 1 ));
     ///     group.bench_function("Bench 2", |b| b.iter(|| 2 ));
-    ///    
+    ///
     ///     group.finish();
     /// }
     /// criterion_group!(benches, bench_simple);
@@ -1192,13 +1179,13 @@ impl<M> Criterion<M>
 where
     M: Measurement + 'static,
 {
-    /// Benchmarks a function. For comparing multiple functions, see `benchmark_group`.
+    /// Benchmarks a function. For comparing multiple functions, see
+    /// [`benchmark_group`](Self::benchmark_group).
     ///
     /// # Example
     ///
     /// ```rust
-    /// #[macro_use] extern crate criterion;
-    /// use self::criterion::*;
+    /// use criterion::{criterion_group, criterion_main, Criterion};
     ///
     /// fn bench(c: &mut Criterion) {
     ///     // Setup (construct data, allocate memory, etc)
@@ -1223,13 +1210,12 @@ where
     }
 
     /// Benchmarks a function with an input. For comparing multiple functions or multiple inputs,
-    /// see `benchmark_group`.
+    /// see [`benchmark_group`](Self::benchmark_group).
     ///
     /// # Example
     ///
     /// ```rust
-    /// #[macro_use] extern crate criterion;
-    /// use self::criterion::*;
+    /// use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
     ///
     /// fn bench(c: &mut Criterion) {
     ///     // Setup (construct data, allocate memory, etc)
@@ -1290,10 +1276,11 @@ pub enum Throughput {
     Elements(u64),
 }
 
-/// Axis scaling type
-#[derive(Debug, Clone, Copy)]
+/// Axis scaling type. Specified via [`PlotConfiguration::summary_scale`].
+#[derive(Debug, Default, Clone, Copy)]
 pub enum AxisScale {
     /// Axes scale linearly
+    #[default]
     Linear,
 
     /// Axes scale logarithmically
@@ -1315,24 +1302,20 @@ pub enum AxisScale {
 /// benchmark_group.plot_config(plot_config);
 /// // Use benchmark group
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct PlotConfiguration {
     summary_scale: AxisScale,
 }
 
-impl Default for PlotConfiguration {
-    fn default() -> PlotConfiguration {
-        PlotConfiguration {
-            summary_scale: AxisScale::Linear,
-        }
-    }
-}
-
 impl PlotConfiguration {
     #[must_use]
-    /// Set the axis scale (linear or logarithmic) for the summary plots. Typically, you would
-    /// set this to logarithmic if benchmarking over a range of inputs which scale exponentially.
-    /// Defaults to linear.
+    /// Set the axis scale ([linear] or [logarithmic]) for the summary plots.
+    ///
+    /// Typically, you would set this to logarithmic if benchmarking over a
+    /// range of inputs which scale exponentially. Defaults to [`AxisScale::Linear`].
+    ///
+    /// [linear]: AxisScale::Linear
+    /// [logarithmic]: AxisScale::Logarithmic
     pub fn summary_scale(mut self, new_scale: AxisScale) -> PlotConfiguration {
         self.summary_scale = new_scale;
         self
@@ -1340,12 +1323,13 @@ impl PlotConfiguration {
 }
 
 /// This enum allows the user to control how Criterion.rs chooses the iteration count when sampling.
-/// The default is Auto, which will choose a method automatically based on the iteration time during
+/// The default is `Auto`, which will choose a method automatically based on the iteration time during
 /// the warm-up phase.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum SamplingMode {
     /// Criterion.rs should choose a sampling method automatically. This is the default, and is
     /// recommended for most users and most benchmarks.
+    #[default]
     Auto,
 
     /// Scale the iteration count in each sample linearly. This is suitable for most benchmarks,
@@ -1354,10 +1338,11 @@ pub enum SamplingMode {
 
     /// Keep the iteration count the same for all samples. This is not recommended, as it affects
     /// the statistics that Criterion.rs can compute. However, it requires fewer iterations than
-    /// the Linear method and therefore is more suitable for very long-running benchmarks where
+    /// the `Linear` method and therefore is more suitable for very long-running benchmarks where
     /// benchmark execution time is more of a problem and statistical precision is less important.
     Flat,
 }
+
 impl SamplingMode {
     pub(crate) fn choose_sampling_mode(
         &self,
@@ -1391,6 +1376,7 @@ pub(crate) enum ActualSamplingMode {
     Linear,
     Flat,
 }
+
 impl ActualSamplingMode {
     pub(crate) fn iteration_counts(
         &self,

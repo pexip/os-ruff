@@ -2,47 +2,82 @@
 #[macro_export]
 macro_rules! setup_tracked_struct {
     (
-        // Attributes on the function
+        // Attributes on the function.
         attrs: [$(#[$attr:meta]),*],
 
-        // Visibility of the struct
+        // Visibility of the struct.
         vis: $vis:vis,
 
-        // Name of the struct
+        // Name of the struct.
         Struct: $Struct:ident,
 
-        // Name of the `'db` lifetime that the user gave
+        // Name of the `'db` lifetime that the user gave.
         db_lt: $db_lt:lifetime,
 
-        // Name user gave for `new`
+        // Name user gave for `new`.
         new_fn: $new_fn:ident,
 
-        // Field names
+        // Field names.
         field_ids: [$($field_id:ident),*],
 
-        // Field names
-        field_getters: [$($field_getter_vis:vis $field_getter_id:ident),*],
+        // Tracked field names.
+        tracked_ids: [$($tracked_id:ident),*],
 
-        // Field types, may reference `db_lt`
+        // Visibility and names of tracked fields.
+        tracked_getters: [$($tracked_getter_vis:vis $tracked_getter_id:ident),*],
+
+        // Visibility and names of untracked fields.
+        untracked_getters: [$($untracked_getter_vis:vis $untracked_getter_id:ident),*],
+
+        // Field types, may reference `db_lt`.
         field_tys: [$($field_ty:ty),*],
+
+        // Tracked field types.
+        tracked_tys: [$($tracked_ty:ty),*],
+
+        // Untracked field types.
+        untracked_tys: [$($untracked_ty:ty),*],
 
         // Indices for each field from 0..N -- must be unsuffixed (e.g., `0`, `1`).
         field_indices: [$($field_index:tt),*],
 
-        // Indices of fields to be used for id computations
-        id_field_indices: [$($id_field_index:tt),*],
+        // Absolute indices of any tracked fields, relative to all other fields of this struct.
+        absolute_tracked_indices: [$($absolute_tracked_index:tt),*],
 
-        // A set of "field options". Each field option is a tuple `(maybe_clone, maybe_backdate)` where:
+        // Indices of any tracked fields, relative to only tracked fields on this struct.
+        relative_tracked_indices: [$($relative_tracked_index:tt),*],
+
+        // Absolute indices of any untracked fields.
+        absolute_untracked_indices: [$($absolute_untracked_index:tt),*],
+
+        // A set of "field options" for each tracked field.
         //
-        // * `maybe_clone` is either the identifier `clone` or `no_clone`
+        // Each field option is a tuple `(return_mode, maybe_backdate)` where:
+        //
+        // * `return_mode` is an identifier as specified in `salsa_macros::options::Option::returns`
         // * `maybe_backdate` is either the identifier `backdate` or `no_backdate`
         //
         // These are used to drive conditional logic for each field via recursive macro invocation
-        // (see e.g. @maybe_clone below).
-        field_options: [$($field_option:tt),*],
+        // (see e.g. @return_mode below).
+        tracked_options: [$($tracked_option:tt),*],
 
-        // Number of fields
-        num_fields: $N:literal,
+        // A set of "field options" for each untracked field.
+        //
+        // Each field option is a tuple `(return_mode, maybe_backdate)` where:
+        //
+        // * `return_mode` is an identifier as specified in `salsa_macros::options::Option::returns`
+        // * `maybe_backdate` is either the identifier `backdate` or `no_backdate`
+        //
+        // These are used to drive conditional logic for each field via recursive macro invocation
+        // (see e.g. @return_mode below).
+        untracked_options: [$($untracked_option:tt),*],
+
+        // Attrs for each field.
+        tracked_field_attrs: [$([$(#[$tracked_field_attr:meta]),*]),*],
+        untracked_field_attrs: [$([$(#[$untracked_field_attr:meta]),*]),*],
+
+        // Number of tracked fields.
+        num_tracked_fields: $N:literal,
 
         // If true, generate a debug impl.
         generate_debug_impl: $generate_debug_impl:tt,
@@ -56,14 +91,13 @@ macro_rules! setup_tracked_struct {
             $Configuration:ident,
             $CACHE:ident,
             $Db:ident,
-            $NonNull:ident,
             $Revision:ident,
         ]
     ) => {
         $(#[$attr])*
-        #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Copy, Clone, PartialEq, Eq, Hash)]
         $vis struct $Struct<$db_lt>(
-            std::ptr::NonNull<salsa::plumbing::tracked_struct::Value < $Struct<'static> >>,
+            salsa::Id,
             std::marker::PhantomData < & $db_lt salsa::plumbing::tracked_struct::Value < $Struct<'static> > >
         );
 
@@ -73,37 +107,36 @@ macro_rules! setup_tracked_struct {
             use salsa::plumbing as $zalsa;
             use $zalsa::tracked_struct as $zalsa_struct;
             use $zalsa::Revision as $Revision;
-            use std::ptr::NonNull as $NonNull;
 
             type $Configuration = $Struct<'static>;
 
             impl $zalsa_struct::Configuration for $Configuration {
+                const LOCATION: $zalsa::Location = $zalsa::Location {
+                    file: file!(),
+                    line: line!(),
+                };
                 const DEBUG_NAME: &'static str = stringify!($Struct);
 
-                const FIELD_DEBUG_NAMES: &'static [&'static str] = &[
-                    $(stringify!($field_id),)*
+                const TRACKED_FIELD_NAMES: &'static [&'static str] = &[
+                    $(stringify!($tracked_id),)*
+                ];
+
+                const TRACKED_FIELD_INDICES: &'static [usize] = &[
+                    $($relative_tracked_index,)*
                 ];
 
                 type Fields<$db_lt> = ($($field_ty,)*);
 
-                type Revisions = $zalsa::Array<$Revision, $N>;
+                type Revisions = [$Revision; $N];
 
                 type Struct<$db_lt> = $Struct<$db_lt>;
 
-                unsafe fn struct_from_raw<$db_lt>(ptr: $NonNull<$zalsa_struct::Value<Self>>) -> Self::Struct<$db_lt> {
-                    $Struct(ptr, std::marker::PhantomData)
-                }
-
-                fn deref_struct(s: Self::Struct<'_>) -> &$zalsa_struct::Value<Self> {
-                    unsafe { s.0.as_ref() }
-                }
-
-                fn id_fields(fields: &Self::Fields<'_>) -> impl std::hash::Hash {
-                    ( $( &fields.$id_field_index ),* )
+                fn untracked_fields(fields: &Self::Fields<'_>) -> impl std::hash::Hash {
+                    ( $( &fields.$absolute_untracked_index ),* )
                 }
 
                 fn new_revisions(current_revision: $Revision) -> Self::Revisions {
-                    $zalsa::Array::new([current_revision; $N])
+                    [current_revision; $N]
                 }
 
                 unsafe fn update_fields<$db_lt>(
@@ -111,55 +144,83 @@ macro_rules! setup_tracked_struct {
                     revisions: &mut Self::Revisions,
                     old_fields: *mut Self::Fields<$db_lt>,
                     new_fields: Self::Fields<$db_lt>,
-                ) {
+                ) -> bool {
                     use $zalsa::UpdateFallback as _;
                     unsafe {
                         $(
                             $crate::maybe_backdate!(
-                                $field_option,
-                                $field_ty,
-                                (*old_fields).$field_index,
-                                new_fields.$field_index,
-                                revisions[$field_index],
+                                $tracked_option,
+                                $tracked_ty,
+                                (*old_fields).$absolute_tracked_index,
+                                new_fields.$absolute_tracked_index,
+                                revisions[$relative_tracked_index],
                                 current_revision,
                                 $zalsa,
                             );
-                        )*
+                        )*;
+
+                        // If any untracked field has changed, return `true`, indicating that the tracked struct
+                        // itself should be considered changed.
+                        $(
+                            $zalsa::UpdateDispatch::<$untracked_ty>::maybe_update(
+                                &mut (*old_fields).$absolute_untracked_index,
+                                new_fields.$absolute_untracked_index,
+                            )
+                            |
+                        )* false
                     }
                 }
             }
 
             impl $Configuration {
-                pub fn ingredient(db: &dyn $zalsa::Database) -> &$zalsa_struct::IngredientImpl<$Configuration> {
+                pub fn ingredient(db: &dyn $zalsa::Database) -> &$zalsa_struct::IngredientImpl<Self> {
+                    Self::ingredient_(db.zalsa())
+                }
+
+                fn ingredient_(zalsa: &$zalsa::Zalsa) -> &$zalsa_struct::IngredientImpl<Self> {
                     static CACHE: $zalsa::IngredientCache<$zalsa_struct::IngredientImpl<$Configuration>> =
                         $zalsa::IngredientCache::new();
-                    CACHE.get_or_create(db, || {
-                        db.zalsa().add_or_lookup_jar_by_type(&<$zalsa_struct::JarImpl::<$Configuration>>::default())
+
+                    CACHE.get_or_create(zalsa, || {
+                        zalsa.add_or_lookup_jar_by_type::<$zalsa_struct::JarImpl<$Configuration>>()
                     })
                 }
             }
 
-            impl<$db_lt> $zalsa::LookupId<$db_lt> for $Struct<$db_lt> {
-                fn lookup_id(id: salsa::Id, db: &$db_lt dyn $zalsa::Database) -> Self {
-                    $Configuration::ingredient(db).lookup_struct(db, id)
+            impl<$db_lt> $zalsa::FromId for $Struct<$db_lt> {
+                #[inline]
+                fn from_id(id: salsa::Id) -> Self {
+                    $Struct(id, std::marker::PhantomData)
                 }
             }
 
             impl $zalsa::AsId for $Struct<'_> {
+                #[inline]
                 fn as_id(&self) -> $zalsa::Id {
-                    unsafe { self.0.as_ref() }.as_id()
+                    self.0
                 }
             }
 
             impl $zalsa::SalsaStructInDb for $Struct<'_> {
-                fn register_dependent_fn(db: &dyn $zalsa::Database, index: $zalsa::IngredientIndex) {
-                    $Configuration::ingredient(db).register_dependent_fn(index)
+                type MemoIngredientMap = $zalsa::MemoIngredientSingletonIndex;
+
+                fn lookup_or_create_ingredient_index(aux: &$zalsa::Zalsa) -> $zalsa::IngredientIndices {
+                    aux.add_or_lookup_jar_by_type::<$zalsa_struct::JarImpl<$Configuration>>().into()
+                }
+
+                #[inline]
+                fn cast(id: $zalsa::Id, type_id: $zalsa::TypeId) -> $zalsa::Option<Self> {
+                    if type_id == $zalsa::TypeId::of::<$Struct<'static>>() {
+                        $zalsa::Some(<$Struct<'static> as $zalsa::FromId>::from_id(id))
+                    } else {
+                        $zalsa::None
+                    }
                 }
             }
 
             impl $zalsa::TrackedStructInDb for $Struct<'_> {
-                fn database_key_index(db: &dyn $zalsa::Database, id: $zalsa::Id) -> $zalsa::DatabaseKeyIndex {
-                    $Configuration::ingredient(db).database_key_index(id)
+                fn database_key_index(zalsa: &$zalsa::Zalsa, id: $zalsa::Id) -> $zalsa::DatabaseKeyIndex {
+                    $Configuration::ingredient_(zalsa).database_key_index(id)
                 }
             }
 
@@ -199,24 +260,53 @@ macro_rules! setup_tracked_struct {
                 }
 
                 $(
-                    $field_getter_vis fn $field_getter_id<$Db>(&self, db: &$db_lt $Db) -> $crate::maybe_cloned_ty!($field_option, $db_lt, $field_ty)
+                    $(#[$tracked_field_attr])*
+                    $tracked_getter_vis fn $tracked_getter_id<$Db>(self, db: &$db_lt $Db) -> $crate::return_mode_ty!($tracked_option, $db_lt, $tracked_ty)
                     where
                         // FIXME(rust-lang/rust#65991): The `db` argument *should* have the type `dyn Database`
                         $Db: ?Sized + $zalsa::Database,
                     {
-                        let fields = unsafe { self.0.as_ref() }.field(db.as_dyn_database(), $field_index);
-                        $crate::maybe_clone!(
-                            $field_option,
-                            $field_ty,
-                            &fields.$field_index,
+                        let db = db.as_dyn_database();
+                        let fields = $Configuration::ingredient(db).tracked_field(db, self, $relative_tracked_index);
+                        $crate::return_mode_expression!(
+                            $tracked_option,
+                            $tracked_ty,
+                            &fields.$absolute_tracked_index,
                         )
                     }
                 )*
 
+                $(
+                    $(#[$untracked_field_attr])*
+                    $untracked_getter_vis fn $untracked_getter_id<$Db>(self, db: &$db_lt $Db) -> $crate::return_mode_ty!($untracked_option, $db_lt, $untracked_ty)
+                    where
+                        // FIXME(rust-lang/rust#65991): The `db` argument *should* have the type `dyn Database`
+                        $Db: ?Sized + $zalsa::Database,
+                    {
+                        let db = db.as_dyn_database();
+                        let fields = $Configuration::ingredient(db).untracked_field(db, self);
+                        $crate::return_mode_expression!(
+                            $untracked_option,
+                            $untracked_ty,
+                            &fields.$absolute_untracked_index,
+                        )
+                    }
+                )*
+            }
+
+            #[allow(unused_lifetimes)]
+            impl<'_db> $Struct<'_db> {
                 /// Default debug formatting for this struct (may be useful if you define your own `Debug` impl)
-                pub fn default_debug_fmt(this: Self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                pub fn default_debug_fmt(this: Self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+                where
+                    // `zalsa::with_attached_database` has a local lifetime for the database
+                    // so we need this function to be higher-ranked over the db lifetime
+                    // Thus the actual lifetime of `Self` does not matter here so we discard
+                    // it with the `'_db` lifetime name as we cannot shadow lifetimes.
+                    $(for<$db_lt> $field_ty: std::fmt::Debug),*
+                {
                     $zalsa::with_attached_database(|db| {
-                        let fields = $Configuration::ingredient(db).leak_fields(this);
+                        let fields = $Configuration::ingredient(db).leak_fields(db, this);
                         let mut f = f.debug_struct(stringify!($Struct));
                         let f = f.field("[salsa id]", &$zalsa::AsId::as_id(&this));
                         $(

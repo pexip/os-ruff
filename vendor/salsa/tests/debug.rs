@@ -3,7 +3,7 @@
 use expect_test::expect;
 use salsa::{Database, Setter};
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct MyInput {
     field: u32,
 }
@@ -13,7 +13,7 @@ struct NotSalsa {
     field: String,
 }
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct ComplexStruct {
     my_input: MyInput,
     not_salsa: NotSalsa,
@@ -30,7 +30,7 @@ fn input() {
 
         // debug includes all fields
         let actual = format!("{complex_struct:?}");
-        let expected = expect![[r#"ComplexStruct { [salsa id]: Id(0), my_input: MyInput { [salsa id]: Id(0), field: 22 }, not_salsa: NotSalsa { field: "it's salsa time" } }"#]];
+        let expected = expect![[r#"ComplexStruct { [salsa id]: Id(400), my_input: MyInput { [salsa id]: Id(0), field: 22 }, not_salsa: NotSalsa { field: "it's salsa time" } }"#]];
         expected.assert_eq(&actual);
     })
 }
@@ -63,7 +63,7 @@ fn untracked_dependencies() {
     assert!(s.contains(", field: 22 }"));
 }
 
-#[salsa::tracked(no_debug)]
+#[salsa::tracked]
 struct DerivedCustom<'db> {
     my_input: MyInput,
     value: u32,

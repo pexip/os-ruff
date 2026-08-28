@@ -11,14 +11,20 @@
 
 [package]
 edition = "2021"
-rust-version = "1.61"
+rust-version = "1.67"
 name = "newtype-uuid"
-version = "1.1.0"
+version = "1.2.1"
+build = "build.rs"
 exclude = [
     ".cargo/**/*",
     ".github/**/*",
     "scripts/**/*",
 ]
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Newtype wrapper around UUIDs"
 documentation = "https://docs.rs/newtype-uuid"
 readme = "README.md"
@@ -30,18 +36,27 @@ keywords = [
 ]
 categories = [
     "data-structures",
-    "uuid",
+    "no-std",
 ]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/oxidecomputer/newtype-uuid"
-resolver = "2"
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg=doc_cfg"]
 
+[lib]
+name = "newtype_uuid"
+path = "src/lib.rs"
+
+[dependencies.proptest]
+version = "1.5.0"
+features = ["std"]
+optional = true
+default-features = false
+
 [dependencies.schemars]
-version = "0.8"
+version = "0.8.17"
 features = ["uuid1"]
 optional = true
 
@@ -60,6 +75,7 @@ default = [
     "uuid/default",
     "std",
 ]
+proptest1 = ["dep:proptest"]
 schemars08 = [
     "dep:schemars",
     "std",
@@ -69,7 +85,7 @@ serde = [
     "uuid/serde",
 ]
 std = [
-    "uuid/std",
     "alloc",
+    "uuid/std",
 ]
 v4 = ["uuid/v4"]

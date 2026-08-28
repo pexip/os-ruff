@@ -50,23 +50,19 @@ Setting up a scheme like this is relatively easy in Salsa and uses the same prin
 ### Parameters to a tracked function
 
 The **first** parameter to a tracked function is **always** the database, `db: &dyn crate::Db`.
-It must be a `dyn` value of whatever database is associated with the jar.
 
 The **second** parameter to a tracked function is **always** some kind of Salsa struct.
-The first parameter to a memoized function is always the database,
-which should be a `dyn Trait` value for the database trait associated with the jar
-(the default jar is `crate::Jar`).
 
 Tracked functions may take other arguments as well, though our examples here do not.
 Functions that take additional arguments are less efficient and flexible.
 It's generally better to structure tracked functions as functions of a single Salsa struct if possible.
 
-### The `return_ref` annotation
+### The `returns(ref)` annotation
 
-You may have noticed that `parse_statements` is tagged with `#[salsa::tracked(return_ref)]`.
+You may have noticed that `parse_statements` is tagged with `#[salsa::tracked(returns(ref))]`.
 Ordinarily, when you call a tracked function, the result you get back is cloned out of the database.
-The `return_ref` attribute means that a reference into the database is returned instead.
+The `returns(ref)` attribute means that a reference into the database is returned instead.
 So, when called, `parse_statements` will return an `&Vec<Statement>` rather than cloning the `Vec`.
 This is useful as a performance optimization.
-(You may recall the `return_ref` annotation from the [ir](./ir.md) section of the tutorial,
+(You may recall the `returns(ref)` annotation from the [ir](./ir.md) section of the tutorial,
 where it was placed on struct fields, with roughly the same meaning.)

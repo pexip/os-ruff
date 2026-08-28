@@ -1,13 +1,15 @@
-use std::{path::PathBuf, sync::Mutex, time::Duration};
+#![allow(unreachable_patterns)]
+// FIXME(rust-lang/rust#129031): regression in nightly
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-use crossbeam::channel::{unbounded, Sender};
-use dashmap::{mapref::entry::Entry, DashMap};
+use crossbeam_channel::{unbounded, Sender};
+use dashmap::mapref::entry::Entry;
+use dashmap::DashMap;
 use eyre::{eyre, Context, Report, Result};
-use notify_debouncer_mini::{
-    new_debouncer,
-    notify::{RecommendedWatcher, RecursiveMode},
-    DebounceEventResult, Debouncer,
-};
+use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
+use notify_debouncer_mini::{new_debouncer, DebounceEventResult, Debouncer};
 use salsa::{Accumulator, Setter, Storage};
 
 // ANCHOR: main
@@ -29,7 +31,7 @@ fn main() -> Result<()> {
         let sum = compile(&db, initial);
         let diagnostics = compile::accumulated::<Diagnostic>(&db, initial);
         if diagnostics.is_empty() {
-            println!("Sum is: {}", sum);
+            println!("Sum is: {sum}");
         } else {
             for diagnostic in diagnostics {
                 println!("{}", diagnostic.0);
@@ -37,7 +39,7 @@ fn main() -> Result<()> {
         }
 
         for log in db.logs.lock().unwrap().drain(..) {
-            eprintln!("{}", log);
+            eprintln!("{log}");
         }
 
         // Wait for file change events, the output can't change unless the
@@ -65,7 +67,7 @@ fn main() -> Result<()> {
 #[salsa::input]
 struct File {
     path: PathBuf,
-    #[return_ref]
+    #[returns(ref)]
     contents: String,
 }
 
@@ -75,34 +77,38 @@ trait Db: salsa::Database {
 }
 
 #[salsa::db]
+#[derive(Clone)]
 struct LazyInputDatabase {
     storage: Storage<Self>,
-    logs: Mutex<Vec<String>>,
+    logs: Arc<Mutex<Vec<String>>>,
     files: DashMap<PathBuf, File>,
-    file_watcher: Mutex<Debouncer<RecommendedWatcher>>,
+    file_watcher: Arc<Mutex<Debouncer<RecommendedWatcher>>>,
 }
 
 impl LazyInputDatabase {
     fn new(tx: Sender<DebounceEventResult>) -> Self {
+        let logs: Arc<Mutex<Vec<String>>> = Default::default();
         Self {
-            storage: Default::default(),
-            logs: Default::default(),
+            storage: Storage::new(Some(Box::new({
+                let logs = logs.clone();
+                move |event| {
+                    // don't log boring events
+                    if let salsa::EventKind::WillExecute { .. } = event.kind {
+                        logs.lock().unwrap().push(format!("{event:?}"));
+                    }
+                }
+            }))),
+            logs,
             files: DashMap::new(),
-            file_watcher: Mutex::new(new_debouncer(Duration::from_secs(1), tx).unwrap()),
+            file_watcher: Arc::new(Mutex::new(
+                new_debouncer(Duration::from_secs(1), tx).unwrap(),
+            )),
         }
     }
 }
 
 #[salsa::db]
-impl salsa::Database for LazyInputDatabase {
-    fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
-        // don't log boring events
-        let event = event();
-        if let salsa::EventKind::WillExecute { .. } = event.kind {
-            self.logs.lock().unwrap().push(format!("{:?}", event));
-        }
-    }
-}
+impl salsa::Database for LazyInputDatabase {}
 
 #[salsa::db]
 impl Db for LazyInputDatabase {
@@ -152,7 +158,7 @@ impl Diagnostic {
 #[salsa::tracked]
 struct ParsedFile<'db> {
     value: u32,
-    #[return_ref]
+    #[returns(ref)]
     links: Vec<ParsedFile<'db>>,
 }
 
@@ -172,8 +178,7 @@ fn parse(db: &dyn Db, input: File) -> ParsedFile<'_> {
                 db,
                 input,
                 Report::new(e).wrap_err(format!(
-                    "First line ({}) could not be parsed as an integer",
-                    line
+                    "First line ({line}) could not be parsed as an integer"
                 )),
             );
             0
@@ -191,7 +196,7 @@ fn parse(db: &dyn Db, input: File) -> ParsedFile<'_> {
                     Diagnostic::push_error(
                         db,
                         input,
-                        Report::new(err).wrap_err(format!("Failed to parse path: {}", path)),
+                        Report::new(err).wrap_err(format!("Failed to parse path: {path}")),
                     );
                     return None;
                 }

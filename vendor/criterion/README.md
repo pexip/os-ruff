@@ -3,7 +3,7 @@
 <div align="center">Statistics-driven Microbenchmarking in Rust</div>
 
 <div align="center">
-	<a href="https://bheisler.github.io/criterion.rs/book/getting_started.html">Getting Started</a>
+ <a href="https://bheisler.github.io/criterion.rs/book/getting_started.html">Getting Started</a>
     |
     <a href="https://bheisler.github.io/criterion.rs/book/index.html">User Guide</a>
     |
@@ -15,12 +15,8 @@
 </div>
 
 <div align="center">
-	<a href="https://github.com/bheisler/criterion.rs/actions/workflows/ci.yaml">
+ <a href="https://github.com/bheisler/criterion.rs/actions/workflows/ci.yaml">
         <img src="https://img.shields.io/github/checks-status/rgeometry/rgeometry/main?label=tests&logo=github" alt="GitHub branch checks state">
-    </a>
-    |
-    <a href="https://ci.appveyor.com/project/bheisler/criterion-rs-vt9fl">
-        <img src="https://ci.appveyor.com/api/projects/status/4255ads9ctpupcl2?svg=true" alt="Appveyor">
     </a>
     |
     <a href="https://crates.io/crates/criterion">
@@ -31,6 +27,7 @@
 Criterion.<span></span>rs helps you write fast code by detecting and measuring performance improvements or regressions, even small ones, quickly and accurately. You can optimize with confidence, knowing how each change affects the performance of your code.
 
 ## Table of Contents
+
 - [Table of Contents](#table-of-contents)
   - [Features](#features)
   - [Quickstart](#quickstart)
@@ -56,7 +53,7 @@ To start with Criterion.<span></span>rs, add the following to your `Cargo.toml` 
 
 ```toml
 [dev-dependencies]
-criterion = { version = "0.4", features = ["html_reports"] }
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]
 name = "my_benchmark"
@@ -66,7 +63,8 @@ harness = false
 Next, define a benchmark by creating a file at `$PROJECT/benches/my_benchmark.rs` with the following contents:
 
 ```rust
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
+use criterion::{criterion_group, criterion_main, Criterion};
 
 fn fibonacci(n: u64) -> u64 {
     match n {
@@ -126,7 +124,7 @@ specific patch version of Criterion.<span></span>rs.
 
 ### Maintenance
 
-Criterion.<span></span>rs was originally created by Jorge Aparicio (@japaric) and is currently being maintained by Brook Heisler (@bheisler).
+Criterion.<span></span>rs was originally created by Jorge Aparicio [(@japaric)](https://github.com/japaric) and is currently being maintained by Brook Heisler [(@bheisler)](https://github.com/bheisler).
 
 ### License
 

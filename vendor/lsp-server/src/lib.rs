@@ -5,12 +5,13 @@
 //! Run with `RUST_LOG=lsp_server=debug` to see all the messages.
 
 #![warn(rust_2018_idioms, unused_lifetimes)]
+#![allow(clippy::print_stdout, clippy::disallowed_types)]
 
-mod msg;
-mod stdio;
 mod error;
-mod socket;
+mod msg;
 mod req_queue;
+mod socket;
+mod stdio;
 
 use std::{
     io,
@@ -184,9 +185,9 @@ impl Connection {
             };
         }
 
-        return Err(ProtocolError::new(String::from(
+        Err(ProtocolError::new(String::from(
             "Initialization has been aborted during initialization",
-        )));
+        )))
     }
 
     /// Finishes the initialization process by sending an `InitializeResult` to the client
@@ -244,9 +245,9 @@ impl Connection {
             }
         }
 
-        return Err(ProtocolError::new(String::from(
+        Err(ProtocolError::new(String::from(
             "Initialization has been aborted during initialization",
-        )));
+        )))
     }
 
     /// Initialize the connection. Sends the server capabilities
@@ -358,12 +359,14 @@ impl Connection {
                 )))
             }
             Err(RecvTimeoutError::Timeout) => {
-                return Err(ProtocolError::new(format!("timed out waiting for exit notification")))
+                return Err(ProtocolError::new(
+                    "timed out waiting for exit notification".to_owned(),
+                ))
             }
             Err(RecvTimeoutError::Disconnected) => {
-                return Err(ProtocolError::new(format!(
-                    "channel disconnected waiting for exit notification"
-                )))
+                return Err(ProtocolError::new(
+                    "channel disconnected waiting for exit notification".to_owned(),
+                ))
             }
         }
         Ok(true)
@@ -403,7 +406,7 @@ mod tests {
     #[test]
     fn not_exit_notification() {
         let notification = crate::Notification {
-            method: Initialized::METHOD.to_string(),
+            method: Initialized::METHOD.to_owned(),
             params: to_value(InitializedParams {}).unwrap(),
         };
 
@@ -411,7 +414,7 @@ mod tests {
         let req_id = RequestId::from(234);
         let request = crate::Request {
             id: req_id.clone(),
-            method: Initialize::METHOD.to_string(),
+            method: Initialize::METHOD.to_owned(),
             params: params_as_value.clone(),
         };
 
@@ -424,14 +427,13 @@ mod tests {
     #[test]
     fn exit_notification() {
         let notification =
-            crate::Notification { method: Exit::METHOD.to_string(), params: to_value(()).unwrap() };
+            crate::Notification { method: Exit::METHOD.to_owned(), params: to_value(()).unwrap() };
         let notification_msg = Message::from(notification);
 
         initialize_start_test(TestCase {
             test_messages: vec![notification_msg.clone()],
             expected_resp: Err(ProtocolError::new(format!(
-                "expected initialize request, got {:?}",
-                notification_msg
+                "expected initialize request, got {notification_msg:?}"
             ))),
         });
     }

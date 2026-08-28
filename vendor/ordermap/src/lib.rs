@@ -62,20 +62,14 @@
 //!
 //! ```
 //! use fnv::FnvBuildHasher;
-//! use fxhash::FxBuildHasher;
 //! use ordermap::{OrderMap, OrderSet};
 //!
 //! type FnvOrderMap<K, V> = OrderMap<K, V, FnvBuildHasher>;
 //! type FnvOrderSet<T> = OrderSet<T, FnvBuildHasher>;
 //!
-//! type FxOrderMap<K, V> = OrderMap<K, V, FxBuildHasher>;
-//! type FxOrderSet<T> = OrderSet<T, FxBuildHasher>;
-//!
 //! let std: OrderSet<i32> = (0..100).collect();
 //! let fnv: FnvOrderSet<i32> = (0..100).collect();
-//! let fx: FxOrderSet<i32> = (0..100).collect();
 //! assert_eq!(std, fnv);
-//! assert_eq!(std, fx);
 //! ```
 //!
 //! ### Rust Version
@@ -98,7 +92,8 @@
 //!   [`with_capacity_and_hasher`][OrderMap::with_capacity_and_hasher] instead.
 //!   A no-std compatible hasher will be needed as well, for example
 //!   from the crate `twox-hash`.
-//! - Macros [`ordermap!`] and [`orderset!`] are unavailable without `std`.
+//! - Macros [`ordermap!`] and [`orderset!`] are unavailable without `std`. Use
+//!   the macros [`ordermap_with_default!`] and [`orderset_with_default!`] instead.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
@@ -121,4 +116,4 @@ pub mod set;
 
 pub use crate::map::OrderMap;
 pub use crate::set::OrderSet;
-pub use indexmap::{Equivalent, TryReserveError};
+pub use indexmap::{Equivalent, GetDisjointMutError, TryReserveError};

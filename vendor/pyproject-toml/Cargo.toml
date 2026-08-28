@@ -13,7 +13,13 @@
 edition = "2021"
 rust-version = "1.64"
 name = "pyproject-toml"
-version = "0.9.0"
+version = "0.13.5"
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "pyproject.toml parser in Rust"
 readme = "README.md"
 keywords = [
@@ -26,23 +32,42 @@ keywords = [
 license = "MIT"
 repository = "https://github.com/PyO3/pyproject-toml-rs.git"
 
+[features]
+pep639-glob = ["glob"]
+tracing = [
+    "pep440_rs/tracing",
+    "pep508_rs/tracing",
+]
+
+[lib]
+name = "pyproject_toml"
+path = "src/lib.rs"
+
+[dependencies.glob]
+version = "0.3.1"
+optional = true
+
 [dependencies.indexmap]
-version = "2.0.0"
+version = "2.6.0"
 features = ["serde"]
 
 [dependencies.pep440_rs]
-version = "0.4.0"
-features = ["serde"]
+version = "0.7.2"
 
 [dependencies.pep508_rs]
-version = "0.3.0"
-features = ["serde"]
+version = "0.9.1"
 
 [dependencies.serde]
-version = "1.0.125"
+version = "1.0.214"
 features = ["derive"]
 
+[dependencies.thiserror]
+version = "2.0.12"
+
 [dependencies.toml]
-version = "0.8.0"
+version = "0.8.19"
 features = ["parse"]
 default-features = false
+
+[dev-dependencies.insta]
+version = "1.41.0"

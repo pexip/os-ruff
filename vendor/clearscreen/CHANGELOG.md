@@ -1,6 +1,21 @@
-# Changelog
 
-## Next (YYYY-MM-DD)
+## v4.0.1 (2025-01-05)
+
+- **Deps:** Update MSRV to 1.79 - ([6984714](https://github.com/watchexec/clearscreen/commit/69847147d4deea47808e317d8b5f34b16a616ef2))
+- **Deps:** Switch from winapi to windows-sys (#26) - ([a13ea5a](https://github.com/watchexec/clearscreen/commit/a13ea5a6da2163a7f1efa8625f74cf84505c0845))
+- **Repo:** Fix changelog format - ([d72ec08](https://github.com/watchexec/clearscreen/commit/d72ec08ad20fd3b32434ed285f062cd5d3e795c0))
+
+## v4.0.0 (2025-01-01)
+
+- **Deps:** Update which to 7.0.0 (#25) - ([207b3a4](https://github.com/watchexec/clearscreen/commit/207b3a4fdf7109faefc699250fb710dcfda18b83))
+- **Deps:** Add lockfile to git - ([64180fe](https://github.com/watchexec/clearscreen/commit/64180fe2d7db612633a77337159b020fbac93e68))
+- **Deps:** Upgrade thiserror to 2.0.9 - ([2b4b16f](https://github.com/watchexec/clearscreen/commit/2b4b16f6d18fefc2324a36dc4f005c84b5245684))
+- **Deps:** Upgrade nix to 0.29.0 - ([556fd47](https://github.com/watchexec/clearscreen/commit/556fd4719a527fac463b6d70ea0539ff72bb0f93))
+- **Documentation:** Update wezterm information - ([dd1430a](https://github.com/watchexec/clearscreen/commit/dd1430a5f8d106f4e9d5951e7c1358202c0994d2))
+- **Feature:** Support wezterm (#23) - ([4225aae](https://github.com/watchexec/clearscreen/commit/4225aae53a68720072bcaa76edb1e00362684218))
+- **Feature:** Decouple public API from dependencies - ([165fe96](https://github.com/watchexec/clearscreen/commit/165fe96b0f6a918d093001b827517c0e65c5dace))
+- **Repo:** Replace custom script with cargo-release - ([8835973](https://github.com/watchexec/clearscreen/commit/8835973168a3c422afbcde4f39e1b60b3a87c795))
+- **Repo:** Use cliff for changelog - ([0d4fe66](https://github.com/watchexec/clearscreen/commit/0d4fe669f7f4625ea86414d8d18aeab3e3c70fc8))
 
 ## v3.0.0 (2024-04-11)
 

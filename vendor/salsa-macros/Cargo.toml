@@ -11,24 +11,33 @@
 
 [package]
 edition = "2021"
+rust-version = "1.85"
 name = "salsa-macros"
-version = "0.18.0"
+version = "0.22.0"
 authors = ["Salsa developers"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Procedural macros for the salsa crate"
+readme = false
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/salsa-rs/salsa"
 
 [lib]
+name = "salsa_macros"
+path = "src/lib.rs"
 proc-macro = true
 
 [dependencies]
-heck = "0.5.0"
 proc-macro2 = "1.0"
 quote = "1.0"
-synstructure = "0.13.1"
+synstructure = "0.13.2"
 
 [dependencies.syn]
-version = "2.0.64"
+version = "2.0.101"
 features = [
     "full",
     "visit-mut",

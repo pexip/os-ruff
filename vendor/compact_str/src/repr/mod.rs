@@ -1,10 +1,7 @@
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use core::str::Utf8Error;
-use core::{
-    mem,
-    ptr,
-};
+use core::{mem, ptr};
 
 #[cfg(feature = "bytes")]
 mod bytes;
@@ -25,39 +22,38 @@ use alloc::string::String;
 use capacity::Capacity;
 use heap::HeapBuffer;
 use inline::InlineBuffer;
-use last_utf8_char::LastUtf8Char;
+use last_utf8_char::LastByte;
 use static_str::StaticStr;
 pub(crate) use traits::IntoRepr;
 
-use crate::{
-    ReserveError,
-    UnwrapWithMsg,
-};
+use crate::{ReserveError, UnwrapWithMsg};
 
 /// The max size of a string we can fit inline
-pub const MAX_SIZE: usize = core::mem::size_of::<String>();
+pub(crate) const MAX_SIZE: usize = core::mem::size_of::<String>();
 /// Used as a discriminant to identify different variants
-pub const HEAP_MASK: u8 = LastUtf8Char::Heap as u8;
+pub(crate) const HEAP_MASK: u8 = LastByte::Heap as u8;
 /// Used for `StaticStr` variant
-pub const STATIC_STR_MASK: u8 = LastUtf8Char::Static as u8;
+pub(crate) const STATIC_STR_MASK: u8 = LastByte::Static as u8;
 /// When our string is stored inline, we represent the length of the string in the last byte, offset
 /// by `LENGTH_MASK`
-pub const LENGTH_MASK: u8 = 0b11000000;
+pub(crate) const LENGTH_MASK: u8 = 0b11000000;
 
 const EMPTY: Repr = Repr::const_new("");
 
 #[repr(C)]
-pub struct Repr(
-    // We have a pointer in the representation to properly carry provenance
+pub(crate) struct Repr(
+    /// We have a pointer in the representation to properly carry provenance.
     *const (),
-    // Then we need two `usize`s (aka WORDs) of data, for the first we just define a `usize`...
+    /// Then we need two `usize`s (aka WORDs) of data, for the first we just define a `usize`...
     usize,
-    // ...but the second we breakup into multiple pieces...
-    #[cfg(target_pointer_width = "64")] u32,
+    /// ...but the second we breakup into multiple pieces...
+    #[cfg(target_pointer_width = "64")]
+    u32,
     u16,
     u8,
-    // ...so that the last byte can be a NonMax, which allows the compiler to see a niche value
-    LastUtf8Char,
+    /// ...so that the last byte can be a [`LastByte`], which allows the compiler to see a niche
+    /// value.
+    LastByte,
 );
 static_assertions::assert_eq_size!([u8; MAX_SIZE], Repr);
 
@@ -66,7 +62,7 @@ unsafe impl Sync for Repr {}
 
 impl Repr {
     #[inline]
-    pub fn new(text: &str) -> Result<Self, ReserveError> {
+    pub(crate) fn new(text: &str) -> Result<Self, ReserveError> {
         let len = text.len();
 
         if len == 0 {
@@ -81,7 +77,7 @@ impl Repr {
     }
 
     #[inline]
-    pub const fn const_new(text: &'static str) -> Self {
+    pub(crate) const fn const_new(text: &'static str) -> Self {
         if text.len() <= MAX_SIZE {
             let inline = InlineBuffer::new_const(text);
             Repr::from_inline(inline)
@@ -93,7 +89,7 @@ impl Repr {
 
     /// Create a [`Repr`] with the provided `capacity`
     #[inline]
-    pub fn with_capacity(capacity: usize) -> Result<Self, ReserveError> {
+    pub(crate) fn with_capacity(capacity: usize) -> Result<Self, ReserveError> {
         if capacity <= MAX_SIZE {
             Ok(EMPTY)
         } else {
@@ -103,7 +99,7 @@ impl Repr {
 
     /// Create a [`Repr`] from a slice of bytes that is UTF-8
     #[inline]
-    pub fn from_utf8<B: AsRef<[u8]>>(buf: B) -> Result<Self, Utf8Error> {
+    pub(crate) fn from_utf8<B: AsRef<[u8]>>(buf: B) -> Result<Self, Utf8Error> {
         // Get a &str from the Vec, failing if it's not valid UTF-8
         let s = core::str::from_utf8(buf.as_ref())?;
         // Construct a Repr from the &str
@@ -114,27 +110,15 @@ impl Repr {
     /// UTF-8
     ///
     /// # Safety
-    /// * The caller must guarantee that `buf` is valid UTF-8
+    ///
+    /// * The caller must guarantee that `buf` is valid UTF-8.
     #[inline]
-    pub unsafe fn from_utf8_unchecked<B: AsRef<[u8]>>(buf: B) -> Result<Self, ReserveError> {
+    pub(crate) unsafe fn from_utf8_unchecked<B: AsRef<[u8]>>(buf: B) -> Result<Self, ReserveError> {
         let bytes = buf.as_ref();
         let bytes_len = bytes.len();
 
         // Create a Repr with enough capacity for the entire buffer
         let mut repr = Repr::with_capacity(bytes_len)?;
-
-        // There's an edge case where the final byte of this buffer == `HEAP_MASK`, which is
-        // invalid UTF-8, but would result in us creating an inline variant, that identifies as
-        // a heap variant. If a user ever tried to reference the data at all, we'd incorrectly
-        // try and read data from an invalid memory address, causing undefined behavior.
-        if bytes_len == MAX_SIZE {
-            let last_byte = bytes[bytes_len - 1];
-            // If we hit the edge case, reserve additional space to make the repr becomes heap
-            // allocated, which prevents us from writing this last byte inline
-            if last_byte >= 0b11000000 {
-                repr.reserve(MAX_SIZE + 1)?;
-            }
-        }
 
         // SAFETY: The caller is responsible for making sure the provided buffer is UTF-8. This
         // invariant is documented in the public API
@@ -155,7 +139,7 @@ impl Repr {
     /// Note: If the provided [`String`] is >16 MB and we're on a 32-bit arch, we'll copy the
     /// `String`.
     #[inline]
-    pub fn from_string(s: String, should_inline: bool) -> Result<Self, ReserveError> {
+    pub(crate) fn from_string(s: String, should_inline: bool) -> Result<Self, ReserveError> {
         let og_cap = s.capacity();
         let cap = Capacity::new(og_cap);
 
@@ -194,7 +178,7 @@ impl Repr {
 
     /// Converts a [`Repr`] into a [`String`], in `O(1)` time, if possible
     #[inline]
-    pub fn into_string(self) -> String {
+    pub(crate) fn into_string(self) -> String {
         #[cold]
         fn into_string_heap(this: HeapBuffer) -> String {
             // SAFETY: We know pointer is valid for `length` bytes
@@ -235,7 +219,7 @@ impl Repr {
     /// Reserves at least `additional` bytes. If there is already enough capacity to store
     /// `additional` bytes this is a no-op
     #[inline]
-    pub fn reserve(&mut self, additional: usize) -> Result<(), ReserveError> {
+    pub(crate) fn reserve(&mut self, additional: usize) -> Result<(), ReserveError> {
         let len = self.len();
         let needed_capacity = len.checked_add(additional).ok_or(ReserveError(()))?;
 
@@ -276,7 +260,7 @@ impl Repr {
         }
     }
 
-    pub fn shrink_to(&mut self, min_capacity: usize) {
+    pub(crate) fn shrink_to(&mut self, min_capacity: usize) {
         // Note: We can't shrink the inline variant since it's buffer is a fixed size
         // or the static str variant since it is just a pointer, so we only
         // take action here if our string is heap allocated
@@ -327,7 +311,7 @@ impl Repr {
     }
 
     #[inline]
-    pub fn push_str(&mut self, s: &str) {
+    pub(crate) fn push_str(&mut self, s: &str) {
         // If `s` is empty, then there's no reason to reserve or push anything
         // at all.
         if s.is_empty() {
@@ -344,7 +328,7 @@ impl Repr {
         let slice = unsafe { self.as_mut_buf() };
         let push_buffer = &mut slice[len..len + str_len];
 
-        debug_assert_eq!(push_buffer.len(), s.as_bytes().len());
+        debug_assert_eq!(push_buffer.len(), s.len());
 
         // Copy the string into our buffer
         push_buffer.copy_from_slice(s.as_bytes());
@@ -357,7 +341,7 @@ impl Repr {
     }
 
     #[inline]
-    pub fn pop(&mut self) -> Option<char> {
+    pub(crate) fn pop(&mut self) -> Option<char> {
         let ch = self.as_str().chars().next_back()?;
 
         // SAFETY: We know this is is a valid length which falls on a char boundary
@@ -368,7 +352,7 @@ impl Repr {
 
     /// Returns the string content, and only the string content, as a slice of bytes.
     #[inline]
-    pub fn as_slice(&self) -> &[u8] {
+    pub(crate) fn as_slice(&self) -> &[u8] {
         // initially has the value of the stack pointer, conditionally becomes the heap pointer
         let mut pointer = self as *const Self as *const u8;
         let heap_pointer = self.0 as *const u8;
@@ -392,14 +376,14 @@ impl Repr {
     }
 
     #[inline]
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         // SAFETY: A `Repr` contains valid UTF-8
         unsafe { core::str::from_utf8_unchecked(self.as_slice()) }
     }
 
     /// Returns the length of the string that we're storing
     #[inline]
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         // This ugly looking code results in two conditional moves and only one comparison, without
         // branching. The outcome of a comparison is a tristate `{lt, eq, gt}`, but the compiler
         // won't use this optimization if you match on `len_inline.cmp(&MAX_SIZE)`, so we have to
@@ -429,11 +413,11 @@ impl Repr {
 
     /// Returns `true` if the length is 0, `false` otherwise
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         let len_heap = ensure_read(self.1);
         let last_byte = self.last_byte() as usize;
-        let mut len = last_byte.wrapping_sub(LastUtf8Char::L0 as u8 as usize);
-        if last_byte >= LastUtf8Char::Heap as u8 as usize {
+        let mut len = last_byte.wrapping_sub(LastByte::L0 as u8 as usize);
+        if last_byte >= LastByte::Heap as u8 as usize {
             len = len_heap;
         }
         len == 0
@@ -441,7 +425,7 @@ impl Repr {
 
     /// Returns the overall capacity of the underlying buffer
     #[inline]
-    pub fn capacity(&self) -> usize {
+    pub(crate) fn capacity(&self) -> usize {
         #[cold]
         fn heap_capacity(this: &Repr) -> usize {
             // SAFETY: We just checked the discriminant to make sure we're heap allocated
@@ -459,7 +443,7 @@ impl Repr {
     }
 
     #[inline(always)]
-    pub fn is_heap_allocated(&self) -> bool {
+    pub(crate) fn is_heap_allocated(&self) -> bool {
         let last_byte = self.last_byte();
         last_byte == HEAP_MASK
     }
@@ -472,7 +456,7 @@ impl Repr {
 
     #[inline]
     #[rustversion::attr(since(1.64), const)]
-    pub fn as_static_str(&self) -> Option<&'static str> {
+    pub(crate) fn as_static_str(&self) -> Option<&'static str> {
         if self.is_static_str() {
             // SAFETY: A `Repr` is transmuted from `StaticStr`
             let s: &StaticStr = unsafe { &*(self as *const Self as *const StaticStr) };
@@ -497,7 +481,7 @@ impl Repr {
     ///
     /// # Safety
     /// * Callers must guarantee that any modifications made to the buffer are valid UTF-8
-    pub unsafe fn as_mut_buf(&mut self) -> &mut [u8] {
+    pub(crate) unsafe fn as_mut_buf(&mut self) -> &mut [u8] {
         #[cold]
         fn inline_static_str(this: &mut Repr) {
             if let Some(s) = this.as_static_str() {
@@ -533,7 +517,7 @@ impl Repr {
     /// # Safety
     /// * `len` bytes in the buffer must be valid UTF-8
     /// * If the underlying buffer is stored inline, `len` must be <= MAX_SIZE
-    pub unsafe fn set_len(&mut self, len: usize) {
+    pub(crate) unsafe fn set_len(&mut self, len: usize) {
         if let Some(s) = self.as_static_variant_mut() {
             s.set_len(len);
         } else if self.is_heap_allocated() {
@@ -547,6 +531,74 @@ impl Repr {
             // SAFETY: The caller guarantees that len <= MAX_SIZE, and `len` bytes is valid UTF-8
             inline_buffer.set_len(len);
         }
+    }
+
+    /// Zero out the memory backing this [`Repr`].
+    #[cfg(feature = "zeroize")]
+    pub(crate) fn zeroize(&mut self) {
+        // We can't zero out static memory so we just replace ourselves with
+        // the EMPTY variant.
+        if self.is_static_str() {
+            *self = EMPTY;
+            return;
+        }
+
+        /// Performs a volatile `memset` operation which fills a slice with a value.
+        ///
+        /// # SAFETY:
+        ///
+        /// * The memory pointed to by `dst` must be valid for `count` contiguous bytes.
+        /// * `count` must not be larger than an isize
+        /// * `dst` + `count` must not wrap around the address space.
+        ///  
+        /// Derived from: <https://github.com/RustCrypto/utils/blob/c68a5204b2e66b0f60832d845e048fca96a81211/zeroize/src/lib.rs#L766-L791>.
+        ///
+        /// TODO(parkmycar): use `volatile_set_memory` when stabilized
+        #[inline(always)]
+        unsafe fn volatile_zero(dst: *mut u8, count: usize) {
+            for i in 0..count {
+                let dst = dst.add(i);
+                ptr::write_volatile(dst, 0);
+            }
+        }
+
+        /// Uses fences to prevent the compiler from re-ordering memory accesses.
+        #[inline(always)]
+        fn atomic_fence() {
+            use core::sync::atomic;
+            atomic::compiler_fence(atomic::Ordering::SeqCst);
+        }
+
+        // The last byte stores our discriminant and stack length.
+        let last_byte = self.last_byte();
+
+        let (ptr, cap) = if last_byte == HEAP_MASK {
+            // SAFETY: We just checked the discriminant to make sure we're heap allocated.
+            let heap_buffer = unsafe { self.as_mut_heap() };
+            // SAFTEY: Setting the length to 0 is always safe because the empty string is
+            // valid UTF-8.
+            unsafe { heap_buffer.set_len(0) };
+
+            let ptr = heap_buffer.ptr.as_ptr();
+            let cap = heap_buffer.capacity();
+            (ptr, cap)
+        } else {
+            // SAFETY: We just checked the discriminant above to see if we're heap allocated.
+            let inline_buffer = unsafe { self.as_mut_inline() };
+            // SAFTEY: Setting the length to 0 is always safe because the empty string is
+            // valid UTF-8.
+            unsafe { inline_buffer.set_len(0) };
+
+            let ptr = self as *mut Self as *mut u8;
+            let cap = MAX_SIZE - 1;
+            (ptr, cap)
+        };
+
+        // SAFTEY: We know our pointer is valid for `cap` bytes because the capacity came
+        // from an already existing CompactString. Also we don't allow allocations larger
+        // then an isize.
+        unsafe { volatile_zero(ptr, cap) };
+        atomic_fence()
     }
 
     /// Returns the last byte that's on the stack.
@@ -812,19 +864,13 @@ fn ensure_read(value: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use alloc::string::{
-        String,
-        ToString,
-    };
+    use alloc::string::{String, ToString};
     use alloc::vec::Vec;
 
     use quickcheck_macros::quickcheck;
     use test_case::test_case;
 
-    use super::{
-        Repr,
-        MAX_SIZE,
-    };
+    use super::{Repr, MAX_SIZE};
     use crate::ReserveError;
 
     const EIGHTEEN_MB: usize = 18 * 1024 * 1024;

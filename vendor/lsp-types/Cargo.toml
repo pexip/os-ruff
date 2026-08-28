@@ -17,6 +17,12 @@ authors = [
     "Markus Westerlind <marwes91@gmail.com>",
     "Bruno Medeiros <bruno.do.medeiros@gmail.com>",
 ]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Types for interaction with a language server, using VSCode's Language Server Protocol"
 documentation = "https://docs.rs/lsp-types"
 readme = "README.md"
@@ -30,6 +36,18 @@ keywords = [
 license = "MIT"
 repository = "https://github.com/gluon-lang/lsp-types"
 
+[features]
+default = []
+proposed = []
+
+[lib]
+name = "lsp_types"
+path = "src/lib.rs"
+
+[[test]]
+name = "lsif"
+path = "tests/lsif.rs"
+
 [dependencies]
 bitflags = "1.0.1"
 serde_json = "1.0.50"
@@ -42,7 +60,3 @@ features = ["derive"]
 [dependencies.url]
 version = "2.0.0"
 features = ["serde"]
-
-[features]
-default = []
-proposed = []

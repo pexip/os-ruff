@@ -11,7 +11,7 @@ https://github.com/bheisler/criterion.rs/issues
 ## A Note on Dependency Updates
 
 Criterion.<span></span>rs does not accept pull requests to update dependencies unless specifically
-requested by the maintaner(s). Dependencies are updated manually by the maintainer(s) before each
+requested by the maintainer(s). Dependencies are updated manually by the maintainer(s) before each
 new release.
 
 ## Code
@@ -33,11 +33,11 @@ cargo test --all
 cargo bench
 ```
 
-It's a good idea to run clippy and fix any warnings as well:
+It's a good idea to run `clippy` and fix any warnings as well:
 
 ```
-rustup component add clippy-preview
-cargo clippy --all
+rustup component add clippy
+cargo clippy --workspace --all-targets
 ```
 
 Finally, run Rustfmt to maintain a common code style:

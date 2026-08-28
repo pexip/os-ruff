@@ -1,13 +1,17 @@
-use crate::{
-    durability::Durability,
-    hash::{FxIndexMap, FxIndexSet},
-    key::{DatabaseKeyIndex, DependencyIndex},
-    tracked_struct::Disambiguator,
-    zalsa_local::EMPTY_DEPENDENCIES,
-    Cycle, Revision,
-};
+use std::{fmt, mem, ops};
 
-use super::zalsa_local::{EdgeKind, QueryEdges, QueryOrigin, QueryRevisions};
+use crate::accumulator::accumulated_map::{
+    AccumulatedMap, AtomicInputAccumulatedValues, InputAccumulatedValues,
+};
+use crate::cycle::{CycleHeads, IterationCount};
+use crate::durability::Durability;
+use crate::hash::FxIndexSet;
+use crate::key::DatabaseKeyIndex;
+use crate::runtime::Stamp;
+use crate::sync::atomic::AtomicBool;
+use crate::tracked_struct::{Disambiguator, DisambiguatorMap, IdentityHash, IdentityMap};
+use crate::zalsa_local::{QueryEdge, QueryOrigin, QueryRevisions, QueryRevisionsExtra};
+use crate::{Accumulator, IngredientIndex, Revision};
 
 #[derive(Debug)]
 pub(crate) struct ActiveQuery {
@@ -15,11 +19,11 @@ pub(crate) struct ActiveQuery {
     pub(crate) database_key_index: DatabaseKeyIndex,
 
     /// Minimum durability of inputs observed so far.
-    pub(crate) durability: Durability,
+    durability: Durability,
 
     /// Maximum revision of all inputs observed. If we observe an
     /// untracked read, this will be set to the most recent revision.
-    pub(crate) changed_at: Revision,
+    changed_at: Revision,
 
     /// Inputs: Set of subqueries that were accessed thus far.
     /// Outputs: Tracks values written by this query. Could be...
@@ -27,47 +31,87 @@ pub(crate) struct ActiveQuery {
     /// * tracked structs created
     /// * invocations of `specify`
     /// * accumulators pushed to
-    input_outputs: FxIndexSet<(EdgeKind, DependencyIndex)>,
+    input_outputs: FxIndexSet<QueryEdge>,
 
     /// True if there was an untracked read.
     untracked_read: bool,
 
-    /// Stores the entire cycle, if one is found and this query is part of it.
-    pub(crate) cycle: Option<Cycle>,
-
-    /// When new entities are created, their data is hashed, and the resulting
+    /// When new tracked structs are created, their data is hashed, and the resulting
     /// hash is added to this map. If it is not present, then the disambiguator is 0.
     /// Otherwise it is 1 more than the current value (which is incremented).
-    disambiguator_map: FxIndexMap<u64, Disambiguator>,
+    ///
+    /// This table starts empty as the query begins and is gradually populated.
+    /// Note that if a query executes in 2 different revisions but creates the same
+    /// set of tracked structs, they will get the same disambiguator values.
+    disambiguator_map: DisambiguatorMap,
+
+    /// Map from tracked struct keys (which include the hash + disambiguator) to their
+    /// final id.
+    tracked_struct_ids: IdentityMap,
+
+    /// Stores the values accumulated to the given ingredient.
+    /// The type of accumulated value is erased but known to the ingredient.
+    accumulated: AccumulatedMap,
+
+    /// [`InputAccumulatedValues::Empty`] if any input read during the query's execution
+    /// has any accumulated values.
+    accumulated_inputs: InputAccumulatedValues,
+
+    /// Provisional cycle results that this query depends on.
+    cycle_heads: CycleHeads,
+
+    /// If this query is a cycle head, iteration count of that cycle.
+    iteration_count: IterationCount,
 }
 
 impl ActiveQuery {
-    pub(super) fn new(database_key_index: DatabaseKeyIndex) -> Self {
-        ActiveQuery {
-            database_key_index,
-            durability: Durability::MAX,
-            changed_at: Revision::start(),
-            input_outputs: FxIndexSet::default(),
-            untracked_read: false,
-            cycle: None,
-            disambiguator_map: Default::default(),
-        }
+    pub(super) fn seed_iteration(
+        &mut self,
+        durability: Durability,
+        changed_at: Revision,
+        edges: &[QueryEdge],
+        untracked_read: bool,
+    ) {
+        assert!(self.input_outputs.is_empty());
+        self.input_outputs = edges.iter().cloned().collect();
+        self.durability = self.durability.min(durability);
+        self.changed_at = self.changed_at.max(changed_at);
+        self.untracked_read |= untracked_read;
     }
 
     pub(super) fn add_read(
         &mut self,
-        input: DependencyIndex,
+        input: DatabaseKeyIndex,
+        durability: Durability,
+        changed_at: Revision,
+        has_accumulated: bool,
+        accumulated_inputs: &AtomicInputAccumulatedValues,
+        cycle_heads: &CycleHeads,
+    ) {
+        self.durability = self.durability.min(durability);
+        self.changed_at = self.changed_at.max(changed_at);
+        self.input_outputs.insert(QueryEdge::input(input));
+        self.accumulated_inputs = self.accumulated_inputs.or_else(|| match has_accumulated {
+            true => InputAccumulatedValues::Any,
+            false => accumulated_inputs.load(),
+        });
+        self.cycle_heads.extend(cycle_heads);
+    }
+
+    pub(super) fn add_read_simple(
+        &mut self,
+        input: DatabaseKeyIndex,
         durability: Durability,
         revision: Revision,
     ) {
-        self.input_outputs.insert((EdgeKind::Input, input));
         self.durability = self.durability.min(durability);
         self.changed_at = self.changed_at.max(revision);
+        self.input_outputs.insert(QueryEdge::input(input));
     }
 
     pub(super) fn add_untracked_read(&mut self, changed_at: Revision) {
         self.untracked_read = true;
-        self.durability = Durability::LOW;
+        self.durability = Durability::MIN;
         self.changed_at = changed_at;
     }
 
@@ -77,72 +121,368 @@ impl ActiveQuery {
         self.changed_at = self.changed_at.max(revision);
     }
 
+    pub(super) fn accumulate(&mut self, index: IngredientIndex, value: impl Accumulator) {
+        self.accumulated.accumulate(index, value);
+    }
+
     /// Adds a key to our list of outputs.
-    pub(super) fn add_output(&mut self, key: DependencyIndex) {
-        self.input_outputs.insert((EdgeKind::Output, key));
+    pub(super) fn add_output(&mut self, key: DatabaseKeyIndex) {
+        self.input_outputs.insert(QueryEdge::output(key));
     }
 
     /// True if the given key was output by this query.
-    pub(super) fn is_output(&self, key: DependencyIndex) -> bool {
-        self.input_outputs.contains(&(EdgeKind::Output, key))
+    pub(super) fn is_output(&self, key: DatabaseKeyIndex) -> bool {
+        self.input_outputs.contains(&QueryEdge::output(key))
     }
 
-    pub(crate) fn revisions(&self) -> QueryRevisions {
-        let input_outputs = if self.input_outputs.is_empty() {
-            EMPTY_DEPENDENCIES.clone()
-        } else {
-            self.input_outputs.iter().copied().collect()
-        };
+    pub(super) fn disambiguate(&mut self, key: IdentityHash) -> Disambiguator {
+        self.disambiguator_map.disambiguate(key)
+    }
 
-        let edges = QueryEdges::new(input_outputs);
+    pub(super) fn stamp(&self) -> Stamp {
+        Stamp {
+            durability: self.durability,
+            changed_at: self.changed_at,
+        }
+    }
 
-        let origin = if self.untracked_read {
-            QueryOrigin::DerivedUntracked(edges)
+    pub(super) fn iteration_count(&self) -> IterationCount {
+        self.iteration_count
+    }
+
+    pub(crate) fn tracked_struct_ids(&self) -> &IdentityMap {
+        &self.tracked_struct_ids
+    }
+
+    pub(crate) fn tracked_struct_ids_mut(&mut self) -> &mut IdentityMap {
+        &mut self.tracked_struct_ids
+    }
+}
+
+impl ActiveQuery {
+    fn new(database_key_index: DatabaseKeyIndex, iteration_count: IterationCount) -> Self {
+        ActiveQuery {
+            database_key_index,
+            durability: Durability::MAX,
+            changed_at: Revision::start(),
+            input_outputs: FxIndexSet::default(),
+            untracked_read: false,
+            disambiguator_map: Default::default(),
+            tracked_struct_ids: Default::default(),
+            accumulated: Default::default(),
+            accumulated_inputs: Default::default(),
+            cycle_heads: Default::default(),
+            iteration_count,
+        }
+    }
+
+    fn top_into_revisions(&mut self) -> QueryRevisions {
+        let &mut Self {
+            database_key_index: _,
+            durability,
+            changed_at,
+            ref mut input_outputs,
+            untracked_read,
+            ref mut disambiguator_map,
+            ref mut tracked_struct_ids,
+            ref mut accumulated,
+            accumulated_inputs,
+            ref mut cycle_heads,
+            iteration_count,
+        } = self;
+
+        let origin = if untracked_read {
+            QueryOrigin::derived_untracked(input_outputs.drain(..))
         } else {
-            QueryOrigin::Derived(edges)
+            QueryOrigin::derived(input_outputs.drain(..))
         };
+        disambiguator_map.clear();
+
+        let verified_final = cycle_heads.is_empty();
+        let extra = QueryRevisionsExtra::new(
+            mem::take(accumulated),
+            mem::take(tracked_struct_ids),
+            mem::take(cycle_heads),
+            iteration_count,
+        );
+        let accumulated_inputs = AtomicInputAccumulatedValues::new(accumulated_inputs);
 
         QueryRevisions {
-            changed_at: self.changed_at,
+            changed_at,
+            durability,
             origin,
-            durability: self.durability,
+            accumulated_inputs,
+            verified_final: AtomicBool::new(verified_final),
+            extra,
         }
     }
 
-    /// Adds any dependencies from `other` into `self`.
-    /// Used during cycle recovery, see [`Runtime::unblock_cycle_and_maybe_throw`].
-    pub(super) fn add_from(&mut self, other: &ActiveQuery) {
-        self.changed_at = self.changed_at.max(other.changed_at);
-        self.durability = self.durability.min(other.durability);
-        self.untracked_read |= other.untracked_read;
-        self.input_outputs
-            .extend(other.input_outputs.iter().copied());
+    fn clear(&mut self) {
+        let Self {
+            database_key_index: _,
+            durability: _,
+            changed_at: _,
+            input_outputs,
+            untracked_read: _,
+            disambiguator_map,
+            tracked_struct_ids,
+            accumulated,
+            accumulated_inputs: _,
+            cycle_heads,
+            iteration_count,
+        } = self;
+        input_outputs.clear();
+        disambiguator_map.clear();
+        tracked_struct_ids.clear();
+        accumulated.clear();
+        *cycle_heads = Default::default();
+        *iteration_count = IterationCount::initial();
     }
 
-    /// Removes the participants in `cycle` from my dependencies.
-    /// Used during cycle recovery, see [`Runtime::unblock_cycle_and_maybe_throw`].
-    pub(super) fn remove_cycle_participants(&mut self, cycle: &Cycle) {
-        for p in cycle.participant_keys() {
-            let p: DependencyIndex = p.into();
-            self.input_outputs.shift_remove(&(EdgeKind::Input, p));
+    fn reset_for(
+        &mut self,
+        new_database_key_index: DatabaseKeyIndex,
+        new_iteration_count: IterationCount,
+    ) {
+        let Self {
+            database_key_index,
+            durability,
+            changed_at,
+            input_outputs,
+            untracked_read,
+            disambiguator_map,
+            tracked_struct_ids,
+            accumulated,
+            accumulated_inputs,
+            cycle_heads,
+            iteration_count,
+        } = self;
+        *database_key_index = new_database_key_index;
+        *durability = Durability::MAX;
+        *changed_at = Revision::start();
+        *untracked_read = false;
+        *accumulated_inputs = Default::default();
+        *iteration_count = new_iteration_count;
+        debug_assert!(
+            input_outputs.is_empty(),
+            "`ActiveQuery::clear` or `ActiveQuery::into_revisions` should've been called"
+        );
+        debug_assert!(
+            disambiguator_map.is_empty(),
+            "`ActiveQuery::clear` or `ActiveQuery::into_revisions` should've been called"
+        );
+        debug_assert!(
+            tracked_struct_ids.is_empty(),
+            "`ActiveQuery::clear` or `ActiveQuery::into_revisions` should've been called"
+        );
+        debug_assert!(
+            cycle_heads.is_empty(),
+            "`ActiveQuery::clear` or `ActiveQuery::into_revisions` should've been called"
+        );
+        debug_assert!(
+            accumulated.is_empty(),
+            "`ActiveQuery::clear` or `ActiveQuery::into_revisions` should've been called"
+        );
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct QueryStack {
+    stack: Vec<ActiveQuery>,
+    len: usize,
+}
+
+impl std::fmt::Debug for QueryStack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            f.debug_list()
+                .entries(self.stack.iter().map(|q| q.database_key_index))
+                .finish()
+        } else {
+            f.debug_struct("QueryStack")
+                .field("stack", &self.stack)
+                .field("len", &self.len)
+                .finish()
         }
     }
+}
 
-    /// Copy the changed-at, durability, and dependencies from `cycle_query`.
-    /// Used during cycle recovery, see [`Runtime::unblock_cycle_and_maybe_throw`].
-    pub(crate) fn take_inputs_from(&mut self, cycle_query: &ActiveQuery) {
-        self.changed_at = cycle_query.changed_at;
-        self.durability = cycle_query.durability;
-        self.input_outputs.clone_from(&cycle_query.input_outputs);
+impl ops::Deref for QueryStack {
+    type Target = [ActiveQuery];
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.stack[..self.len]
+    }
+}
+
+impl ops::DerefMut for QueryStack {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.stack[..self.len]
+    }
+}
+
+impl QueryStack {
+    pub(crate) fn push_new_query(
+        &mut self,
+        database_key_index: DatabaseKeyIndex,
+        iteration_count: IterationCount,
+    ) {
+        if self.len < self.stack.len() {
+            self.stack[self.len].reset_for(database_key_index, iteration_count);
+        } else {
+            self.stack
+                .push(ActiveQuery::new(database_key_index, iteration_count));
+        }
+        self.len += 1;
     }
 
-    pub(super) fn disambiguate(&mut self, hash: u64) -> Disambiguator {
-        let disambiguator = self
-            .disambiguator_map
-            .entry(hash)
-            .or_insert(Disambiguator(0));
-        let result = *disambiguator;
-        disambiguator.0 += 1;
-        result
+    #[cfg(debug_assertions)]
+    pub(crate) fn len(&self) -> usize {
+        self.len
+    }
+
+    pub(crate) fn pop_into_revisions(
+        &mut self,
+        key: DatabaseKeyIndex,
+        #[cfg(debug_assertions)] push_len: usize,
+    ) -> QueryRevisions {
+        #[cfg(debug_assertions)]
+        assert_eq!(push_len, self.len(), "unbalanced push/pop");
+        debug_assert_ne!(self.len, 0, "too many pops");
+        self.len -= 1;
+        debug_assert_eq!(
+            self.stack[self.len].database_key_index, key,
+            "unbalanced push/pop"
+        );
+        self.stack[self.len].top_into_revisions()
+    }
+
+    pub(crate) fn pop(&mut self, key: DatabaseKeyIndex, #[cfg(debug_assertions)] push_len: usize) {
+        #[cfg(debug_assertions)]
+        assert_eq!(push_len, self.len(), "unbalanced push/pop");
+        debug_assert_ne!(self.len, 0, "too many pops");
+        self.len -= 1;
+        debug_assert_eq!(
+            self.stack[self.len].database_key_index, key,
+            "unbalanced push/pop"
+        );
+        self.stack[self.len].clear()
+    }
+}
+
+struct CapturedQuery {
+    database_key_index: DatabaseKeyIndex,
+    durability: Durability,
+    changed_at: Revision,
+    cycle_heads: CycleHeads,
+    iteration_count: IterationCount,
+}
+
+impl fmt::Debug for CapturedQuery {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut debug_struct = f.debug_struct("CapturedQuery");
+        debug_struct
+            .field("database_key_index", &self.database_key_index)
+            .field("durability", &self.durability)
+            .field("changed_at", &self.changed_at);
+        if !self.cycle_heads.is_empty() {
+            debug_struct
+                .field("cycle_heads", &self.cycle_heads)
+                .field("iteration_count", &self.iteration_count);
+        }
+        debug_struct.finish()
+    }
+}
+
+pub struct Backtrace(Box<[CapturedQuery]>);
+
+impl Backtrace {
+    pub fn capture() -> Option<Self> {
+        crate::with_attached_database(|db| {
+            db.zalsa_local().try_with_query_stack(|stack| {
+                Backtrace(
+                    stack
+                        .iter()
+                        .rev()
+                        .map(|query| CapturedQuery {
+                            database_key_index: query.database_key_index,
+                            durability: query.durability,
+                            changed_at: query.changed_at,
+                            cycle_heads: query.cycle_heads.clone(),
+                            iteration_count: query.iteration_count,
+                        })
+                        .collect(),
+                )
+            })
+        })?
+    }
+}
+
+impl fmt::Debug for Backtrace {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "Backtrace ")?;
+
+        let mut dbg = fmt.debug_list();
+
+        for frame in &self.0 {
+            dbg.entry(&frame);
+        }
+
+        dbg.finish()
+    }
+}
+
+impl fmt::Display for Backtrace {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(fmt, "query stacktrace:")?;
+        let full = fmt.alternate();
+        let indent = "             ";
+        for (
+            idx,
+            &CapturedQuery {
+                database_key_index,
+                durability,
+                changed_at,
+                ref cycle_heads,
+                iteration_count,
+            },
+        ) in self.0.iter().enumerate()
+        {
+            write!(fmt, "{idx:>4}: {database_key_index:?}")?;
+            if full {
+                write!(fmt, " -> ({changed_at:?}, {durability:#?}")?;
+                if !cycle_heads.is_empty() || !iteration_count.is_initial() {
+                    write!(fmt, ", iteration = {iteration_count:?}")?;
+                }
+                write!(fmt, ")")?;
+            }
+            writeln!(fmt)?;
+            crate::attach::with_attached_database(|db| {
+                let ingredient = db
+                    .zalsa()
+                    .lookup_ingredient(database_key_index.ingredient_index());
+                let loc = ingredient.location();
+                writeln!(fmt, "{indent}at {}:{}", loc.file, loc.line)?;
+                if !cycle_heads.is_empty() {
+                    write!(fmt, "{indent}cycle heads: ")?;
+                    for (idx, head) in cycle_heads.iter().enumerate() {
+                        if idx != 0 {
+                            write!(fmt, ", ")?;
+                        }
+                        write!(
+                            fmt,
+                            "{:?} -> {:?}",
+                            head.database_key_index, head.iteration_count
+                        )?;
+                    }
+                    writeln!(fmt)?;
+                }
+                Ok(())
+            })
+            .transpose()?;
+        }
+        Ok(())
     }
 }

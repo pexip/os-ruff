@@ -36,12 +36,12 @@
     no_std
 )]
 
+#[cfg(target_os = "wasi")]
+use std::os::fd::{AsFd, AsRawFd};
 #[cfg(target_os = "hermit")]
 use std::os::hermit::io::AsFd;
 #[cfg(unix)]
 use std::os::unix::io::{AsFd, AsRawFd};
-#[cfg(target_os = "wasi")]
-use std::os::wasi::io::{AsFd, AsRawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsHandle, AsRawHandle, BorrowedHandle};
 #[cfg(windows)]
@@ -116,12 +116,12 @@ fn handle_is_console(handle: BorrowedHandle<'_>) -> bool {
 
     let handle = handle.as_raw_handle();
 
-    unsafe {
-        // A null handle means the process has no console.
-        if handle.is_null() {
-            return false;
-        }
+    // A null handle means the process has no console.
+    if handle.is_null() {
+        return false;
+    }
 
+    unsafe {
         let mut out = 0;
         if GetConsoleMode(handle as HANDLE, &mut out) != 0 {
             // False positives aren't possible. If we got a console then we definitely have a console.
@@ -377,6 +377,6 @@ mod tests {
         assert!(file_path.to_string_lossy().len() > MAX_PATH as usize);
         let file = File::create(file_path).expect("Unable to create file");
 
-        assert!(!unsafe { crate::msys_tty_on(file.as_raw_handle() as isize) });
+        assert!(!unsafe { crate::msys_tty_on(file.as_raw_handle()) });
     }
 }

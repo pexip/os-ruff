@@ -15,16 +15,18 @@ macro_rules! setup_accumulator_impl {
             $ingredient:ident,
         ]
     ) => {
+        #[allow(clippy::all)]
+        #[allow(dead_code)]
         const _: () = {
             use salsa::plumbing as $zalsa;
             use salsa::plumbing::accumulator as $zalsa_struct;
 
-            static $CACHE: $zalsa::IngredientCache<$zalsa_struct::IngredientImpl<$Struct>> =
-                $zalsa::IngredientCache::new();
+            fn $ingredient(zalsa: &$zalsa::Zalsa) -> &$zalsa_struct::IngredientImpl<$Struct> {
+                static $CACHE: $zalsa::IngredientCache<$zalsa_struct::IngredientImpl<$Struct>> =
+                    $zalsa::IngredientCache::new();
 
-            fn $ingredient(db: &dyn $zalsa::Database) -> &$zalsa_struct::IngredientImpl<$Struct> {
-                $CACHE.get_or_create(db, || {
-                    db.zalsa().add_or_lookup_jar_by_type(&<$zalsa_struct::JarImpl<$Struct>>::default())
+                $CACHE.get_or_create(zalsa, || {
+                    zalsa.add_or_lookup_jar_by_type::<$zalsa_struct::JarImpl<$Struct>>()
                 })
             }
 
@@ -35,8 +37,8 @@ macro_rules! setup_accumulator_impl {
                 where
                     Db: ?Sized + $zalsa::Database,
                 {
-                    let db = db.as_dyn_database();
-                    $ingredient(db).push(db, self);
+                    let (zalsa, zalsa_local) = db.zalsas();
+                    $ingredient(zalsa).push(zalsa_local, self);
                 }
             }
         };

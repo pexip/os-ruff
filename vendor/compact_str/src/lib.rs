@@ -12,35 +12,15 @@ extern crate alloc;
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::string::String;
-#[doc(hidden)]
+#[doc(hidden)] // Referenced in macros.
 pub use core;
-use core::borrow::{
-    Borrow,
-    BorrowMut,
-};
+use core::borrow::{Borrow, BorrowMut};
 use core::cmp::Ordering;
-use core::hash::{
-    Hash,
-    Hasher,
-};
+use core::hash::{Hash, Hasher};
 use core::iter::FusedIterator;
-use core::ops::{
-    Add,
-    AddAssign,
-    Bound,
-    Deref,
-    DerefMut,
-    RangeBounds,
-};
-use core::str::{
-    FromStr,
-    Utf8Error,
-};
-use core::{
-    fmt,
-    mem,
-    slice,
-};
+use core::ops::{Add, AddAssign, Bound, Deref, DerefMut, RangeBounds};
+use core::str::{FromStr, Utf8Error};
+use core::{fmt, mem, slice};
 #[cfg(feature = "std")]
 use std::ffi::OsStr;
 
@@ -52,10 +32,7 @@ mod repr;
 use repr::Repr;
 
 mod traits;
-pub use traits::{
-    CompactStringExt,
-    ToCompactString,
-};
+pub use traits::{CompactStringExt, ToCompactString};
 
 #[cfg(test)]
 mod tests;
@@ -234,26 +211,6 @@ impl CompactString {
         CompactString(Repr::const_new(text))
     }
 
-    /// Creates a new inline [`CompactString`] at compile time.
-    #[deprecated(
-        since = "0.8.0",
-        note = "replaced by CompactString::const_new, will be removed in 0.9.0"
-    )]
-    #[inline]
-    pub const fn new_inline(text: &'static str) -> Self {
-        CompactString::const_new(text)
-    }
-
-    /// Creates a new inline [`CompactString`] from `&'static str` at compile time.
-    #[deprecated(
-        since = "0.8.0",
-        note = "replaced by CompactString::const_new, will be removed in 0.9.0"
-    )]
-    #[inline]
-    pub const fn from_static_str(text: &'static str) -> Self {
-        CompactString::const_new(text)
-    }
-
     /// Get back the `&'static str` constructed by [`CompactString::const_new`].
     ///
     /// If the string was short enough that it could be inlined, then it was inline, and
@@ -384,10 +341,12 @@ impl CompactString {
     ///
     /// # Safety
     ///
-    /// This function is unsafe because it does not check that the bytes passed to it are valid
-    /// UTF-8. If this constraint is violated, it may cause memory unsafety issues with future users
-    /// of the [`CompactString`], as the rest of the standard library assumes that
-    /// [`CompactString`]s are valid UTF-8.
+    /// * The contents pased to this method must be valid UTF-8.
+    ///
+    /// It's very important that this constraint is upheld because the internals of a
+    /// [`CompactString`] (e.g. determing an inline string versus a heap allocated string) rely on
+    /// the [`CompactString`] containing valid UTF-8. If this constraint is violated any further
+    /// use of the returned [`CompactString`] (including dropping it) can cause undefined behavior.
     ///
     /// # Examples
     ///
@@ -635,7 +594,7 @@ impl CompactString {
     /// ```
     #[inline]
     pub fn as_bytes(&self) -> &[u8] {
-        &self.0.as_slice()[..self.len()]
+        self.0.as_slice()
     }
 
     // TODO: Implement a `try_as_mut_slice(...)` that will fail if it results in cloning?
@@ -1253,24 +1212,38 @@ impl CompactString {
     pub fn retain(&mut self, mut predicate: impl FnMut(char) -> bool) {
         // We iterate over the string, and copy character by character.
 
-        let s = self.as_mut_str();
-        let mut dest_idx = 0;
-        let mut src_idx = 0;
-        while let Some(ch) = s[src_idx..].chars().next() {
+        struct SetLenOnDrop<'a> {
+            self_: &'a mut CompactString,
+            src_idx: usize,
+            dst_idx: usize,
+        }
+
+        let mut g = SetLenOnDrop {
+            self_: self,
+            src_idx: 0,
+            dst_idx: 0,
+        };
+        let s = g.self_.as_mut_str();
+        while let Some(ch) = s[g.src_idx..].chars().next() {
             let ch_len = ch.len_utf8();
             if predicate(ch) {
                 // SAFETY: We know that both indices are valid, and that we don't split a char.
                 unsafe {
                     let p = s.as_mut_ptr();
-                    core::ptr::copy(p.add(src_idx), p.add(dest_idx), ch_len);
+                    core::ptr::copy(p.add(g.src_idx), p.add(g.dst_idx), ch_len);
                 }
-                dest_idx += ch_len;
+                g.dst_idx += ch_len;
             }
-            src_idx += ch_len;
+            g.src_idx += ch_len;
         }
 
-        // SAFETY: We know that the index is a valid position to break the string.
-        unsafe { self.set_len(dest_idx) };
+        impl Drop for SetLenOnDrop<'_> {
+            fn drop(&mut self) {
+                // SAFETY: We know that the index is a valid position to break the string.
+                unsafe { self.self_.set_len(self.dst_idx) };
+            }
+        }
+        drop(g);
     }
 
     /// Decode a bytes slice as UTF-8 string, replacing any illegal codepoints
@@ -2064,7 +2037,7 @@ impl PartialEq<CompactString> for String {
     }
 }
 
-impl<'a> PartialEq<&'a CompactString> for String {
+impl PartialEq<&CompactString> for String {
     fn eq(&self, other: &&CompactString) -> bool {
         self.as_str() == other.as_str()
     }
@@ -2082,7 +2055,7 @@ impl PartialEq<CompactString> for str {
     }
 }
 
-impl<'a> PartialEq<&'a CompactString> for str {
+impl PartialEq<&'_ CompactString> for str {
     fn eq(&self, other: &&CompactString) -> bool {
         self == other.as_str()
     }
@@ -2100,13 +2073,13 @@ impl PartialEq<CompactString> for &&str {
     }
 }
 
-impl<'a> PartialEq<CompactString> for Cow<'a, str> {
+impl PartialEq<CompactString> for Cow<'_, str> {
     fn eq(&self, other: &CompactString) -> bool {
         *self == other.as_str()
     }
 }
 
-impl<'a> PartialEq<CompactString> for &Cow<'a, str> {
+impl PartialEq<CompactString> for &Cow<'_, str> {
     fn eq(&self, other: &CompactString) -> bool {
         *self == other.as_str()
     }
@@ -2118,8 +2091,8 @@ impl PartialEq<String> for &CompactString {
     }
 }
 
-impl<'a> PartialEq<Cow<'a, str>> for &CompactString {
-    fn eq(&self, other: &Cow<'a, str>) -> bool {
+impl PartialEq<Cow<'_, str>> for &CompactString {
+    fn eq(&self, other: &Cow<'_, str>) -> bool {
         self.as_str() == other
     }
 }
@@ -2444,7 +2417,7 @@ impl Extend<CompactString> for CompactString {
     }
 }
 
-impl<'a> Extend<CompactString> for Cow<'a, str> {
+impl Extend<CompactString> for Cow<'_, str> {
     fn extend<T: IntoIterator<Item = CompactString>>(&mut self, iter: T) {
         self.to_mut().extend(iter);
     }
@@ -2686,3 +2659,4 @@ fn unwrap_with_msg_fail<E: fmt::Display>(error: E) -> ! {
 }
 
 static_assertions::assert_eq_size!(CompactString, String);
+static_assertions::assert_eq_size!(Option<CompactString>, CompactString);

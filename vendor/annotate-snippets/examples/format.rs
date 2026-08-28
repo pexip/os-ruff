@@ -1,12 +1,7 @@
-use annotate_snippets::{
-    display_list::{DisplayList, FormatOptions},
-    snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation},
-};
+use annotate_snippets::{Level, Renderer, Snippet};
 
 fn main() {
-    let snippet = Snippet {
-        slices: vec![Slice {
-            source: r#") -> Option<String> {
+    let source = r#") -> Option<String> {
     for ann in annotations {
         match (ann.range.0, ann.range.1) {
             (None, None) => continue,
@@ -27,35 +22,23 @@ fn main() {
             }
             _ => continue,
         }
-    }"#,
-            line_start: 51,
-            origin: Some("src/format.rs"),
-            fold: false,
-            annotations: vec![
-                SourceAnnotation {
-                    label: "expected `Option<String>` because of return type",
-                    annotation_type: AnnotationType::Warning,
-                    range: (5, 19),
-                },
-                SourceAnnotation {
-                    label: "expected enum `std::option::Option`",
-                    annotation_type: AnnotationType::Error,
-                    range: (26, 724),
-                },
-            ],
-        }],
-        title: Some(Annotation {
-            label: Some("mismatched types"),
-            id: Some("E0308"),
-            annotation_type: AnnotationType::Error,
-        }),
-        footer: vec![],
-        opt: FormatOptions {
-            color: true,
-            ..Default::default()
-        },
-    };
+    }"#;
+    let message = Level::Error.title("mismatched types").id("E0308").snippet(
+        Snippet::source(source)
+            .line_start(51)
+            .origin("src/format.rs")
+            .annotation(
+                Level::Warning
+                    .span(5..19)
+                    .label("expected `Option<String>` because of return type"),
+            )
+            .annotation(
+                Level::Error
+                    .span(26..724)
+                    .label("expected enum `std::option::Option`"),
+            ),
+    );
 
-    let dl = DisplayList::from(snippet);
-    println!("{}", dl);
+    let renderer = Renderer::styled();
+    anstream::println!("{}", renderer.render(message));
 }

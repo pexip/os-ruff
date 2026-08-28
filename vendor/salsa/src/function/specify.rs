@@ -1,13 +1,12 @@
-use crossbeam::atomic::AtomicCell;
-
-use crate::{
-    tracked_struct::TrackedStructInDb,
-    zalsa::ZalsaDatabase,
-    zalsa_local::{QueryOrigin, QueryRevisions},
-    AsDynDatabase as _, Database, DatabaseKeyIndex, Id,
-};
-
-use super::{memo::Memo, Configuration, IngredientImpl};
+use crate::accumulator::accumulated_map::InputAccumulatedValues;
+use crate::function::memo::Memo;
+use crate::function::{Configuration, IngredientImpl};
+use crate::revision::AtomicRevision;
+use crate::sync::atomic::AtomicBool;
+use crate::tracked_struct::TrackedStructInDb;
+use crate::zalsa::{Zalsa, ZalsaDatabase};
+use crate::zalsa_local::{QueryOrigin, QueryOriginRef, QueryRevisions, QueryRevisionsExtra};
+use crate::{DatabaseKeyIndex, Id};
 
 impl<C> IngredientImpl<C>
 where
@@ -19,7 +18,7 @@ where
     where
         C::Input<'db>: TrackedStructInDb,
     {
-        let zalsa_local = db.zalsa_local();
+        let (zalsa, zalsa_local) = db.zalsas();
 
         let (active_query_key, current_deps) = match zalsa_local.active_query() {
             Some(v) => v,
@@ -38,9 +37,8 @@ where
         // * Q4 invokes Q2 and then Q1
         //
         // Now, if We invoke Q3 first, We get one result for Q2, but if We invoke Q4 first, We get a different value. That's no good.
-        let database_key_index = <C::Input<'db>>::database_key_index(db.as_dyn_database(), key);
-        let dependency_index = database_key_index.into();
-        if !zalsa_local.is_output_of_active_query(dependency_index) {
+        let database_key_index = <C::Input<'db>>::database_key_index(zalsa, key);
+        if !zalsa_local.is_output_of_active_query(database_key_index) {
             panic!("can only use `specify` on salsa structs created during the current tracked fn");
         }
 
@@ -63,53 +61,61 @@ where
         // - a result that is verified in the current revision, because it was set, which will use the set value
         // - a result that is NOT verified and has untracked inputs, which will re-execute (and likely panic)
 
-        let revision = db.zalsa().current_revision();
+        let revision = zalsa.current_revision();
         let mut revisions = QueryRevisions {
             changed_at: current_deps.changed_at,
             durability: current_deps.durability,
-            origin: QueryOrigin::Assigned(active_query_key),
+            origin: QueryOrigin::assigned(active_query_key),
+            accumulated_inputs: Default::default(),
+            verified_final: AtomicBool::new(true),
+            extra: QueryRevisionsExtra::default(),
         };
 
-        if let Some(old_memo) = self.memo_map.get(key) {
-            self.backdate_if_appropriate(&old_memo, &mut revisions, &value);
-            self.diff_outputs(db, database_key_index, &old_memo, &revisions);
+        let memo_ingredient_index = self.memo_ingredient_index(zalsa, key);
+        if let Some(old_memo) = self.get_memo_from_table_for(zalsa, key, memo_ingredient_index) {
+            self.backdate_if_appropriate(old_memo, database_key_index, &mut revisions, &value);
+            self.diff_outputs(zalsa, database_key_index, old_memo, &mut revisions);
         }
 
         let memo = Memo {
             value: Some(value),
-            verified_at: AtomicCell::new(revision),
+            verified_at: AtomicRevision::from(revision),
             revisions,
         };
 
-        tracing::debug!("specify: about to add memo {:#?} for key {:?}", memo, key);
-        self.insert_memo(db, key, memo);
+        tracing::debug!(
+            "specify: about to add memo {:#?} for key {:?}",
+            memo.tracing_debug(),
+            key
+        );
+        self.insert_memo(zalsa, key, memo, memo_ingredient_index);
 
         // Record that the current query *specified* a value for this cell.
         let database_key_index = self.database_key_index(key);
-        zalsa_local.add_output(database_key_index.into());
+        zalsa_local.add_output(database_key_index);
     }
 
     /// Invoked when the query `executor` has been validated as having green inputs
     /// and `key` is a value that was specified by `executor`.
     /// Marks `key` as valid in the current revision since if `executor` had re-executed,
     /// it would have specified `key` again.
-    pub(super) fn validate_specified_value<Db: ?Sized + Database>(
+    pub(super) fn validate_specified_value(
         &self,
-        db: &Db,
+        zalsa: &Zalsa,
         executor: DatabaseKeyIndex,
         key: Id,
     ) {
-        let zalsa = db.zalsa();
+        let memo_ingredient_index = self.memo_ingredient_index(zalsa, key);
 
-        let memo = match self.memo_map.get(key) {
+        let memo = match self.get_memo_from_table_for(zalsa, key, memo_ingredient_index) {
             Some(m) => m,
             None => return,
         };
 
         // If we are marking this as validated, it must be a value that was
-        // assigneed by `executor`.
-        match memo.revisions.origin {
-            QueryOrigin::Assigned(by_query) => assert_eq!(by_query, executor),
+        // assigned by `executor`.
+        match memo.revisions.origin.as_ref() {
+            QueryOriginRef::Assigned(by_query) => assert_eq!(by_query, executor),
             _ => panic!(
                 "expected a query assigned by `{:?}`, not `{:?}`",
                 executor, memo.revisions.origin,
@@ -117,10 +123,9 @@ where
         }
 
         let database_key_index = self.database_key_index(key);
-        memo.mark_as_verified(
-            db.as_dyn_database(),
-            zalsa.current_revision(),
-            database_key_index,
-        );
+        memo.mark_as_verified(zalsa, database_key_index);
+        memo.revisions
+            .accumulated_inputs
+            .store(InputAccumulatedValues::Empty);
     }
 }

@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.74"
 name = "clap_builder"
-version = "4.5.15"
+version = "4.5.40"
 build = false
 include = [
     "build.rs",
@@ -21,9 +21,9 @@ include = [
     "Cargo.toml",
     "LICENSE*",
     "README.md",
-    "benches/**/*",
     "examples/**/*",
 ]
+autolib = false
 autobins = false
 autoexamples = false
 autotests = false
@@ -59,50 +59,6 @@ features = ["unstable-doc"]
 dependent-version = "upgrade"
 shared-version = true
 tag-name = "v{{version}}"
-
-[lib]
-name = "clap_builder"
-path = "src/lib.rs"
-bench = false
-
-[dependencies.anstream]
-version = "0.6.7"
-optional = true
-
-[dependencies.anstyle]
-version = "1.0.8"
-
-[dependencies.backtrace]
-version = "0.3.73"
-optional = true
-
-[dependencies.clap_lex]
-version = "0.7.0"
-
-[dependencies.strsim]
-version = "0.11.0"
-optional = true
-
-[dependencies.terminal_size]
-version = "0.3.0"
-optional = true
-
-[dependencies.unicase]
-version = "2.6.0"
-optional = true
-
-[dependencies.unicode-width]
-version = "0.1.9"
-optional = true
-
-[dev-dependencies.color-print]
-version = "0.3.6"
-
-[dev-dependencies.static_assertions]
-version = "1.1.0"
-
-[dev-dependencies.unic-emoji-char]
-version = "0.9.0"
 
 [features]
 cargo = []
@@ -147,6 +103,50 @@ wrap_help = [
     "dep:terminal_size",
 ]
 
+[lib]
+name = "clap_builder"
+path = "src/lib.rs"
+bench = false
+
+[dependencies.anstream]
+version = "0.6.7"
+optional = true
+
+[dependencies.anstyle]
+version = "1.0.8"
+
+[dependencies.backtrace]
+version = "0.3.73"
+optional = true
+
+[dependencies.clap_lex]
+version = "0.7.4"
+
+[dependencies.strsim]
+version = "0.11.0"
+optional = true
+
+[dependencies.terminal_size]
+version = "0.4.0"
+optional = true
+
+[dependencies.unicase]
+version = "2.6.0"
+optional = true
+
+[dependencies.unicode-width]
+version = "0.2.0"
+optional = true
+
+[dev-dependencies.color-print]
+version = "0.3.6"
+
+[dev-dependencies.static_assertions]
+version = "1.1.0"
+
+[dev-dependencies.unic-emoji-char]
+version = "0.9.0"
+
 [lints.clippy]
 assigning_clones = "allow"
 blocks_in_conditions = "allow"
@@ -186,7 +186,7 @@ macro_use_imports = "warn"
 mem_forget = "warn"
 multiple_bound_locations = "allow"
 mutex_integer = "warn"
-needless_continue = "warn"
+needless_continue = "allow"
 needless_for_each = "warn"
 negative_feature_names = "warn"
 path_buf_push_overwrite = "warn"
@@ -195,6 +195,7 @@ rc_mutex = "warn"
 redundant_feature_names = "warn"
 ref_option_ref = "warn"
 rest_pat_in_fully_bound_structs = "warn"
+result_large_err = "allow"
 same_functions_in_if_condition = "warn"
 self_named_module_files = "warn"
 semicolon_if_nothing_returned = "warn"
@@ -202,10 +203,12 @@ string_add_assign = "warn"
 string_lit_as_bytes = "warn"
 todo = "warn"
 trait_duplication_in_bounds = "warn"
+uninlined_format_args = "warn"
 verbose_file_reads = "warn"
 zero_sized_map_values = "warn"
 
 [lints.rust]
+unnameable_types = "allow"
 unreachable_pub = "warn"
 unsafe_op_in_unsafe_fn = "warn"
 unused_lifetimes = "warn"

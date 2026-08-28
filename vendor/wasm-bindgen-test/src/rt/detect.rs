@@ -1,5 +1,6 @@
 //! Runtime detection of whether we're in node.js or a browser.
 
+use alloc::string::String;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -11,6 +12,11 @@ extern "C" {
     type Scope;
     #[wasm_bindgen(method, getter, structural)]
     fn constructor(me: &Scope) -> Constructor;
+
+    #[wasm_bindgen(method, getter, structural, js_name = Deno)]
+    fn deno(me: &Scope) -> Option<Deno>;
+
+    type Deno;
 
     type Constructor;
     #[wasm_bindgen(method, getter, structural)]
@@ -27,7 +33,10 @@ pub fn detect() -> Runtime {
             "DedicatedWorkerGlobalScope"
             | "SharedWorkerGlobalScope"
             | "ServiceWorkerGlobalScope" => Runtime::Worker,
-            _ => Runtime::Browser,
+            _ => match scope.deno() {
+                Some(_) => Runtime::Node,
+                _ => Runtime::Browser,
+            },
         },
         None => Runtime::Node,
     }

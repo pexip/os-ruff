@@ -7,10 +7,10 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{fmt, io, thread};
 
-#[cfg(target_arch = "wasm32")]
-use instant::Instant;
 #[cfg(test)]
 use once_cell::sync::Lazy;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 use crate::draw_target::ProgressDrawTarget;
 use crate::state::{AtomicPosition, BarState, ProgressFinish, Reset, TabExpandedString};
@@ -37,7 +37,7 @@ impl fmt::Debug for ProgressBar {
 impl ProgressBar {
     /// Creates a new progress bar with a given length
     ///
-    /// This progress bar by default draws directly to stderr, and refreshes a maximum of 15 times
+    /// This progress bar by default draws directly to stderr, and refreshes a maximum of 20 times
     /// a second. To change the refresh rate, [set] the [draw target] to one with a different refresh
     /// rate.
     ///
@@ -45,6 +45,18 @@ impl ProgressBar {
     /// [draw target]: ProgressDrawTarget
     pub fn new(len: u64) -> Self {
         Self::with_draw_target(Some(len), ProgressDrawTarget::stderr())
+    }
+
+    /// Creates a new progress bar without a specified length
+    ///
+    /// This progress bar by default draws directly to stderr, and refreshes a maximum of 20 times
+    /// a second. To change the refresh rate, [set] the [draw target] to one with a different refresh
+    /// rate.
+    ///
+    /// [set]: ProgressBar::set_draw_target
+    /// [draw target]: ProgressDrawTarget
+    pub fn no_length() -> Self {
+        Self::with_draw_target(None, ProgressDrawTarget::stderr())
     }
 
     /// Creates a completely hidden progress bar
@@ -149,7 +161,7 @@ impl ProgressBar {
     }
 
     /// Sets the tab width (default: 8). All tabs will be expanded to this many spaces.
-    pub fn set_tab_width(&mut self, tab_width: usize) {
+    pub fn set_tab_width(&self, tab_width: usize) {
         let mut state = self.state();
         state.set_tab_width(tab_width);
         state.draw(true, Instant::now()).unwrap();
@@ -223,6 +235,15 @@ impl ProgressBar {
         }
     }
 
+    /// Decrease the position of the progress bar by `delta`
+    pub fn dec(&self, delta: u64) {
+        self.pos.dec(delta);
+        let now = Instant::now();
+        if self.pos.allow(now) {
+            self.tick_inner(now);
+        }
+    }
+
     /// A quick convenience check if the progress bar is hidden
     pub fn is_hidden(&self) -> bool {
         self.state().draw_target.is_hidden()
@@ -263,6 +284,11 @@ impl ProgressBar {
         }
     }
 
+    /// Sets the length of the progress bar to `None`
+    pub fn unset_length(&self) {
+        self.state().unset_length(Instant::now());
+    }
+
     /// Sets the length of the progress bar
     pub fn set_length(&self, len: u64) {
         self.state().set_length(Instant::now(), len);
@@ -271,6 +297,11 @@ impl ProgressBar {
     /// Increase the length of the progress bar
     pub fn inc_length(&self, delta: u64) {
         self.state().inc_length(Instant::now(), delta);
+    }
+
+    /// Decrease the length of the progress bar
+    pub fn dec_length(&self, delta: u64) {
+        self.state().dec_length(Instant::now(), delta);
     }
 
     /// Sets the current prefix of the progress bar

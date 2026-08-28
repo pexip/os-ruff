@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## [0.5.1] - 2024-11-18
+
+### Updated
+
+Internal dependency update: `quick-xml` updated to 0.37.1.
+
+## [0.5.0] - 2024-09-01
+
+### Changed
+
+- The `Output` type, which strips invalid XML characters from a string, has been renamed to
+  `XmlString`.
+- All internal storage now uses `XmlString` rather than `String`.
 
 ## [0.4.0] - 2024-04-18
 
@@ -103,6 +115,7 @@
 
 - Initial version.
 
+[0.5.0]: https://github.com/nextest-rs/quick-junit/releases/tag/quick-junit-0.5.0
 [0.4.0]: https://github.com/nextest-rs/quick-junit/releases/tag/quick-junit-0.4.0
 [0.3.6]: https://github.com/nextest-rs/quick-junit/releases/tag/quick-junit-0.3.6
 [0.3.5]: https://github.com/nextest-rs/nextest/releases/tag/quick-junit-0.3.5

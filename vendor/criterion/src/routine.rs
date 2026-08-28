@@ -2,7 +2,8 @@ use crate::benchmark::BenchmarkConfig;
 use crate::connection::OutgoingMessage;
 use crate::measurement::Measurement;
 use crate::report::{BenchmarkId, Report, ReportContext};
-use crate::{black_box, ActualSamplingMode, Bencher, Criterion};
+use crate::{ActualSamplingMode, Bencher, Criterion};
+use std::hint::black_box;
 use std::marker::PhantomData;
 use std::time::Duration;
 
@@ -37,7 +38,7 @@ pub(crate) trait Routine<M: Measurement, T: ?Sized> {
             .profile(id, report_context, time.as_nanos() as f64);
 
         let mut profile_path = report_context.output_directory.clone();
-        if (*crate::CARGO_CRITERION_CONNECTION).is_some() {
+        if crate::cargo_criterion_connection().is_some() {
             // If connected to cargo-criterion, generate a cargo-criterion-style path.
             // This is kind of a hack.
             profile_path.push("profile");

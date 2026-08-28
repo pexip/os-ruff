@@ -1,5 +1,3 @@
-#![deny(rust_2018_idioms)]
-
 //! A library for formatting of text or programming code snippets.
 //!
 //! It's primary purpose is to build an ASCII-graphical representation of the snippet
@@ -7,48 +5,46 @@
 //!
 //! # Example
 //!
-//! ```text
-//! error[E0308]: mismatched types
-//!   --> src/format.rs:52:1
-//!    |
-//! 51 |   ) -> Option<String> {
-//!    |        -------------- expected `Option<String>` because of return type
-//! 52 | /     for ann in annotations {
-//! 53 | |         match (ann.range.0, ann.range.1) {
-//! 54 | |             (None, None) => continue,
-//! 55 | |             (Some(start), Some(end)) if start > end_index => continue,
-//! ...  |
-//! 71 | |         }
-//! 72 | |     }
-//!    | |_____^ expected enum `std::option::Option`, found ()
+//! ```rust
+#![doc = include_str!("../examples/expected_type.rs")]
 //! ```
+//!
+#![doc = include_str!("../examples/expected_type.svg")]
 //!
 //! The crate uses a three stage process with two conversions between states:
 //!
 //! ```text
-//! Snippet --> DisplayList --> String
+//! Message --> Renderer --> impl Display
 //! ```
 //!
-//! The input type - [Snippet](self::snippet) is a structure designed
+//! The input type - [Message] is a structure designed
 //! to align with likely output from any parser whose code snippet is to be
 //! annotated.
 //!
-//! The middle structure - [DisplayList](self::display_list) is a
-//! structure designed to store the snippet data converted into a vector
-//! of lines containing semantic information about each line.
-//! This structure is the easiest to manipulate and organize.
+//! The middle structure - [Renderer] is a structure designed
+//! to convert a snippet into an internal structure that is designed to store
+//! the snippet data in a way that is easy to format.
+//! [Renderer] also handles the user-configurable formatting
+//! options, such as color, or margins.
 //!
 //! Finally, `impl Display` into a final `String` output.
 //!
-//! A user of the crate may choose to provide their own equivalent of the input
-//! structure with an `Into<DisplayList>` trait.
-//!
-//! A user of the crate may also choose to provide their own formatter logic,
-//! to convert a `DisplayList` into a `String`, or just a `Stylesheet` to
-//! use the crate's formatting logic, but with a custom stylesheet.
-// TODO: check documentation
+//! # features
+//! - `testing-colors` - Makes [Renderer::styled] colors OS independent, which
+//! allows for easier testing when testing colored output. It should be added as
+//! a feature in `[dev-dependencies]`, which can be done with the following command:
+//! ```text
+//! cargo add annotate-snippets --dev --feature testing-colors
+//! ```
 
-pub mod display_list;
-pub mod formatter;
-pub mod snippet;
-pub mod stylesheets;
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![warn(clippy::print_stderr)]
+#![warn(clippy::print_stdout)]
+#![warn(missing_debug_implementations)]
+
+pub mod renderer;
+mod snippet;
+
+#[doc(inline)]
+pub use renderer::Renderer;
+pub use snippet::*;

@@ -1,6 +1,7 @@
-use std::thread::ThreadId;
-
-use crate::{key::DatabaseKeyIndex, key::DependencyIndex};
+use crate::cycle::IterationCount;
+use crate::key::DatabaseKeyIndex;
+use crate::sync::thread::{self, ThreadId};
+use crate::Revision;
 
 /// The `Event` struct identifies various notable things that can
 /// occur during salsa execution. Instances of this struct are given
@@ -12,6 +13,15 @@ pub struct Event {
 
     /// What sort of event was it.
     pub kind: EventKind,
+}
+
+impl Event {
+    pub fn new(kind: EventKind) -> Self {
+        Self {
+            thread_id: thread::current().id(),
+            kind,
+        }
+    }
 }
 
 /// An enum identifying the various kinds of events that can occur.
@@ -49,6 +59,13 @@ pub enum EventKind {
         database_key: DatabaseKeyIndex,
     },
 
+    WillIterateCycle {
+        /// The database-key for the cycle head. Implements `Debug`.
+        database_key: DatabaseKeyIndex,
+        iteration_count: IterationCount,
+        fell_back: bool,
+    },
+
     /// Indicates that `unwind_if_cancelled` was called and salsa will check if
     /// the current revision has been cancelled.
     WillCheckCancellation,
@@ -64,7 +81,7 @@ pub enum EventKind {
         execute_key: DatabaseKeyIndex,
 
         /// Key for the query that is no longer output
-        output_key: DependencyIndex,
+        output_key: DatabaseKeyIndex,
     },
 
     /// Tracked structs or memoized data were discarded (freed).
@@ -79,6 +96,33 @@ pub enum EventKind {
         executor_key: DatabaseKeyIndex,
 
         /// Accumulator that was accumulated into
-        accumulator: DependencyIndex,
+        accumulator: DatabaseKeyIndex,
+    },
+
+    /// Indicates that a value was newly interned.
+    DidInternValue {
+        // The key of the interned value.
+        key: DatabaseKeyIndex,
+
+        // The revision the value was interned in.
+        revision: Revision,
+    },
+
+    /// Indicates that a value was interned by reusing an existing slot.
+    DidReuseInternedValue {
+        // The key of the interned value.
+        key: DatabaseKeyIndex,
+
+        // The revision the value was interned in.
+        revision: Revision,
+    },
+
+    /// Indicates that a previously interned value was read in a new revision.
+    DidValidateInternedValue {
+        // The key of the interned value.
+        key: DatabaseKeyIndex,
+
+        // The revision the value was interned in.
+        revision: Revision,
     },
 }

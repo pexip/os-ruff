@@ -4,19 +4,18 @@
 
 mod common;
 use common::LogDatabase;
-
 use expect_test::expect;
 use salsa::Setter;
 use test_log::test;
 
-#[salsa::input]
+#[salsa::input(debug)]
 struct MyInput {
     field: u32,
 }
 
 #[salsa::tracked]
 fn final_result(db: &dyn LogDatabase, input: MyInput) -> u32 {
-    db.push_log(format!("final_result({:?})", input));
+    db.push_log(format!("final_result({input:?})"));
     let mut sum = 0;
     for tracked_struct in create_tracked_structs(db, input) {
         sum += contribution_from_struct(db, tracked_struct);
@@ -31,7 +30,7 @@ struct MyTracked<'db> {
 
 #[salsa::tracked]
 fn create_tracked_structs(db: &dyn LogDatabase, input: MyInput) -> Vec<MyTracked<'_>> {
-    db.push_log(format!("intermediate_result({:?})", input));
+    db.push_log(format!("intermediate_result({input:?})"));
     (0..input.field(db))
         .map(|i| MyTracked::new(db, i))
         .collect()
@@ -67,9 +66,9 @@ fn basic() {
     db.assert_logs(expect![[r#"
         [
             "intermediate_result(MyInput { [salsa id]: Id(0), field: 2 })",
-            "salsa_event(WillDiscardStaleOutput { execute_key: create_tracked_structs(0), output_key: MyTracked(2) })",
-            "salsa_event(DidDiscard { key: MyTracked(2) })",
-            "salsa_event(DidDiscard { key: contribution_from_struct(2) })",
+            "salsa_event(WillDiscardStaleOutput { execute_key: create_tracked_structs(Id(0)), output_key: MyTracked(Id(402)) })",
+            "salsa_event(DidDiscard { key: MyTracked(Id(402)) })",
+            "salsa_event(DidDiscard { key: contribution_from_struct(Id(402)) })",
             "final_result(MyInput { [salsa id]: Id(0), field: 2 })",
         ]"#]]);
 }
