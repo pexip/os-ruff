@@ -1,3 +1,9 @@
+ruff (0.12.1+pexip25u1) pexip-trixie; urgency=medium
+
+  * New upstream release
+
+ -- Michael Oultram <michael.oultram@pexip.com>  Fri, 28 Aug 2026 14:15:01 +0100
+
 ruff (0.6.1+pexip25u2) pexip-trixie; urgency=medium
 
   * Trixie build for product distribution
